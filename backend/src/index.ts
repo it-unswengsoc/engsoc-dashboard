@@ -1,13 +1,10 @@
+import 'dotenv/config';
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import dotenv from 'dotenv';
 import apiRoutes from './routes/api';
 import authRoutes from './routes/auth';
-
-// Load environment variables
-dotenv.config();
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
