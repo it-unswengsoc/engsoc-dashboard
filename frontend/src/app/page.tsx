@@ -1,37 +1,27 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import styles from './page.module.css';
+import { useRouter } from 'next/navigation';
+import NavBar from '@/components/Navbar';
 
 export default function Home() {
-  const [message, setMessage] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    fetch('/api/health')
-      .then((res) => res.json())
-      .then((data) => {
-        setMessage(data.message);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Failed to fetch from backend:', err);
-        setMessage('Backend not connected');
-        setLoading(false);
-      });
-  }, []);
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.replace('/login');
+    } else {
+      setReady(true);
+    }
+  }, [router]);
+
+  if (!ready) return null;
 
   return (
-    <main className={styles.main}>
-      <div className={styles.container}>
-        <h1>EngSoc Dashboard</h1>
-        <p className={styles.status}>
-          Backend Status: {loading ? 'Checking...' : message}
-        </p>
-        <p className={styles.description}>
-          Welcome to the Engineering Society Dashboard
-        </p>
-      </div>
+    <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
+      <h1>Welcome to EngSoc Dashboard</h1>
     </main>
   );
 }

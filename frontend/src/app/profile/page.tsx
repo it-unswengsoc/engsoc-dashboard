@@ -2,15 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-interface Profile {
-  id: number;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  createdAt: string;
-}
+import { getProfile } from '@/services/auth';
+import type { Profile } from '@/services/auth';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -26,21 +19,16 @@ export default function ProfilePage() {
       return;
     }
 
-    fetch('http://localhost:5001/api/auth/profile', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (res.status === 401) {
+    getProfile(token)
+      .then(setProfile)
+      .catch((err) => {
+        if (err.message === 'Unauthorized') {
           sessionStorage.removeItem('token');
           router.push('/login');
-          return null;
+        } else {
+          setError('Failed to load profile');
         }
-        return res.json();
       })
-      .then((data) => {
-        if (data) setProfile(data.data);
-      })
-      .catch(() => setError('Failed to load profile'))
       .finally(() => setLoading(false));
   }, [router]);
 

@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { login } from '@/services/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,24 +17,11 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5001/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.message || 'Login failed');
-        return;
-      }
-
-      sessionStorage.setItem('token', data.data.token);
-      console.log(data.data.token);
-      router.push('/profile');
-    } catch {
-      setError('Could not connect to server');
+      const data = await login(email, password);
+      sessionStorage.setItem('token', data.token);
+      router.push('/');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not connect to server');
     } finally {
       setLoading(false);
     }
