@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import apiRoutes from './routes/api';
 import authRoutes from './routes/auth';
 import eventRoutes from './routes/events';
+import notificationRoutes from './routes/notifications';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -23,6 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/event', eventRoutes);
+app.use('/api/notification', notificationRoutes);
 app.use('/api', apiRoutes);
 
 // Health check endpoint
