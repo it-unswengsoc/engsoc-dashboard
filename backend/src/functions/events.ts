@@ -36,6 +36,7 @@ export interface UpdateEventInput {
 }
 
 /**
+ * Stuart
  * Retrieves all events from the database, ordered by event date ascending.
  * Returns an array of events, or an empty array if none exist.
  */
@@ -45,6 +46,7 @@ export async function getAllEvents(): Promise<Event[]> {
 }
 
 /**
+ * Emma
  * Retrieves a single event by its ID.
  * Returns the event if found, or null if no event exists with the given ID.
  */
@@ -54,6 +56,7 @@ export async function getEventById(eventId: number): Promise<Event | null> {
 }
 
 /**
+ * Ethan
  * Creates a new event with the provided details.
  * Returns the newly created event, or null if creation failed.
  */
@@ -63,6 +66,7 @@ export async function createEvent(input: CreateEventInput): Promise<Event | null
 }
 
 /**
+ * Stuart
  * Updates an existing event identified by eventId with the provided fields.
  * Only the fields present in input will be updated.
  * Returns the updated event if successful, or null if the event was not found.
@@ -76,6 +80,7 @@ export async function updateEvent(
 }
 
 /**
+ * Emma
  * Deletes an event by its ID.
  * Returns true if the event was deleted, or false if no event was found with the given ID.
  */
