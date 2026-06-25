@@ -20,7 +20,7 @@ const roboto = Roboto({
   subsets: ['latin'],
   weight: ['100', '300', '400', '500', '700', '900'],
   style: ['normal', 'italic'],
-  variable: '--font-roboto',
+  variable: '--next-font-roboto',
   display: 'swap',
 });
 

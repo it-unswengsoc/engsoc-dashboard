@@ -11,7 +11,7 @@ interface StatCardProps {
 export default function StatCard({ label, value, colour }: StatCardProps) {
   return (
     // bg-white = white background, rounded-lg = rounded corners, border = subtle outline, p-5 = space inside 5pixels
-    <div className="bg-white rounded-xl border border-[#8A94A3] w-[50%] flex overflow-hidden">
+    <div className="bg-white rounded-xl border border-[#8A94A3] flex flex-1 overflow-hidden">
       <div className="w-2 shrink-0" style={{ backgroundColor: colour }}></div>
 
       <div className="p-5">

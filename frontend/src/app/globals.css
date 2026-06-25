@@ -3,5 +3,5 @@
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-ibm-plex-mono), ui-monospace, monospace;
-  --font-roboto: var(--font-roboto), ui-sans-serif, system-ui, sans-serif;
+  --font-roboto: var(--next-font-roboto), ui-sans-serif, system-ui, sans-serif;
 }
