@@ -1,5 +1,5 @@
 import { Pool, QueryResult } from 'pg';
-
+import { dbGetEventById, dbDeleteEvent } from '../database/events'
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
@@ -51,8 +51,16 @@ export async function getAllEvents(): Promise<Event[]> {
  * Returns the event if found, or null if no event exists with the given ID.
  */
 export async function getEventById(eventId: number): Promise<Event | null> {
-  // TODO: implement
-  throw new Error('Not implemented');
+  try {
+    const event = await dbGetEventById(eventId);
+    if (event) {
+      return event; 
+    }
+    return null;
+  } catch (error) {
+    console.error('Get event error:', error);
+    return null;
+  }
 }
 
 /**
@@ -85,8 +93,14 @@ export async function updateEvent(
  * Returns true if the event was deleted, or false if no event was found with the given ID.
  */
 export async function deleteEvent(eventId: number): Promise<boolean> {
-  // TODO: implement
-  throw new Error('Not implemented');
+  
+  try {
+    const result = await dbDeleteEvent(eventId);
+    return result;
+  } catch (error) {
+    console.error('Delete event error:', error);
+    return false;
+  }
 }
 
 export default pool;
