@@ -93,9 +93,9 @@ export default function HomePage() {
             </div>
 
             <div className="divide-y divide-gray-200 border-t border-gray-200">
-              <TaskRow days_till_due={0} name={"finish wireframe"} dateString={"Mon, 1 June"} time={"9:30PM"} />
-              <TaskRow days_till_due={4} name={"port meeting"} dateString={"Thu, 4 June"} time={"9:30PM"} />
-              <TaskRow days_till_due={7} name={"team call"} dateString={"Mon, 8 June"} time={"9:30PM"} />
+              <TaskRow daysTillDue={0} name={"finish wireframe"} dateString={"Mon, 1 June"} time={"9:30PM"} />
+              <TaskRow daysTillDue={4} name={"port meeting"} dateString={"Thu, 4 June"} time={"9:30PM"} />
+              <TaskRow daysTillDue={7} name={"team call"} dateString={"Mon, 8 June"} time={"9:30PM"} />
             </div>
           </div>
 

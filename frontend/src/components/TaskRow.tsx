@@ -1,5 +1,5 @@
 interface TaskRowProps {
-  days_till_due: number;     // e.g. "5"
+  daysTillDue: number;     // e.g. "5"
   name: string;      // e.g. "Edit cover photo"
   dateString: string; // e.g. "Mon, 1 June"
   time: string;      // e.g. "9:30PM"
@@ -23,8 +23,8 @@ function getBadge(days: number): { label: string; styles: string } {
   };
 }
 
-export default function TaskRow({ days_till_due, name, dateString, time }: TaskRowProps) {
-  const badge = getBadge(days_till_due);
+export default function TaskRow({ daysTillDue, name, dateString, time }: TaskRowProps) {
+  const badge = getBadge(daysTillDue);
 
   return (
     <div className="flex items-center gap-3 px-4 py-3">
