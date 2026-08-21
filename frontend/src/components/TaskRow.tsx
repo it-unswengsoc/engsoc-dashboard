@@ -27,21 +27,21 @@ export default function TaskRow({ days_till_due, name, dateString, time }: TaskR
   const badge = getBadge(days_till_due);
 
   return (
-    <div className="flex items-center gap-4 px-6 py-5">
+    <div className="flex items-center gap-3 px-4 py-3">
       {/* Checkbox */}
       <input
         type="checkbox"
-        className="h-14 w-14 shrink-0 cursor-pointer appearance-none rounded-xl border border-gray-300 bg-white transition-colors checked:border-gray-400 checked:bg-gray-100"
+        className="h-9 w-9 shrink-0 cursor-pointer appearance-none rounded-lg border border-gray-300 bg-white transition-colors checked:border-gray-400 checked:bg-gray-100"
       />
 
       {/* Task details */}
-      <div className="flex flex-col gap-1.5">
-        <p className="text-xl font-bold text-gray-900">{name}</p>
-        <div className="flex items-center gap-2">
-          <span className={`rounded px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wide ${badge.styles}`}>
+      <div className="flex flex-col gap-1">
+        <p className="text-sm font-bold text-gray-900">{name}</p>
+        <div className="flex items-center gap-1.5">
+          <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${badge.styles}`}>
             {badge.label}
           </span>
-          <span className="font-mono text-sm text-gray-400">
+          <span className="font-mono text-xs text-gray-400">
             {dateString} {time}
           </span>
         </div>
