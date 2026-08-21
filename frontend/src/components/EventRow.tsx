@@ -9,23 +9,34 @@ interface EventRowProps {
   time: string;      // e.g. "9:30PM"
 }
 
-// TODO: Style this component to match the design
-// - a small date block on the left: month abbreviation in red above a bold day number
-// - event name in bold next to it
-// - a badge below the name: INTERNAL = dark filled, EXTERNAL = outlined
-// - small grey text showing the date and time next to the badge
 export default function EventRow({ month, day, name, type, dateString, time }: EventRowProps) {
+  const badgeStyles =
+    type === 'EXTERNAL'
+      ? 'bg-[#F1C4C9] text-[#8B2E38]'
+      : 'bg-gray-200 text-gray-700';
+
   return (
-    <div>
-      <div>
-        <p>{month}</p>
-        <p>{day}</p>
+    <div className="flex items-center gap-4 px-6 py-5">
+      {/* Calendar chip */}
+      <div className="flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-xl border border-gray-200 bg-white">
+        <span className="text-xs font-bold uppercase tracking-wide text-[#8B2E38]">
+          {month}
+        </span>
+        <span className="text-2xl font-bold leading-none text-gray-900">
+          {day}
+        </span>
       </div>
-      <div>
-        <p>{name}</p>
-        <div>
-          <span>{type}</span>
-          <span>{dateString} {time}</span>
+
+      {/* Event details */}
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xl font-bold text-gray-900">{name}</p>
+        <div className="flex items-center gap-2">
+          <span className={`rounded px-2 py-0.5 font-mono text-xs font-bold uppercase tracking-wide ${badgeStyles}`}>
+            {type}
+          </span>
+          <span className="font-mono text-sm text-gray-400">
+            {dateString} {time}
+          </span>
         </div>
       </div>
     </div>
