@@ -2,8 +2,21 @@ import EventRow from "@/components/EventRow";
 import StatCard from "@/components/StatCard";
 import TaskRow from "@/components/TaskRow";
 import AnnouncementRow from "@/components/AnnouncementRow";
+import {
+  getUpcomingEvents,
+  getOpenTasks,
+  getRecentAnnouncements,
+  getDashboardStats,
+} from "@/services/dashboard";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [stats, events, tasks, announcements] = await Promise.all([
+    getDashboardStats(),
+    getUpcomingEvents(),
+    getOpenTasks(),
+    getRecentAnnouncements(),
+  ]);
+
   return (
     <div>
       <div className="flex items-start justify-between">
@@ -20,9 +33,9 @@ export default function HomePage() {
 
       {/* UPPER BOX SECTION */}
       <div className="mt-6 mr-78 flex flex-wrap justify-evenly gap-5">
-        <StatCard label={"OPEN TASKS"} value={"5/9"} colour={"#F4EFD3"} />
-        <StatCard label={"UPCOMING EVENTS"} value={"4"} colour={"#B1C9DC"} />
-        <StatCard label={"NEW ANNOUNCEMENTS"} value={"6"} colour={"#ED6672"} />
+        <StatCard label={"OPEN TASKS"} value={stats.openTasks} colour={"#F4EFD3"} />
+        <StatCard label={"UPCOMING EVENTS"} value={stats.upcomingEvents} colour={"#B1C9DC"} />
+        <StatCard label={"NEW ANNOUNCEMENTS"} value={stats.newAnnouncements} colour={"#ED6672"} />
       </div>
 
       {/* BELOW SECTION */}
@@ -44,19 +57,9 @@ export default function HomePage() {
 
           {/* ANNOUNCEMENT ROWS */}
           <div className="mt-4 flex flex-col gap-4">
-            <AnnouncementRow
-              posterName="Ethan"
-              posterRole="Socials VP"
-              posterAvatar="https://placehold.co/64x64"
-              image="https://placehold.co/900x500"
-              description="Love Roulette is our annual dating show hosted by Jenny Tang from Socials. This year Engsoc. Decided to partner up with BESS to bring us the most entertaining and fun experience yet."
-            />
-            <AnnouncementRow
-              posterName="Ethan"
-              posterRole="Socials VP"
-              posterAvatar="https://placehold.co/64x64"
-              description="A quick text-only announcement with no attached image."
-            />
+            {announcements.map((announcement) => (
+              <AnnouncementRow key={announcement.id} {...announcement} />
+            ))}
           </div>
         </div>
 
@@ -70,9 +73,9 @@ export default function HomePage() {
             </h2>
 
             <div className="divide-y divide-gray-200 border-t border-gray-200">
-              <EventRow month={"JUL"} day={5} name={"NAME"} type={"INTERNAL"} dateString={"05/08/26"} time={"9:30pm"}/>
-              <EventRow month={"AUG"} day={5} name={"NAME"} type={"EXTERNAL"} dateString={"21/08/26"} time={"7:30pm"}/>
-              <EventRow month={"AUG"} day={5} name={"NAME"} type={"EXTERNAL"} dateString={"21/08/26"} time={"7:30pm"}/>
+              {events.map((event) => (
+                <EventRow key={event.id} {...event} />
+              ))}
             </div>
 
             <div className="border-t border-gray-200 p-3">
@@ -93,9 +96,9 @@ export default function HomePage() {
             </div>
 
             <div className="divide-y divide-gray-200 border-t border-gray-200">
-              <TaskRow daysTillDue={0} name={"finish wireframe"} dateString={"Mon, 1 June"} time={"9:30PM"} />
-              <TaskRow daysTillDue={4} name={"port meeting"} dateString={"Thu, 4 June"} time={"9:30PM"} />
-              <TaskRow daysTillDue={7} name={"team call"} dateString={"Mon, 8 June"} time={"9:30PM"} />
+              {tasks.map((task) => (
+                <TaskRow key={task.id} {...task} />
+              ))}
             </div>
           </div>
 
