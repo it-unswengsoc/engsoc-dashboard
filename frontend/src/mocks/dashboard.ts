@@ -1,32 +1,44 @@
 import type { EventItem, TaskItem, AnnouncementItem } from '@/services/dashboard';
 
 /* Dates are stored as ISO strings so the display bits (month chip, "3 days"
-   badge, etc.) can be derived instead of going stale in here. */
+   badge, etc.) can be derived instead of going stale in here.
+
+   They're generated relative to today so the mock never rots — hardcoded dates
+   would drift into the past and make every task read as DUE. Swap `at()` for
+   real ISO strings once this comes from the API. */
+function at(daysFromToday: number, time: string): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromToday);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T${time}`;
+}
 
 export const mockEvents: EventItem[] = [
   {
     id: 1,
     name: 'Careers Night',
     type: 'INTERNAL',
-    startsAt: '2026-07-05T21:30:00',
+    startsAt: at(2, '21:30'),
   },
   {
     id: 2,
     name: 'Love Roulette',
     type: 'EXTERNAL',
-    startsAt: '2026-08-21T19:30:00',
+    startsAt: at(9, '19:30'),
   },
   {
     id: 3,
     name: 'BESS x Engsoc BBQ',
     type: 'EXTERNAL',
-    startsAt: '2026-08-28T12:00:00',
+    startsAt: at(23, '12:00'),
   },
   {
     id: 4,
     name: 'End of Term Ball',
     type: 'EXTERNAL',
-    startsAt: '2026-09-12T18:00:00',
+    startsAt: at(40, '18:00'),
   },
 ];
 
@@ -34,31 +46,31 @@ export const mockTasks: TaskItem[] = [
   {
     id: 1,
     name: 'finish wireframe',
-    dueAt: '2026-06-01T21:30:00',
+    dueAt: at(0, '21:30'),
     completed: false,
   },
   {
     id: 2,
     name: 'port meeting',
-    dueAt: '2026-06-04T21:30:00',
+    dueAt: at(3, '21:30'),
     completed: false,
   },
   {
     id: 3,
     name: 'team call',
-    dueAt: '2026-06-08T21:30:00',
+    dueAt: at(12, '21:30'),
     completed: false,
   },
   {
     id: 4,
     name: 'send sponsor deck',
-    dueAt: '2026-06-15T17:00:00',
+    dueAt: at(-6, '17:00'),
     completed: true,
   },
   {
     id: 5,
     name: 'book venue',
-    dueAt: '2026-06-20T17:00:00',
+    dueAt: at(-2, '17:00'),
     completed: true,
   },
 ];
@@ -72,7 +84,7 @@ export const mockAnnouncements: AnnouncementItem[] = [
     image: 'https://placehold.co/900x500',
     description:
       'Love Roulette is our annual dating show hosted by Jenny Tang from Socials. This year Engsoc. Decided to partner up with BESS to bring us the most entertaining and fun experience yet.',
-    postedAt: '2026-08-20T10:00:00',
+    postedAt: at(-1, '10:00'),
     read: false,
   },
   {
@@ -81,7 +93,7 @@ export const mockAnnouncements: AnnouncementItem[] = [
     posterRole: 'Socials VP',
     posterAvatar: 'https://placehold.co/64x64',
     description: 'A quick text-only announcement with no attached image.',
-    postedAt: '2026-08-18T09:15:00',
+    postedAt: at(-3, '09:15'),
     read: false,
   },
   {
@@ -92,7 +104,7 @@ export const mockAnnouncements: AnnouncementItem[] = [
     image: 'https://placehold.co/900x500',
     description:
       'Reminder: all event graphics need to be submitted to the marketing drive at least two weeks before the event date.',
-    postedAt: '2026-08-14T16:40:00',
+    postedAt: at(-8, '16:40'),
     read: true,
   },
 ];

@@ -1,3 +1,7 @@
+'use client';
+
+import { useState } from 'react';
+
 interface TaskRowProps {
   daysTillDue: number;     // e.g. "5"
   name: string;      // e.g. "Edit cover photo"
@@ -25,18 +29,42 @@ function getBadge(days: number): { label: string; styles: string } {
 
 export default function TaskRow({ daysTillDue, name, dateString, time }: TaskRowProps) {
   const badge = getBadge(daysTillDue);
+  const [done, setDone] = useState(false);
 
   return (
     <div className="flex items-center gap-3 px-4 py-3">
-      {/* Checkbox */}
-      <input
-        type="checkbox"
-        className="h-9 w-9 shrink-0 cursor-pointer appearance-none rounded-lg border border-gray-300 bg-white transition-colors checked:border-gray-400 checked:bg-gray-100"
-      />
+      {/* Checkbox — red border on hover, red fill + tick once checked */}
+      <label className="relative h-9 w-9 shrink-0 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={done}
+          onChange={(e) => setDone(e.target.checked)}
+          className="h-full w-full cursor-pointer appearance-none rounded-lg border border-gray-300 bg-white transition-colors hover:border-2 hover:border-[#ED6672] checked:border-0 checked:bg-[#ED6672]"
+        />
+        {done && (
+          <svg
+            className="pointer-events-none absolute inset-0 m-auto h-5 w-5 text-white"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={3}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            viewBox="0 0 24 24"
+          >
+            <path d="M5 13l4 4L19 7" />
+          </svg>
+        )}
+      </label>
 
       {/* Task details */}
       <div className="flex flex-col gap-1">
-        <p className="text-sm font-bold text-gray-900">{name}</p>
+        <p
+          className={`text-sm font-bold transition-colors ${
+            done ? 'text-gray-400 line-through' : 'text-gray-900'
+          }`}
+        >
+          {name}
+        </p>
         <div className="flex items-center gap-1.5">
           <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${badge.styles}`}>
             {badge.label}

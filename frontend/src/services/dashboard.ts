@@ -159,8 +159,9 @@ export async function getAnnouncements(): Promise<AnnouncementItem[]> {
 /* Soonest first, capped so the sidebar card doesn't blow out */
 export async function getUpcomingEvents(limit = 3): Promise<EventRowData[]> {
   const events = await getEvents();
+  const now = Date.now();
   return events
-    .slice()
+    .filter((e) => new Date(e.startsAt).getTime() >= now)
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
     .slice(0, limit)
     .map(toEventRow);
