@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { dbCreateNotification, dbDeleteNotification } from '../database/notifications';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -51,8 +52,13 @@ export async function getNotificationById(notificationId: number): Promise<Notif
 export async function createNotification(
   input: CreateNotificationInput
 ): Promise<Notification | null> {
-  // TODO: implement
-  throw new Error('Not implemented');
+  try {
+    const result = await dbCreateNotification(input)
+    return result
+  } catch (error) {
+    console.error('Create Notification error:', error);
+    return null;
+  }
 }
 
 /**
@@ -83,8 +89,13 @@ export async function markAllNotificationsRead(userId: number): Promise<number> 
  * Returns true if the notification was deleted, or false if no notification was found with the given ID.
  */
 export async function deleteNotification(notificationId: number): Promise<boolean> {
-  // TODO: implement
-  throw new Error('Not implemented');
+  try {
+    const result = await dbDeleteNotification(notificationId);
+    return result;
+  } catch (error) {
+    console.error('Delete notification error', error);
+    return false;
+  }
 }
 
 export default pool;
