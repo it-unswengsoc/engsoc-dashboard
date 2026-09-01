@@ -12,6 +12,7 @@ export interface Event {
   location: string | null;
   organizerId: number;
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+  eventType: 'internal' | 'external';
   capacity: number | null;
   createdAt: string;
   updatedAt: string;
