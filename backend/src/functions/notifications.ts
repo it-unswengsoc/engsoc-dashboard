@@ -1,5 +1,6 @@
 import { Pool } from 'pg';
-import { dbCreateNotification, dbDeleteNotification } from '../database/notifications';
+import { dbCreateNotification, dbDeleteNotification, dbGetNotificationsForUser, dbMarkNotificationRead } from '../database/notifications';
+import { dbGetAllEvents } from '../database/events';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -31,7 +32,12 @@ export interface CreateNotificationInput {
  */
 export async function getNotificationsForUser(userId: number): Promise<Notification[]> {
   // TODO: implement
-  throw new Error('Not implemented');
+  try {
+    const result = await dbGetNotificationsForUser(userId);
+    return result;
+  } catch (error) {
+    throw error;
+  }
 }
 
 /**
@@ -69,8 +75,12 @@ export async function createNotification(
 export async function markNotificationRead(
   notificationId: number
 ): Promise<Notification | null> {
-  // TODO: implement
-  throw new Error('Not implemented');
+  try {
+    const result = await dbMarkNotificationRead(notificationId);
+    return result;
+  } catch (error) {
+    throw error;
+  }
 }
 
 /**
