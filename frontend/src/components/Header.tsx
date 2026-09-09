@@ -1,22 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { getProfile } from '@/services/auth-api';
 
-const pageTitles: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/dashboard/calendar': 'Calendar',
-  '/dashboard/documents': 'Documents',
-  '/dashboard/settings': 'Settings',
-};
-
 export default function Header() {
-  const pathname = usePathname();
   const [initials, setInitials] = useState('');
-
-  const title = pageTitles[pathname] ?? 'Dashboard';
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
@@ -32,27 +21,25 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-200">
-      <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-4 px-8 py-2 bg-white border-b border-gray-200">
+      {/* Search bar — TODO: wire up to search API */}
+      <div className="relative flex-1 max-w-md">
+        <input
+          type="text"
+          placeholder="Search..."
+          className="pl-9 pr-4 py-2 text-sm bg-gray-100 border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white w-full transition-colors"
+        />
+        <svg
+          className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
 
       <div className="flex items-center gap-3">
-        {/* Search bar — TODO: wire up to search API */}
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search..."
-            className="pl-9 pr-4 py-2 text-sm bg-gray-100 border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white w-56 transition-colors"
-          />
-          <svg
-            className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-
         {/* Notifications — TODO: wire up to notifications API, add red dot for unread */}
         <button className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,7 +50,7 @@ export default function Header() {
         {/* User avatar — links to profile page */}
         <Link
           href="/profile"
-          className="w-9 h-9 rounded-md bg-blue-600 text-white text-sm font-bold flex items-center justify-center hover:bg-blue-700 transition-colors"
+          className="w-9 h-9 rounded-full bg-[#B1C9DC] text-white text-sm font-bold flex items-center justify-center hover:bg-[#9db8cd] transition-colors"
         >
           {initials || '?'}
         </Link>
