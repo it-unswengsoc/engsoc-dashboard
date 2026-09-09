@@ -15,6 +15,12 @@ export const mockEvents: EventItem[] = [
     startsAt: at(9, '19:30'),
   },
   {
+    id: 5,
+    name: 'Sponsor Coffee Chat',
+    type: 'INTERNAL',
+    startsAt: at(2, '10:00'),
+  },
+  {
     id: 3,
     name: 'BESS x Engsoc BBQ',
     type: 'EXTERNAL',
