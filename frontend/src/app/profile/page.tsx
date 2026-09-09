@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { getProfile } from '@/services/auth';
-import type { Profile } from '@/services/auth';
+import { getProfile } from '@/services/auth-api';
+import type { Profile } from '@/types/auth';
 
 export default function ProfilePage() {
   const router = useRouter();

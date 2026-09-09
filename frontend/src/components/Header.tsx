@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { getProfile } from '@/services/auth';
+import { getProfile } from '@/services/auth-api';
 
 const pageTitles: Record<string, string> = {
-  '/': 'Dashboard',
-  '/calendar': 'Calendar',
-  '/documents': 'Documents',
-  '/settings': 'Settings',
+  '/dashboard': 'Dashboard',
+  '/dashboard/calendar': 'Calendar',
+  '/dashboard/documents': 'Documents',
+  '/dashboard/settings': 'Settings',
 };
 
 export default function Header() {

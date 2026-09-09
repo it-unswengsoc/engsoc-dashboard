@@ -1,23 +1,13 @@
+import type { Profile, AuthResponse } from '@/types/auth';
+
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
-export interface Profile {
-  id: number;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  createdAt: string;
-}
-
-export interface AuthResponse {
-  token: string;
-  user: Profile;
-}
+export type { Profile, AuthResponse };
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
   if (USE_MOCK) {
-    const { mockAuthResponse } = await import('@/mocks/auth');
-    return mockAuthResponse;
+    const { login: mockLogin } = await import('@/mocks/functions/auth');
+    return mockLogin(email, password);
   }
 
   const res = await fetch('/api/auth/login', {
@@ -33,8 +23,8 @@ export async function login(email: string, password: string): Promise<AuthRespon
 
 export async function getProfile(token: string): Promise<Profile> {
   if (USE_MOCK) {
-    const { mockProfile } = await import('@/mocks/auth');
-    return mockProfile;
+    const { getProfile: mockGetProfile } = await import('@/mocks/functions/auth');
+    return mockGetProfile(token);
   }
 
   const res = await fetch('/api/auth/profile', {

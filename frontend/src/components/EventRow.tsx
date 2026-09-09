@@ -1,4 +1,4 @@
-type EventType = 'INTERNAL' | 'EXTERNAL';
+import type { EventType } from '@/types/events';
 
 interface EventRowProps {
   month: string;     // e.g. "JUN"

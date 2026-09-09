@@ -1,4 +1,4 @@
-import type { Profile, AuthResponse } from '@/services/auth';
+import type { Profile, AuthResponse } from '@/types/auth';
 
 export const mockProfile: Profile = {
   id: 1,

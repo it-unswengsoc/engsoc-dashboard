@@ -1,59 +1,13 @@
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+import { getEvents } from '@/services/events-api';
+import { getTasks } from '@/services/tasks-api';
+import { getAnnouncements } from '@/services/announcements-api';
+import type { EventItem, EventType } from '@/types/events';
+import type { TaskItem } from '@/types/tasks';
+import type { AnnouncementItem } from '@/types/announcements';
+import type { EventRowData, TaskRowData, DashboardStats } from '@/types/dashboard';
 
-export type EventType = 'INTERNAL' | 'EXTERNAL';
-
-/* ---------- Raw shapes (what the API will eventually return) ---------- */
-
-export interface EventItem {
-  id: number;
-  name: string;
-  type: EventType;
-  startsAt: string; // ISO date string
-}
-
-export interface TaskItem {
-  id: number;
-  name: string;
-  dueAt: string; // ISO date string
-  completed: boolean;
-}
-
-export interface AnnouncementItem {
-  id: number;
-  posterName: string;
-  posterRole: string;
-  posterAvatar: string;
-  image?: string;
-  description: string;
-  postedAt: string; // ISO date string
-  read: boolean;
-}
-
-/* ---------- Display shapes (what the row components take) ---------- */
-
-export interface EventRowData {
-  id: number;
-  month: string;      // "AUG"
-  day: number;        // 21
-  name: string;
-  type: EventType;
-  dateString: string; // "21/08/26"
-  time: string;       // "7:30pm"
-}
-
-export interface TaskRowData {
-  id: number;
-  daysTillDue: number;
-  name: string;
-  dateString: string; // "Mon, 1 June"
-  time: string;       // "9:30PM"
-}
-
-export interface DashboardStats {
-  openTasks: string;          // "3/5"
-  upcomingEvents: string;     // "4"
-  newAnnouncements: string;   // "2"
-}
+export type { EventItem, EventType, TaskItem, AnnouncementItem };
+export type { EventRowData, TaskRowData, DashboardStats };
 
 /* ---------- Date helpers ---------- */
 
@@ -114,44 +68,6 @@ export function toTaskRow(task: TaskItem): TaskRowData {
     dateString: toLongDate(d),
     time: toTime(d, true),
   };
-}
-
-/* ---------- Fetchers ---------- */
-
-export async function getEvents(): Promise<EventItem[]> {
-  if (USE_MOCK) {
-    const { mockEvents } = await import('@/mocks/dashboard');
-    return mockEvents;
-  }
-
-  const res = await fetch('/api/events');
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load events');
-  return data.data;
-}
-
-export async function getTasks(): Promise<TaskItem[]> {
-  if (USE_MOCK) {
-    const { mockTasks } = await import('@/mocks/dashboard');
-    return mockTasks;
-  }
-
-  const res = await fetch('/api/tasks');
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load tasks');
-  return data.data;
-}
-
-export async function getAnnouncements(): Promise<AnnouncementItem[]> {
-  if (USE_MOCK) {
-    const { mockAnnouncements } = await import('@/mocks/dashboard');
-    return mockAnnouncements;
-  }
-
-  const res = await fetch('/api/announcements');
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load announcements');
-  return data.data;
 }
 
 /* ---------- Dashboard-shaped getters ---------- */

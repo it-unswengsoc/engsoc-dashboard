@@ -4,13 +4,13 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
 const dashboardLinks = [
-  { label: 'Home', href: '/' },
-  { label: 'Calendar', href: '/calendar' },
-  { label: 'Documents', href: '/documents' },
+  { label: 'Home', href: '/dashboard' },
+  { label: 'Calendar', href: '/dashboard/calendar' },
+  { label: 'Documents', href: '/dashboard/documents' },
 ];
 
 const accountLinks = [
-  { label: 'Settings', href: '/settings' },
+  { label: 'Settings', href: '/dashboard/settings' },
 ];
 
 
