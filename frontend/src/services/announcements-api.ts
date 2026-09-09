@@ -1,4 +1,5 @@
 import type { AnnouncementItem } from '@/types/announcements';
+import { apiUrl } from '@/services/api-config';
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
@@ -10,7 +11,7 @@ export async function getAnnouncements(): Promise<AnnouncementItem[]> {
     return mockGetAnnouncements();
   }
 
-  const res = await fetch('/api/announcements');
+  const res = await fetch(apiUrl('/announcements'));
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load announcements');
   return data.data;

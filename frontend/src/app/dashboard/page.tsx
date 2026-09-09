@@ -9,6 +9,10 @@ import {
   getDashboardStats,
 } from "@/services/dashboard";
 
+/* Fetches live task/event data server-side; the deployment's own URL doesn't
+   exist yet at build time, so this can't be statically prerendered. */
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const [stats, events, tasks, announcements] = await Promise.all([
     getDashboardStats(),
