@@ -6,6 +6,7 @@ import {
   updateUserProfile,
   verifyToken,
 } from '../functions/auth';
+import { getGoogleAuthUrl, exchangeGoogleCode } from '../functions/google';
 
 const router = Router();
 
@@ -209,6 +210,60 @@ router.post('/logout', verifyAuthToken, (req: Request, res: Response) => {
     status: 'success',
     message: 'Logout successful. Please remove the token from client storage.',
   });
+});
+
+/**
+ * GET /api/auth/google
+ * Redirects the user to Google's OAuth consent screen.
+ */
+router.get('/google', (req: Request, res: Response) => {
+  res.redirect(getGoogleAuthUrl());
+});
+
+/**
+ * GET /api/auth/google/callback
+ * Google's OAuth redirect target — this exact path is registered in Google
+ * Cloud Console as the authorized redirect URI. Exchanges the auth code for
+ * tokens and verifies the signed-in user's identity.
+ */
+router.get('/google/callback', async (req: Request, res: Response) => {
+  try {
+    const { code, error } = req.query;
+
+    if (error) {
+      return res.status(400).json({
+        status: 'error',
+        message: `Google OAuth error: ${error}`,
+      });
+    }
+
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Missing authorization code',
+      });
+    }
+
+    const { profile } = await exchangeGoogleCode(code);
+
+    // TODO: find-or-create a `users` row for profile.email and issue our own
+    // JWT via generateToken(), then redirect to FRONTEND_URL with it.
+    // Blocked on a schema change first: users.password_hash is NOT NULL
+    // (see database/schema.sql), so Google-only accounts can't be inserted
+    // as-is. Returning the verified profile for now so the Google Cloud
+    // redirect URI and token exchange can be tested end-to-end.
+    res.status(200).json({
+      status: 'success',
+      message: 'Google account verified',
+      data: profile,
+    });
+  } catch (error) {
+    console.error('Google OAuth callback error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Google authentication failed',
+    });
+  }
 });
 
 export default router;
