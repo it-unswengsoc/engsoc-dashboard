@@ -1,4 +1,5 @@
 import type { Profile, AuthResponse } from '@/types/auth';
+import { apiUrl } from '@/services/api-config';
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
@@ -10,7 +11,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
     return mockLogin(email, password);
   }
 
-  const res = await fetch('/api/auth/login', {
+  const res = await fetch(apiUrl('/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -27,7 +28,7 @@ export async function getProfile(token: string): Promise<Profile> {
     return mockGetProfile(token);
   }
 
-  const res = await fetch('/api/auth/profile', {
+  const res = await fetch(apiUrl('/auth/profile'), {
     headers: { Authorization: `Bearer ${token}` },
   });
 
