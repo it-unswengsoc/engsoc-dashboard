@@ -32,4 +32,16 @@ export const mockTasks: TaskItem[] = [
     dueAt: at(-2, '17:00'),
     completed: true,
   },
+  {
+    id: 6,
+    name: 'order name badges',
+    dueAt: at(5, '12:00'),
+    completed: false,
+  },
+  {
+    id: 7,
+    name: 'confirm catering',
+    dueAt: at(8, '10:00'),
+    completed: false,
+  },
 ];

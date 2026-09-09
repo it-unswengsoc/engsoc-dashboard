@@ -72,7 +72,7 @@ export function toTaskRow(task: TaskItem): TaskRowData {
 
 /* ---------- Dashboard-shaped getters ---------- */
 
-/* Soonest first, capped so the sidebar card doesn't blow out */
+/* Soonest first, capped so the query doesn't grow unbounded — the panel scrolls past the cap */
 export async function getUpcomingEvents(limit = 3): Promise<EventRowData[]> {
   const events = await getEvents();
   const now = Date.now();

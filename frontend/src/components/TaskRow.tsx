@@ -32,18 +32,18 @@ export default function TaskRow({ daysTillDue, name, dateString, time }: TaskRow
   const [done, setDone] = useState(false);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-2.5 px-3 py-3.5">
       {/* Checkbox — red border on hover, red fill + tick once checked */}
-      <label className="relative h-9 w-9 shrink-0 cursor-pointer">
+      <label className="relative h-5 w-5 shrink-0 cursor-pointer">
         <input
           type="checkbox"
           checked={done}
           onChange={(e) => setDone(e.target.checked)}
-          className="h-full w-full cursor-pointer appearance-none rounded-lg border border-gray-300 bg-white transition-colors hover:border-2 hover:border-[#ED6672] checked:border-0 checked:bg-[#ED6672]"
+          className="h-full w-full cursor-pointer appearance-none rounded-md border border-gray-300 bg-white transition-colors hover:border-2 hover:border-[#ED6672] checked:border-0 checked:bg-[#ED6672]"
         />
         {done && (
           <svg
-            className="pointer-events-none absolute inset-0 m-auto h-5 w-5 text-white"
+            className="pointer-events-none absolute inset-0 m-auto h-3 w-3 text-white"
             fill="none"
             stroke="currentColor"
             strokeWidth={3}
@@ -57,7 +57,7 @@ export default function TaskRow({ daysTillDue, name, dateString, time }: TaskRow
       </label>
 
       {/* Task details */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-0.5">
         <p
           className={`text-sm font-bold transition-colors ${
             done ? 'text-gray-400 line-through' : 'text-gray-900'
