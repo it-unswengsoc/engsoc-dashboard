@@ -1,7 +1,5 @@
-export default function CalendarPage() {
-  return (
-    <div>
-      {/* TODO: Calendar Sections */}
-    </div>
-  );
+import { redirect } from 'next/navigation';
+
+export default function CalendarIndexPage() {
+  redirect('/dashboard/calendar/month');
 }
