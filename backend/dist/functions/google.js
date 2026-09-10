@@ -1,0 +1,96 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.GoogleDomainError = void 0;
+exports.getGoogleAuthUrl = getGoogleAuthUrl;
+exports.exchangeGoogleCode = exchangeGoogleCode;
+const google_auth_library_1 = require("google-auth-library");
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
+/* Only club Google Workspace accounts may sign in. */
+const ALLOWED_GOOGLE_DOMAIN = 'unswengsoc.com';
+/* Thrown when a Google account outside ALLOWED_GOOGLE_DOMAIN completes the
+   consent screen — distinguishable from other failures so the callback
+   route can send back a specific, user-facing error instead of a generic
+   500. */
+class GoogleDomainError extends Error {
+    constructor() {
+        super(`Only @${ALLOWED_GOOGLE_DOMAIN} accounts may sign in`);
+        this.name = 'GoogleDomainError';
+    }
+}
+exports.GoogleDomainError = GoogleDomainError;
+/* Login (openid/email/profile) plus read-write Calendar and read-only Drive
+   access, all under the one consent screen. EngSoc's Drive is organised as
+   a set of Shared Drives (Arc Delegate, HR, IT, ...), not files/folders the
+   app itself creates — so drive.file (access limited to app-created files)
+   can't see any of it. drive.readonly covers listing and reading across
+   Shared Drives; swap it for the full drive scope only if upload/write ever
+   gets built. */
+const GOOGLE_SCOPES = [
+    'openid',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/calendar',
+    'https://www.googleapis.com/auth/drive.readonly',
+];
+function getOAuthClient() {
+    return new google_auth_library_1.OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
+}
+/**
+ * Builds the Google consent screen URL to redirect the user to.
+ *
+ * `state` round-trips through Google back to the callback unchanged — used
+ * to tell a normal "Sign in with Google" apart from the one-time admin flow
+ * that connects the shared EngSoc Drive (see routes/auth.ts).
+ */
+function getGoogleAuthUrl(state) {
+    const client = getOAuthClient();
+    return client.generateAuthUrl({
+        access_type: 'offline', // request a refresh_token, needed for Calendar/Drive access outside the login session
+        prompt: 'consent',
+        scope: GOOGLE_SCOPES,
+        hd: ALLOWED_GOOGLE_DOMAIN, // hints Google's account chooser to the club's Workspace — a UX nicety, not a security boundary (still enforced below)
+        ...(state ? { state } : {}),
+    });
+}
+/**
+ * Exchanges the authorization code from the callback for tokens, and
+ * verifies the ID token to recover the signed-in user's profile.
+ */
+async function exchangeGoogleCode(code) {
+    const client = getOAuthClient();
+    const { tokens } = await client.getToken(code);
+    if (!tokens.id_token) {
+        throw new Error('Google did not return an id_token');
+    }
+    const ticket = await client.verifyIdToken({
+        idToken: tokens.id_token,
+        audience: GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload?.sub || !payload.email) {
+        throw new Error('Google id_token payload missing sub/email');
+    }
+    // payload.hd is Google's own verified claim for which Workspace domain the
+    // account belongs to — check that first. Fall back to the email suffix for
+    // safety, though a genuine unswengsoc.com Workspace account should always
+    // carry a matching hd.
+    const isAllowedDomain = payload.hd === ALLOWED_GOOGLE_DOMAIN || payload.email.endsWith(`@${ALLOWED_GOOGLE_DOMAIN}`);
+    if (!isAllowedDomain) {
+        throw new GoogleDomainError();
+    }
+    return {
+        profile: {
+            googleId: payload.sub,
+            email: payload.email,
+            emailVerified: payload.email_verified ?? false,
+            firstName: payload.given_name ?? '',
+            lastName: payload.family_name ?? '',
+            picture: payload.picture,
+        },
+        accessToken: tokens.access_token ?? undefined,
+        refreshToken: tokens.refresh_token ?? undefined,
+    };
+}
+//# sourceMappingURL=google.js.map

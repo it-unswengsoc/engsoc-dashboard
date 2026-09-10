@@ -3,8 +3,10 @@
 /.pnp
 .pnp.js
 
-# production
-/dist
+# production build output is committed, not ignored — see the comment in
+# ../vercel.json for why (Vercel's Services TS-entrypoint packaging for
+# this backend doesn't include node_modules at runtime; a pre-built plain
+# JS entrypoint uses its standard, working Node.js Function path instead)
 
 # misc
 .DS_Store

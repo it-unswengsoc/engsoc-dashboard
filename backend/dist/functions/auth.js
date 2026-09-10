@@ -1,0 +1,186 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.hashPassword = hashPassword;
+exports.comparePassword = comparePassword;
+exports.generateToken = generateToken;
+exports.verifyToken = verifyToken;
+exports.registerUser = registerUser;
+exports.loginUser = loginUser;
+exports.findOrCreateGoogleUser = findOrCreateGoogleUser;
+exports.getUserProfile = getUserProfile;
+exports.updateUserProfile = updateUserProfile;
+const bcrypt_1 = __importDefault(require("bcrypt"));
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const pg_1 = require("pg");
+const SALT_ROUNDS = 10;
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
+const JWT_EXPIRY = '7d';
+// Initialize database pool
+const pool = new pg_1.Pool({
+    connectionString: process.env.DATABASE_URL,
+});
+/**
+ * Hash a password using bcrypt
+ */
+async function hashPassword(password) {
+    return await bcrypt_1.default.hash(password, SALT_ROUNDS);
+}
+/**
+ * Compare a password with its hash
+ */
+async function comparePassword(password, hash) {
+    return await bcrypt_1.default.compare(password, hash);
+}
+/**
+ * Generate JWT token
+ */
+function generateToken(userId, email) {
+    return jsonwebtoken_1.default.sign({ userId, email }, JWT_SECRET, { expiresIn: JWT_EXPIRY });
+}
+/**
+ * Verify JWT token
+ */
+function verifyToken(token) {
+    try {
+        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        return decoded;
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * Register a new user
+ */
+async function registerUser(email, password, firstName, lastName) {
+    try {
+        // Validate inputs
+        if (!email || !password || !firstName || !lastName) {
+            return null;
+        }
+        // Check if user already exists
+        const userExists = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (userExists.rows.length > 0) {
+            throw new Error('User already exists');
+        }
+        // Hash password
+        const hashedPassword = await hashPassword(password);
+        // Insert user
+        const result = await pool.query('INSERT INTO users (email, password_hash, first_name, last_name, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING id, email', [email, hashedPassword, firstName, lastName]);
+        return {
+            userId: result.rows[0].id,
+            email: result.rows[0].email,
+        };
+    }
+    catch (error) {
+        console.error('Registration error:', error);
+        return null;
+    }
+}
+/**
+ * Login user and return token
+ */
+async function loginUser(email, password) {
+    try {
+        // Validate inputs
+        if (!email || !password) {
+            return null;
+        }
+        // Find user
+        const result = await pool.query('SELECT id, email, password_hash FROM users WHERE email = $1', [email]);
+        if (result.rows.length === 0) {
+            return null;
+        }
+        const user = result.rows[0];
+        // Compare password
+        const passwordMatch = await comparePassword(password, user.password_hash);
+        if (!passwordMatch) {
+            return null;
+        }
+        // Generate token
+        const token = generateToken(user.id, user.email);
+        // Update last login
+        await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [
+            user.id,
+        ]);
+        return {
+            token,
+            userId: user.id,
+            email: user.email,
+        };
+    }
+    catch (error) {
+        console.error('Login error:', error);
+        return null;
+    }
+}
+/**
+ * Find the user for a verified Google identity, linking it to an existing
+ * local-password account with the same email, or creating a Google-only
+ * account (no password_hash) if neither exists.
+ */
+async function findOrCreateGoogleUser(googleId, email, firstName, lastName) {
+    try {
+        const byGoogleId = await pool.query('SELECT id, email FROM users WHERE google_id = $1', [googleId]);
+        if (byGoogleId.rows.length > 0) {
+            const user = byGoogleId.rows[0];
+            await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+            return { userId: user.id, email: user.email };
+        }
+        const byEmail = await pool.query('SELECT id, email FROM users WHERE email = $1', [email]);
+        if (byEmail.rows.length > 0) {
+            const user = byEmail.rows[0];
+            await pool.query('UPDATE users SET google_id = $1, last_login = NOW() WHERE id = $2', [googleId, user.id]);
+            return { userId: user.id, email: user.email };
+        }
+        const result = await pool.query(`INSERT INTO users (email, google_id, first_name, last_name, created_at, last_login)
+       VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id, email`, [email, googleId, firstName || 'Google', lastName || 'User']);
+        return { userId: result.rows[0].id, email: result.rows[0].email };
+    }
+    catch (error) {
+        console.error('findOrCreateGoogleUser error:', error);
+        return null;
+    }
+}
+/**
+ * Get user profile by ID
+ */
+async function getUserProfile(userId) {
+    try {
+        const result = await pool.query('SELECT id, email, first_name, last_name, role, created_at FROM users WHERE id = $1', [userId]);
+        if (result.rows.length === 0) {
+            return null;
+        }
+        const user = result.rows[0];
+        return {
+            id: user.id,
+            email: user.email,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            role: user.role,
+            createdAt: user.created_at,
+        };
+    }
+    catch (error) {
+        console.error('Get profile error:', error);
+        return null;
+    }
+}
+/**
+ * Update user profile
+ */
+async function updateUserProfile(userId, firstName, lastName) {
+    try {
+        const result = await pool.query('UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3', [firstName, lastName, userId]);
+        return result.rowCount !== null && result.rowCount > 0;
+    }
+    catch (error) {
+        console.error('Update profile error:', error);
+        return false;
+    }
+}
+exports.default = pool;
+//# sourceMappingURL=auth.js.map
