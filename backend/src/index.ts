@@ -7,6 +7,7 @@ import apiRoutes from './routes/api';
 import authRoutes from './routes/auth';
 import eventRoutes from './routes/events';
 import notificationRoutes from './routes/notifications';
+import driveRoutes from './routes/drive';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -25,6 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/event', eventRoutes);
 app.use('/api/notification', notificationRoutes);
+app.use('/api/drive', driveRoutes);
 app.use('/api', apiRoutes);
 
 // Health check endpoint
