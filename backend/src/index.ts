@@ -1,10 +1,3 @@
-// Plain import + explicit call, not `import 'dotenv/config'` — Vercel's
-// function bundler for this service failed to trace that side-effect-only
-// subpath import and dropped `dotenv` from the deployed bundle entirely
-// ("Cannot find module 'dotenv/config'"), crashing every route. This form
-// traces reliably. Must run before the other imports below, since their
-// modules read process.env at the top level — safe here because TS compiles
-// imports to sequential requires, not hoisted ES module imports.
 import dotenv from 'dotenv';
 dotenv.config();
 
