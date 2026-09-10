@@ -244,7 +244,7 @@ router.get('/google/callback', async (req: Request, res: Response) => {
       });
     }
 
-    const { profile } = await exchangeGoogleCode(code);
+    const { profile, refreshToken } = await exchangeGoogleCode(code);
 
     // TODO: find-or-create a `users` row for profile.email and issue our own
     // JWT via generateToken(), then redirect to FRONTEND_URL with it.
@@ -252,10 +252,17 @@ router.get('/google/callback', async (req: Request, res: Response) => {
     // (see database/schema.sql), so Google-only accounts can't be inserted
     // as-is. Returning the verified profile for now so the Google Cloud
     // redirect URI and token exchange can be tested end-to-end.
+    //
+    // refreshToken is only ever present on the first consent for an account
+    // (Google omits it on repeat logins) — it's surfaced here so whoever
+    // authorizes the club's shared Drive account can copy it once into
+    // GOOGLE_DRIVE_REFRESH_TOKEN (see .env.example). It's sensitive: treat it
+    // like a password, never commit it, and don't complete this flow with a
+    // personal Google account expecting to grant only login access.
     res.status(200).json({
       status: 'success',
       message: 'Google account verified',
-      data: profile,
+      data: { ...profile, refreshToken },
     });
   } catch (error) {
     console.error('Google OAuth callback error:', error);

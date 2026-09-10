@@ -12,3 +12,9 @@ export function at(daysFromToday: number, time: string): string {
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}T${time}`;
 }
+
+/* For "modified N ago" style mocks, where minute-level freshness matters
+   more than a fixed calendar date. */
+export function minutesAgo(n: number): string {
+  return new Date(Date.now() - n * 60_000).toISOString();
+}
