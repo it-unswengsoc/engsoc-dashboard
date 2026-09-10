@@ -18,17 +18,19 @@ export class GoogleDomainError extends Error {
   }
 }
 
-/* Login (openid/email/profile) plus read-write Calendar and per-file Drive
-   access, all under the one consent screen. drive.file (not the full drive
-   scope) only grants access to files the app itself creates/opens — swap it
-   for https://www.googleapis.com/auth/drive if broader access turns out to
-   be required. */
+/* Login (openid/email/profile) plus read-write Calendar and read-only Drive
+   access, all under the one consent screen. EngSoc's Drive is organised as
+   a set of Shared Drives (Arc Delegate, HR, IT, ...), not files/folders the
+   app itself creates — so drive.file (access limited to app-created files)
+   can't see any of it. drive.readonly covers listing and reading across
+   Shared Drives; swap it for the full drive scope only if upload/write ever
+   gets built. */
 const GOOGLE_SCOPES = [
   'openid',
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
   'https://www.googleapis.com/auth/calendar',
-  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/drive.readonly',
 ];
 
 function getOAuthClient(): OAuth2Client {
