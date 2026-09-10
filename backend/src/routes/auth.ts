@@ -5,10 +5,13 @@ import {
   getUserProfile,
   updateUserProfile,
   verifyToken,
+  findOrCreateGoogleUser,
+  generateToken,
 } from '../functions/auth';
-import { getGoogleAuthUrl, exchangeGoogleCode } from '../functions/google';
+import { getGoogleAuthUrl, exchangeGoogleCode, GoogleDomainError } from '../functions/google';
 
 const router = Router();
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Middleware to verify JWT token
 export function verifyAuthToken(req: Request, res: Response, next: Function) {
@@ -214,62 +217,73 @@ router.post('/logout', verifyAuthToken, (req: Request, res: Response) => {
 
 /**
  * GET /api/auth/google
- * Redirects the user to Google's OAuth consent screen.
+ * Redirects to Google's OAuth consent screen. Plain "Sign in with Google"
+ * needs no query param; the one-time admin flow that connects the shared
+ * EngSoc Drive account passes ?intent=drive-connect (see .env.example).
  */
 router.get('/google', (req: Request, res: Response) => {
-  res.redirect(getGoogleAuthUrl());
+  const intent = typeof req.query.intent === 'string' ? req.query.intent : undefined;
+  res.redirect(getGoogleAuthUrl(intent));
 });
 
 /**
  * GET /api/auth/google/callback
  * Google's OAuth redirect target — this exact path is registered in Google
  * Cloud Console as the authorized redirect URI. Exchanges the auth code for
- * tokens and verifies the signed-in user's identity.
+ * tokens, verifies the signed-in user's identity, and either:
+ *   - signs them in (default) — finds/creates their `users` row and redirects
+ *     back to the frontend with a JWT
+ *   - or (state=drive-connect) returns the profile + refresh token as JSON,
+ *     for the one-time admin setup that connects the shared EngSoc Drive.
  */
 router.get('/google/callback', async (req: Request, res: Response) => {
+  const state = typeof req.query.state === 'string' ? req.query.state : undefined;
+
   try {
     const { code, error } = req.query;
 
     if (error) {
-      return res.status(400).json({
-        status: 'error',
-        message: `Google OAuth error: ${error}`,
-      });
+      return res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
     }
 
     if (!code || typeof code !== 'string') {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing authorization code',
-      });
+      return res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
     }
 
     const { profile, refreshToken } = await exchangeGoogleCode(code);
 
-    // TODO: find-or-create a `users` row for profile.email and issue our own
-    // JWT via generateToken(), then redirect to FRONTEND_URL with it.
-    // Blocked on a schema change first: users.password_hash is NOT NULL
-    // (see database/schema.sql), so Google-only accounts can't be inserted
-    // as-is. Returning the verified profile for now so the Google Cloud
-    // redirect URI and token exchange can be tested end-to-end.
-    //
-    // refreshToken is only ever present on the first consent for an account
-    // (Google omits it on repeat logins) — it's surfaced here so whoever
-    // authorizes the club's shared Drive account can copy it once into
-    // GOOGLE_DRIVE_REFRESH_TOKEN (see .env.example). It's sensitive: treat it
-    // like a password, never commit it, and don't complete this flow with a
-    // personal Google account expecting to grant only login access.
-    res.status(200).json({
-      status: 'success',
-      message: 'Google account verified',
-      data: { ...profile, refreshToken },
-    });
+    if (state === 'drive-connect') {
+      // refreshToken is only ever present on the first consent for an
+      // account (Google omits it on repeat logins) — surfaced here so
+      // whoever authorizes the club's shared Drive account can copy it once
+      // into GOOGLE_DRIVE_REFRESH_TOKEN (see .env.example). It's sensitive:
+      // treat it like a password, never commit it.
+      return res.status(200).json({
+        status: 'success',
+        message: 'Google account verified',
+        data: { ...profile, refreshToken },
+      });
+    }
+
+    const user = await findOrCreateGoogleUser(
+      profile.googleId,
+      profile.email,
+      profile.firstName,
+      profile.lastName
+    );
+
+    if (!user) {
+      return res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+    }
+
+    const token = generateToken(user.userId, user.email);
+    res.redirect(`${FRONTEND_URL}/login?token=${encodeURIComponent(token)}`);
   } catch (error) {
+    if (error instanceof GoogleDomainError) {
+      return res.redirect(`${FRONTEND_URL}/login?error=domain_not_allowed`);
+    }
     console.error('Google OAuth callback error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Google authentication failed',
-    });
+    res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
   }
 });
 
