@@ -146,6 +146,56 @@ export async function loginUser(
 }
 
 /**
+ * Find the user for a verified Google identity, linking it to an existing
+ * local-password account with the same email, or creating a Google-only
+ * account (no password_hash) if neither exists.
+ */
+export async function findOrCreateGoogleUser(
+  googleId: string,
+  email: string,
+  firstName: string,
+  lastName: string
+): Promise<{ userId: number; email: string } | null> {
+  try {
+    const byGoogleId: QueryResult = await pool.query(
+      'SELECT id, email FROM users WHERE google_id = $1',
+      [googleId]
+    );
+
+    if (byGoogleId.rows.length > 0) {
+      const user = byGoogleId.rows[0];
+      await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+      return { userId: user.id, email: user.email };
+    }
+
+    const byEmail: QueryResult = await pool.query(
+      'SELECT id, email FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (byEmail.rows.length > 0) {
+      const user = byEmail.rows[0];
+      await pool.query(
+        'UPDATE users SET google_id = $1, last_login = NOW() WHERE id = $2',
+        [googleId, user.id]
+      );
+      return { userId: user.id, email: user.email };
+    }
+
+    const result: QueryResult = await pool.query(
+      `INSERT INTO users (email, google_id, first_name, last_name, created_at, last_login)
+       VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id, email`,
+      [email, googleId, firstName || 'Google', lastName || 'User']
+    );
+
+    return { userId: result.rows[0].id, email: result.rows[0].email };
+  } catch (error) {
+    console.error('findOrCreateGoogleUser error:', error);
+    return null;
+  }
+}
+
+/**
  * Get user profile by ID
  */
 export async function getUserProfile(userId: number): Promise<{

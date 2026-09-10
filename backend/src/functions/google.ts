@@ -4,6 +4,20 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
 
+/* Only club Google Workspace accounts may sign in. */
+const ALLOWED_GOOGLE_DOMAIN = 'unswengsoc.com';
+
+/* Thrown when a Google account outside ALLOWED_GOOGLE_DOMAIN completes the
+   consent screen — distinguishable from other failures so the callback
+   route can send back a specific, user-facing error instead of a generic
+   500. */
+export class GoogleDomainError extends Error {
+  constructor() {
+    super(`Only @${ALLOWED_GOOGLE_DOMAIN} accounts may sign in`);
+    this.name = 'GoogleDomainError';
+  }
+}
+
 /* Login (openid/email/profile) plus read-write Calendar and per-file Drive
    access, all under the one consent screen. drive.file (not the full drive
    scope) only grants access to files the app itself creates/opens — swap it
@@ -23,14 +37,20 @@ function getOAuthClient(): OAuth2Client {
 
 /**
  * Builds the Google consent screen URL to redirect the user to.
+ *
+ * `state` round-trips through Google back to the callback unchanged — used
+ * to tell a normal "Sign in with Google" apart from the one-time admin flow
+ * that connects the shared EngSoc Drive (see routes/auth.ts).
  */
-export function getGoogleAuthUrl(): string {
+export function getGoogleAuthUrl(state?: string): string {
   const client = getOAuthClient();
 
   return client.generateAuthUrl({
     access_type: 'offline', // request a refresh_token, needed for Calendar/Drive access outside the login session
     prompt: 'consent',
     scope: GOOGLE_SCOPES,
+    hd: ALLOWED_GOOGLE_DOMAIN, // hints Google's account chooser to the club's Workspace — a UX nicety, not a security boundary (still enforced below)
+    ...(state ? { state } : {}),
   });
 }
 
@@ -68,6 +88,17 @@ export async function exchangeGoogleCode(code: string): Promise<{
 
   if (!payload?.sub || !payload.email) {
     throw new Error('Google id_token payload missing sub/email');
+  }
+
+  // payload.hd is Google's own verified claim for which Workspace domain the
+  // account belongs to — check that first. Fall back to the email suffix for
+  // safety, though a genuine unswengsoc.com Workspace account should always
+  // carry a matching hd.
+  const isAllowedDomain =
+    payload.hd === ALLOWED_GOOGLE_DOMAIN || payload.email.endsWith(`@${ALLOWED_GOOGLE_DOMAIN}`);
+
+  if (!isAllowedDomain) {
+    throw new GoogleDomainError();
   }
 
   return {
