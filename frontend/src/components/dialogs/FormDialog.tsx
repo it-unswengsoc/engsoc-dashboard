@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import Dialog from '@/components/dialogs/Dialog';
-import Select from '@/components/dialogs/Select';
+import Select, { type FieldOption } from '@/components/dialogs/Select';
+
+export type { FieldOption };
 
 export type FieldDef =
   | {
@@ -16,13 +18,15 @@ export type FieldDef =
       kind: 'select' | 'segmented';
       name: string;
       label: string;
-      options: string[];
+      options: FieldOption[];
       placeholder?: string;
       required?: boolean;
     }
   | { kind: 'file'; name: string; label: string; accept?: string; required?: boolean };
 
+/* Raw DOM input values — always strings. `buildPayload` converts them. */
 export type FieldValues = Record<string, string>;
+export type FieldPayload = Record<string, string | number>;
 
 interface FormDialogProps {
   open: boolean;
@@ -31,6 +35,7 @@ interface FormDialogProps {
   /* A function when later fields depend on earlier answers — the request form
      swaps its whole body based on the chosen request type. */
   fields: FieldDef[] | ((values: FieldValues) => FieldDef[]);
+  onSubmit: (payload: FieldPayload) => void;
   onClose: () => void;
   onBack: () => void;
 }
@@ -38,11 +43,35 @@ interface FormDialogProps {
 const inputStyles =
   'w-full rounded-lg border border-transparent bg-gray-100 px-3 py-2 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]';
 
+/* A `datetime` input yields a naive "2026-09-12T10:00" with no offset. Parsing
+   it as local time and emitting ISO pins it to a real instant, so a timestamp
+   column can't drift between the user's timezone and the server's. A `date`
+   stays a plain YYYY-MM-DD — a calendar date shouldn't shift across zones. */
+function buildPayload(fields: FieldDef[], values: FieldValues): FieldPayload {
+  const payload: FieldPayload = {};
+
+  for (const field of fields) {
+    const raw = values[field.name];
+    if (raw === undefined || raw === '') continue;
+
+    if (field.kind === 'number') {
+      payload[field.name] = Number(raw);
+    } else if (field.kind === 'datetime') {
+      payload[field.name] = new Date(raw).toISOString();
+    } else {
+      payload[field.name] = raw;
+    }
+  }
+
+  return payload;
+}
+
 export default function FormDialog({
   open,
   title,
   submitLabel,
   fields,
+  onSubmit,
   onClose,
   onBack,
 }: FormDialogProps) {
@@ -50,6 +79,24 @@ export default function FormDialog({
   const [missing, setMissing] = useState<Record<string, boolean>>({});
 
   const resolvedFields = typeof fields === 'function' ? fields(values) : fields;
+  const shownNames = resolvedFields.map((field) => field.name).join('\n');
+
+  /* Changing request type swaps the field set, so drop anything no longer on
+     screen. A file input is uncontrolled and remounts empty, so a leftover
+     filename would let validation pass with nothing actually attached — and
+     the payload would carry fields belonging to the previous type. */
+  useEffect(() => {
+    const shown = new Set(shownNames.split('\n'));
+    const prune = <T,>(prev: Record<string, T>): Record<string, T> => {
+      const next = Object.fromEntries(
+        Object.entries(prev).filter(([name]) => shown.has(name)),
+      );
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    };
+
+    setValues(prune);
+    setMissing(prune);
+  }, [shownNames]);
 
   function setValue(name: string, value: string) {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -72,9 +119,7 @@ export default function FormDialog({
       return;
     }
 
-    /* TODO: no create endpoint is wired up yet — POST /api/event exists for
-       events, the rest are frontend-only. File fields hold the filename only,
-       so real uploads need a FormData pass here. */
+    onSubmit(buildPayload(resolvedFields, values));
     onClose();
   }
 
@@ -124,18 +169,18 @@ export default function FormDialog({
                 >
                   {field.options.map((option) => (
                     <button
-                      key={option}
+                      key={option.value}
                       type="button"
                       role="radio"
-                      aria-checked={values[field.name] === option}
-                      onClick={() => setValue(field.name, option)}
+                      aria-checked={values[field.name] === option.value}
+                      onClick={() => setValue(field.name, option.value)}
                       className={`flex-1 rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
-                        values[field.name] === option
+                        values[field.name] === option.value
                           ? 'border-[#B1C9DC] bg-[#B1C9DC]/20 text-gray-900'
                           : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                       }`}
                     >
-                      {option}
+                      {option.label}
                     </button>
                   ))}
                 </div>

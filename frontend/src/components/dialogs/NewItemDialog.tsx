@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import { ClipboardList, Calendar, Megaphone, Inbox, type LucideIcon } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
-import FormDialog, { type FieldDef, type FieldValues } from '@/components/dialogs/FormDialog';
+import FormDialog, {
+  type FieldDef,
+  type FieldPayload,
+  type FieldValues,
+} from '@/components/dialogs/FormDialog';
 
 interface NewItemDialogProps {
   open: boolean;
@@ -19,74 +23,140 @@ const options: { view: Exclude<View, 'chooser'>; label: string; icon: LucideIcon
   { view: 'task', label: 'New task', icon: ClipboardList },
 ];
 
-/* Each request type swaps in its own fields below the type selector. */
-const requestFields: Record<string, FieldDef[]> = {
-  'Marketing request': [
-    { kind: 'text', name: 'title', label: 'Title', required: true },
-    { kind: 'textarea', name: 'description', label: 'Description', required: true },
-    { kind: 'date', name: 'neededBy', label: 'Needed by' },
-    { kind: 'file', name: 'assets', label: 'Assets' },
-  ],
-  'IT request': [
-    { kind: 'text', name: 'title', label: 'Title', required: true },
-    { kind: 'textarea', name: 'description', label: 'Description', required: true },
-    {
-      kind: 'select',
-      name: 'category',
-      label: 'Category',
-      options: ['Website', 'Email / accounts', 'Hardware', 'Access / permissions', 'Other'],
-    },
-    { kind: 'segmented', name: 'urgency', label: 'Urgency', options: ['Low', 'Medium', 'High'] },
-    { kind: 'file', name: 'attachment', label: 'Attachment' },
-  ],
-  'Reimbursement form': [
-    { kind: 'text', name: 'title', label: 'Title', required: true },
-    { kind: 'textarea', name: 'description', label: 'Description', required: true },
-    { kind: 'number', name: 'amount', label: 'Amount (AUD)', placeholder: '0.00', required: true },
-    { kind: 'date', name: 'purchasedOn', label: 'Date of purchase', required: true },
-    { kind: 'file', name: 'receipt', label: 'Receipt', accept: 'image/*,.pdf', required: true },
-  ],
-  'Grievance form': [
-    { kind: 'text', name: 'title', label: 'Subject', required: true },
-    { kind: 'textarea', name: 'description', label: 'What happened', required: true },
-    { kind: 'text', name: 'involved', label: 'Who was involved' },
-    { kind: 'segmented', name: 'anonymous', label: 'Submit anonymously', options: ['Yes', 'No'] },
-    { kind: 'file', name: 'attachment', label: 'Attachment' },
-  ],
-  'Publications request': [
-    { kind: 'text', name: 'title', label: 'Title', required: true },
-    { kind: 'textarea', name: 'description', label: 'Description', required: true },
-    {
-      kind: 'select',
-      name: 'publication',
-      label: 'Publication',
-      options: ['Handbook', 'Newsletter', 'Blog', 'Social'],
-    },
-    { kind: 'date', name: 'deadline', label: 'Deadline' },
-    { kind: 'file', name: 'draft', label: 'Draft' },
-  ],
-};
+/* Each request type swaps in its own fields below the type selector. `value`
+   is what the API will receive, so the labels stay free to be reworded. */
+const requestTypes: { value: string; label: string; fields: FieldDef[] }[] = [
+  {
+    value: 'marketing',
+    label: 'Marketing request',
+    fields: [
+      { kind: 'text', name: 'eventName', label: 'Event Name', required: true },
+      { kind: 'date', name: 'eventLaunchDate', label: 'Event Launch Date' },
+      { kind: 'date', name: 'eventDate', label: 'Event Date' },
+      { kind: 'textarea', name: 'eventTheme', label: 'Event Theme', required: true },
+    ],
+  },
+  {
+    value: 'it',
+    label: 'IT request',
+    fields: [
+      { kind: 'text', name: 'title', label: 'Title', required: true },
+      { kind: 'textarea', name: 'description', label: 'Description', required: true },
+      {
+        kind: 'select',
+        name: 'category',
+        label: 'Category',
+        options: [
+          { value: 'website', label: 'Website' },
+          { value: 'accounts', label: 'Email / accounts' },
+          { value: 'hardware', label: 'Hardware' },
+          { value: 'access', label: 'Access / permissions' },
+          { value: 'other', label: 'Other' },
+        ],
+      },
+      {
+        kind: 'segmented',
+        name: 'urgency',
+        label: 'Urgency',
+        options: [
+          { value: 'low', label: 'Low' },
+          { value: 'medium', label: 'Medium' },
+          { value: 'high', label: 'High' },
+        ],
+      },
+      { kind: 'file', name: 'attachment', label: 'Attachment' },
+    ],
+  },
+  {
+    value: 'reimbursement',
+    label: 'Reimbursement form',
+    fields: [
+      { kind: 'text', name: 'title', label: 'Title', required: true },
+      { kind: 'textarea', name: 'description', label: 'Description', required: true },
+      {
+        kind: 'number',
+        name: 'amount',
+        label: 'Amount (AUD)',
+        placeholder: '0.00',
+        required: true,
+      },
+      { kind: 'date', name: 'purchasedOn', label: 'Date of purchase', required: true },
+      { kind: 'file', name: 'receipt', label: 'Receipt', accept: 'image/*,.pdf', required: true },
+    ],
+  },
+  {
+    value: 'grievance',
+    label: 'Grievance form',
+    fields: [
+      { kind: 'text', name: 'title', label: 'Subject', required: true },
+      { kind: 'textarea', name: 'description', label: 'What happened', required: true },
+      { kind: 'text', name: 'involved', label: 'Who was involved' },
+      {
+        kind: 'segmented',
+        name: 'anonymous',
+        label: 'Submit anonymously',
+        options: [
+          { value: 'true', label: 'Yes' },
+          { value: 'false', label: 'No' },
+        ],
+      },
+      { kind: 'file', name: 'attachment', label: 'Attachment' },
+    ],
+  },
+  {
+    value: 'publications',
+    label: 'Publications request',
+    fields: [
+      { kind: 'text', name: 'title', label: 'Title', required: true },
+      { kind: 'textarea', name: 'description', label: 'Description', required: true },
+      {
+        kind: 'select',
+        name: 'publication',
+        label: 'Publication',
+        options: [
+          { value: 'handbook', label: 'Handbook' },
+          { value: 'newsletter', label: 'Newsletter' },
+          { value: 'blog', label: 'Blog' },
+          { value: 'social', label: 'Social' },
+        ],
+      },
+      { kind: 'date', name: 'deadline', label: 'Deadline' },
+      { kind: 'file', name: 'draft', label: 'Draft' },
+    ],
+  },
+];
 
 function requestForm(values: FieldValues): FieldDef[] {
+  const selected = requestTypes.find((type) => type.value === values.requestType);
+
   return [
     {
       kind: 'select',
       name: 'requestType',
       label: 'Request type',
       placeholder: 'Select a request type...',
-      options: Object.keys(requestFields),
+      options: requestTypes.map(({ value, label }) => ({ value, label })),
       required: true,
     },
-    ...(requestFields[values.requestType] ?? []),
+    ...(selected?.fields ?? []),
   ];
 }
 
 /* Mirrors POST /api/event's body, plus the INTERNAL/EXTERNAL split the
-   dashboard renders — note the API and events table have no column for it. */
+   dashboard renders — values match EventType, though note the API and the
+   events table have no column to store it. */
 const eventForm: FieldDef[] = [
   { kind: 'text', name: 'title', label: 'Event title', required: true },
   { kind: 'datetime', name: 'eventDate', label: 'Date and time', required: true },
-  { kind: 'segmented', name: 'type', label: 'Type', options: ['Internal', 'External'] },
+  {
+    kind: 'segmented',
+    name: 'type',
+    label: 'Type',
+    options: [
+      { value: 'INTERNAL', label: 'Internal' },
+      { value: 'EXTERNAL', label: 'External' },
+    ],
+  },
   { kind: 'text', name: 'location', label: 'Location' },
   { kind: 'number', name: 'capacity', label: 'Capacity' },
   { kind: 'textarea', name: 'description', label: 'Description' },
@@ -103,6 +173,18 @@ const taskForm: FieldDef[] = [
   { kind: 'datetime', name: 'dueAt', label: 'Due date and time', required: true },
 ];
 
+type FormFields = FieldDef[] | ((values: FieldValues) => FieldDef[]);
+
+const forms: Record<
+  Exclude<View, 'chooser'>,
+  { title: string; submitLabel: string; fields: FormFields }
+> = {
+  request: { title: 'New request', submitLabel: 'Submit request', fields: requestForm },
+  event: { title: 'New event', submitLabel: 'Create event', fields: eventForm },
+  announcement: { title: 'New announcement', submitLabel: 'Post', fields: announcementForm },
+  task: { title: 'New task', submitLabel: 'Add task', fields: taskForm },
+};
+
 export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   const [view, setView] = useState<View>('chooser');
 
@@ -111,58 +193,29 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     onClose();
   }
 
-  const back = () => setView('chooser');
+  /* The one seam backend wiring plugs into: `payload` is already pruned to the
+     fields on screen, with numbers coerced and datetimes pinned to ISO. */
+  function handleSubmit(payload: FieldPayload) {
+    /* TODO: POST per view. /api/event exists (title, description, eventDate,
+       location, capacity); requests, announcements and tasks have no endpoint
+       yet. File fields still carry only the filename, so uploads need the File
+       object itself sent as FormData. */
+  }
 
   if (!open) return null;
 
-  if (view === 'request') {
-    return (
-      <FormDialog
-        open
-        title="New request"
-        submitLabel="Submit request"
-        fields={requestForm}
-        onClose={handleClose}
-        onBack={back}
-      />
-    );
-  }
+  if (view !== 'chooser') {
+    const form = forms[view];
 
-  if (view === 'event') {
     return (
       <FormDialog
         open
-        title="New event"
-        submitLabel="Create event"
-        fields={eventForm}
+        title={form.title}
+        submitLabel={form.submitLabel}
+        fields={form.fields}
+        onSubmit={handleSubmit}
         onClose={handleClose}
-        onBack={back}
-      />
-    );
-  }
-
-  if (view === 'announcement') {
-    return (
-      <FormDialog
-        open
-        title="New announcement"
-        submitLabel="Post"
-        fields={announcementForm}
-        onClose={handleClose}
-        onBack={back}
-      />
-    );
-  }
-
-  if (view === 'task') {
-    return (
-      <FormDialog
-        open
-        title="New task"
-        submitLabel="Add task"
-        fields={taskForm}
-        onClose={handleClose}
-        onBack={back}
+        onBack={() => setView('chooser')}
       />
     );
   }

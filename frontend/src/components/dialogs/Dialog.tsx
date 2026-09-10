@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, X } from 'lucide-react';
 
 interface DialogProps {
@@ -20,6 +21,12 @@ export default function Dialog({
   onBack,
   children,
 }: DialogProps) {
+  const [mounted, setMounted] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const pressStartedOutside = useRef(false);
+
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -29,18 +36,35 @@ export default function Dialog({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
-  if (!open) return null;
+  /* createPortal needs a real document, which the server render doesn't have. */
+  if (!open || !mounted) return null;
 
-  return (
-    /* The backdrop scrolls rather than the card — a scroll container clips
-       absolutely positioned children, which would cut off open dropdowns. */
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/15" onClick={onClose}>
+  const outsideCard = (target: EventTarget | null) =>
+    !cardRef.current?.contains(target as Node);
+
+  return createPortal(
+    /* Portalled to <body> because the header is `sticky z-10`, and a sticky
+       element with a z-index creates a stacking context — nested inside it,
+       this overlay's z-50 is only compared against the header's contents, so
+       the calendar's own sticky header would paint over it. */
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/15"
+      /* A click is dispatched to the common ancestor of press and release, so
+         dragging a text selection from an input out onto the backdrop would
+         otherwise read as a backdrop click and discard the whole form. */
+      onMouseDown={(e) => {
+        pressStartedOutside.current = outsideCard(e.target);
+      }}
+      onClick={(e) => {
+        if (pressStartedOutside.current && outsideCard(e.target)) onClose();
+      }}
+    >
       <div className="flex min-h-full items-center justify-center p-4">
         <div
+          ref={cardRef}
           className={`relative w-full animate-dialog-in rounded-2xl bg-white p-8 shadow-xl motion-reduce:animate-none ${
             size === 'sm' ? 'max-w-sm' : 'max-w-md'
           }`}
-          onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={onClose}
@@ -66,6 +90,7 @@ export default function Dialog({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
