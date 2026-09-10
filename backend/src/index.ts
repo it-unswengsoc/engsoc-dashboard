@@ -1,5 +1,23 @@
-import dotenv from 'dotenv';
-dotenv.config();
+// dotenv is dev-only. Vercel injects real env vars straight into
+// process.env in production — there's no .env file in the deployed bundle,
+// so dotenv.config() would be a no-op there even if it worked. It didn't:
+// Vercel's function bundler for this service has failed to trace this
+// package's require() under two different import styles now
+// (`dotenv/config`, then a plain `import dotenv from 'dotenv'`), dropping
+// it from the deployed bundle and crashing every route on
+// "Cannot find module". Rather than chase a third import style, this stops
+// production depending on the package being present in the bundle at all —
+// skipped outright on Vercel (VERCEL is always set there), and loaded via a
+// dynamic require (invisible to static bundler analysis) everywhere else,
+// so local `.env` loading keeps working against the real node_modules.
+if (!process.env.VERCEL) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    require('dotenv').config();
+  } catch {
+    // not installed locally — fine, env vars can be set another way
+  }
+}
 
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
