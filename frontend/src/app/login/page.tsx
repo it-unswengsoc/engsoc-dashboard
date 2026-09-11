@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { login } from '@/services/auth-api';
+import { apiUrl } from '@/services/api-config';
 
 /* The backend's OAuth callback is a full-page redirect, not a fetch — it
    comes back here as ?token=... on success or ?error=... on failure, since
@@ -97,12 +98,8 @@ function LoginForm() {
               </p>
             )}
 
-            {/* Plain relative link, not apiUrl() — this is only ever clicked in
-                a browser, and apiUrl() resolves an absolute URL for server-side
-                fetches, which would mismatch between the SSR and hydration
-                passes for a client link like this. */}
             <a
-              href="/api/backend/auth/google"
+              href={apiUrl('/auth/google')}
               className="mt-6 flex w-full items-center justify-center gap-2.5 rounded-xl border border-gray-200 bg-white py-3 text-sm font-bold text-gray-700 shadow-sm transition-all hover:bg-gray-50 hover:shadow-md active:scale-[0.98]"
             >
               <GoogleIcon />

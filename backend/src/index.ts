@@ -23,14 +23,16 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import apiRoutes from './routes/api';
 import authRoutes from './routes/auth';
 import eventRoutes from './routes/events';
 import notificationRoutes from './routes/notifications';
 import driveRoutes from './routes/drive';
 
 const app: Application = express();
-const PORT = process.env.PORT || 3000;
+// Frontend owns port 3000 by Next.js convention; this backend now runs as
+// its own standalone service (not routed through the frontend's domain
+// anymore), so it needs a port of its own for local dev.
+const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(helmet());
@@ -42,12 +44,15 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/event', eventRoutes);
-app.use('/api/notification', notificationRoutes);
-app.use('/api/drive', driveRoutes);
-app.use('/api', apiRoutes);
+// Routes — no /api prefix: this backend has its own domain now
+// (previously /api/backend/* routed here through the frontend's domain via
+// Vercel's "Services" feature, which never correctly packaged this
+// service's dependencies; it's a standalone deployment now, so a plain
+// resource-named path is all that's needed).
+app.use('/auth', authRoutes);
+app.use('/events', eventRoutes);
+app.use('/notifications', notificationRoutes);
+app.use('/drive', driveRoutes);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {
