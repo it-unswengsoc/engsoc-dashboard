@@ -28,13 +28,15 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const morgan_1 = __importDefault(require("morgan"));
-const api_1 = __importDefault(require("./routes/api"));
 const auth_1 = __importDefault(require("./routes/auth"));
 const events_1 = __importDefault(require("./routes/events"));
 const notifications_1 = __importDefault(require("./routes/notifications"));
 const drive_1 = __importDefault(require("./routes/drive"));
 const app = (0, express_1.default)();
-const PORT = process.env.PORT || 3000;
+// Frontend owns port 3000 by Next.js convention; this backend now runs as
+// its own standalone service (not routed through the frontend's domain
+// anymore), so it needs a port of its own for local dev.
+const PORT = process.env.PORT || 5001;
 // Middleware
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({
@@ -44,12 +46,15 @@ app.use((0, cors_1.default)({
 app.use((0, morgan_1.default)('dev'));
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
-// Routes
-app.use('/api/auth', auth_1.default);
-app.use('/api/event', events_1.default);
-app.use('/api/notification', notifications_1.default);
-app.use('/api/drive', drive_1.default);
-app.use('/api', api_1.default);
+// Routes — no /api prefix: this backend has its own domain now
+// (previously /api/backend/* routed here through the frontend's domain via
+// Vercel's "Services" feature, which never correctly packaged this
+// service's dependencies; it's a standalone deployment now, so a plain
+// resource-named path is all that's needed).
+app.use('/auth', auth_1.default);
+app.use('/events', events_1.default);
+app.use('/notifications', notifications_1.default);
+app.use('/drive', drive_1.default);
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({
