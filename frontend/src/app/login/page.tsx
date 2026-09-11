@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { login } from '@/services/auth-api';
+import { apiUrl } from '@/services/api-config';
 
 /* The backend's OAuth callback is a full-page redirect, not a fetch — it
    comes back here as ?token=... on success or ?error=... on failure, since
@@ -65,11 +66,7 @@ function LoginForm() {
         <h1 style={styles.title}>EngSoc Dashboard</h1>
         <h2 style={styles.subtitle}>Sign in</h2>
 
-        {/* Plain relative link, not apiUrl() — this is only ever clicked in
-            a browser, and apiUrl() resolves an absolute URL for server-side
-            fetches, which would mismatch between the SSR and hydration
-            passes for a client link like this. */}
-        <a href="/api/backend/auth/google" style={styles.googleButton}>
+        <a href={apiUrl('/auth/google')} style={styles.googleButton}>
           <GoogleIcon />
           Sign in with Google
         </a>
