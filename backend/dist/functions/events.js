@@ -18,8 +18,13 @@ const pool = new pg_1.Pool({
  * Returns an array of events, or an empty array if none exist.
  */
 async function getAllEvents() {
-    // TODO: implement
-    throw new Error('Not implemented');
+    try {
+        return await (0, events_1.dbGetAllEvents)();
+    }
+    catch (error) {
+        console.error('Get all events error:', error);
+        return [];
+    }
 }
 /**
  * Emma
@@ -45,8 +50,13 @@ async function getEventById(eventId) {
  * Returns the newly created event, or null if creation failed.
  */
 async function createEvent(input) {
-    // TODO: implement
-    throw new Error('Not implemented');
+    try {
+        return await (0, events_1.dbCreateEvent)(input);
+    }
+    catch (error) {
+        console.error('Create event error:', error);
+        return null;
+    }
 }
 /**
  * Stuart
@@ -55,8 +65,13 @@ async function createEvent(input) {
  * Returns the updated event if successful, or null if the event was not found.
  */
 async function updateEvent(eventId, input) {
-    // TODO: implement
-    throw new Error('Not implemented');
+    try {
+        return await (0, events_1.dbUpdateEvent)(eventId, input);
+    }
+    catch (error) {
+        console.error('Update event error:', error);
+        return null;
+    }
 }
 /**
  * Emma

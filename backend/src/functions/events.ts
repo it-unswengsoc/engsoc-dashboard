@@ -1,5 +1,5 @@
 import { Pool, QueryResult } from 'pg';
-import { dbGetEventById, dbDeleteEvent } from '../database/events'
+import { dbGetAllEvents, dbGetEventById, dbCreateEvent, dbUpdateEvent, dbDeleteEvent } from '../database/events'
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   // RDS requires SSL — see functions/auth.ts's pool for why.
@@ -43,8 +43,12 @@ export interface UpdateEventInput {
  * Returns an array of events, or an empty array if none exist.
  */
 export async function getAllEvents(): Promise<Event[]> {
-  // TODO: implement
-  throw new Error('Not implemented');
+  try {
+    return await dbGetAllEvents();
+  } catch (error) {
+    console.error('Get all events error:', error);
+    return [];
+  }
 }
 
 /**
@@ -71,8 +75,12 @@ export async function getEventById(eventId: number): Promise<Event | null> {
  * Returns the newly created event, or null if creation failed.
  */
 export async function createEvent(input: CreateEventInput): Promise<Event | null> {
-  // TODO: implement
-  throw new Error('Not implemented');
+  try {
+    return await dbCreateEvent(input);
+  } catch (error) {
+    console.error('Create event error:', error);
+    return null;
+  }
 }
 
 /**
@@ -85,8 +93,12 @@ export async function updateEvent(
   eventId: number,
   input: UpdateEventInput
 ): Promise<Event | null> {
-  // TODO: implement
-  throw new Error('Not implemented');
+  try {
+    return await dbUpdateEvent(eventId, input);
+  } catch (error) {
+    console.error('Update event error:', error);
+    return null;
+  }
 }
 
 /**
