@@ -1,18 +1,12 @@
 import type { TaskItem } from '@/types/tasks';
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
 export type { TaskItem };
 
+/* Always mock, regardless of NEXT_PUBLIC_USE_MOCK — there's no tasks table
+   or backend route yet (unlike events/drive/auth, which are real). Wire
+   this up to a real endpoint once a Tasks feature actually exists on the
+   backend; until then this would just 404 in "real" mode. */
 export async function getTasks(): Promise<TaskItem[]> {
-  if (USE_MOCK) {
-    const { getTasks: mockGetTasks } = await import('@/mocks/functions/tasks');
-    return mockGetTasks();
-  }
-
-  const res = await fetch(apiUrl('/tasks'));
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load tasks');
-  return data.data;
+  const { getTasks: mockGetTasks } = await import('@/mocks/functions/tasks');
+  return mockGetTasks();
 }

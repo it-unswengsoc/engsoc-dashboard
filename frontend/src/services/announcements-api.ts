@@ -1,18 +1,12 @@
 import type { AnnouncementItem } from '@/types/announcements';
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
 export type { AnnouncementItem };
 
+/* Always mock, regardless of NEXT_PUBLIC_USE_MOCK — there's no announcements
+   table or backend route yet (unlike events/drive/auth, which are real).
+   Wire this up to a real endpoint once an Announcements feature actually
+   exists on the backend; until then this would just 404 in "real" mode. */
 export async function getAnnouncements(): Promise<AnnouncementItem[]> {
-  if (USE_MOCK) {
-    const { getAnnouncements: mockGetAnnouncements } = await import('@/mocks/functions/announcements');
-    return mockGetAnnouncements();
-  }
-
-  const res = await fetch(apiUrl('/announcements'));
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load announcements');
-  return data.data;
+  const { getAnnouncements: mockGetAnnouncements } = await import('@/mocks/functions/announcements');
+  return mockGetAnnouncements();
 }
