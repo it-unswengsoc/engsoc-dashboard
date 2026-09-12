@@ -8,6 +8,8 @@ exports.dbDeleteEvent = dbDeleteEvent;
 const pg_1 = require("pg");
 const pool = new pg_1.Pool({
     connectionString: process.env.DATABASE_URL,
+    // RDS requires SSL — see functions/auth.ts's pool for why.
+    ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
 });
 /**
  * Maps a raw database row to the Event interface,

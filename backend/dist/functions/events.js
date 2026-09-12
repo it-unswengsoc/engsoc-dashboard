@@ -9,6 +9,8 @@ const pg_1 = require("pg");
 const events_1 = require("../database/events");
 const pool = new pg_1.Pool({
     connectionString: process.env.DATABASE_URL,
+    // RDS requires SSL — see functions/auth.ts's pool for why.
+    ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
 });
 /**
  * Stuart
