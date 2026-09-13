@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getProfile } from '@/services/auth-api';
+import NewItemDialog from '@/components/dialogs/NewItemDialog';
 
 export default function Header() {
   const [initials, setInitials] = useState('');
+  const [newDialogOpen, setNewDialogOpen] = useState(false);
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
@@ -41,7 +43,10 @@ export default function Header() {
 
       <div className="flex items-center gap-3">
         {/* New button */}
-        <button className="flex items-center gap-2 rounded-xl bg-[#B1C9DC] px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98]">
+        <button
+          onClick={() => setNewDialogOpen(true)}
+          className="flex items-center gap-2 rounded-xl bg-[#B1C9DC] px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98]"
+        >
           <svg
             className="h-4 w-4"
             fill="none"
@@ -73,6 +78,8 @@ export default function Header() {
           {initials || '?'}
         </Link>
       </div>
+
+      <NewItemDialog open={newDialogOpen} onClose={() => setNewDialogOpen(false)} />
     </header>
   );
 }

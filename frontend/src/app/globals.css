@@ -4,4 +4,17 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-ibm-plex-mono), ui-monospace, monospace;
   --font-roboto: var(--next-font-roboto), ui-sans-serif, system-ui, sans-serif;
+
+  --animate-dialog-in: dialog-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
 }
