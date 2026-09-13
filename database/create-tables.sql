@@ -61,6 +61,10 @@ CREATE TABLE events (
   organizer_id INTEGER,
   status event_status DEFAULT 'upcoming',
   capacity INTEGER,
+  -- Set once this event has been mirrored to the shared EngSoc Google
+  -- Calendar (see backend/src/functions/calendar-sync.ts). Null means the
+  -- mirror hasn't happened yet (sync failed, or predates this feature).
+  google_calendar_event_id VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (organizer_id) REFERENCES users(id) ON DELETE SET NULL,

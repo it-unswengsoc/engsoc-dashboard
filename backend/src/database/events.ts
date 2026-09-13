@@ -8,7 +8,7 @@ const pool = new Pool({
 });
 
 const EVENT_COLUMNS = `id, title, description, image_url, event_type, start_date, end_date,
-       location, organizer_id, status, capacity, created_at, updated_at`;
+       location, organizer_id, status, capacity, google_calendar_event_id, created_at, updated_at`;
 
 /**
  * Maps a raw database row to the Event interface,
@@ -27,6 +27,7 @@ function rowToEvent(row: any): Event {
     organizerId: row.organizer_id,
     status: row.status,
     capacity: row.capacity,
+    googleCalendarEventId: row.google_calendar_event_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -162,4 +163,19 @@ export async function dbDeleteEvent(eventId: number): Promise<boolean> {
     [eventId]
   );
   return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * Records which Google Calendar event a row was mirrored to. Kept separate
+ * from dbUpdateEvent so this can't be set through the public update API —
+ * only the calendar-sync flow in functions/events.ts writes it.
+ */
+export async function dbSetGoogleCalendarEventId(
+  eventId: number,
+  googleCalendarEventId: string
+): Promise<void> {
+  await pool.query(`UPDATE events SET google_calendar_event_id = $1 WHERE id = $2`, [
+    googleCalendarEventId,
+    eventId,
+  ]);
 }

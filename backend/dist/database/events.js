@@ -5,6 +5,7 @@ exports.dbGetEventById = dbGetEventById;
 exports.dbCreateEvent = dbCreateEvent;
 exports.dbUpdateEvent = dbUpdateEvent;
 exports.dbDeleteEvent = dbDeleteEvent;
+exports.dbSetGoogleCalendarEventId = dbSetGoogleCalendarEventId;
 const pg_1 = require("pg");
 const pool = new pg_1.Pool({
     connectionString: process.env.DATABASE_URL,
@@ -12,7 +13,7 @@ const pool = new pg_1.Pool({
     ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
 });
 const EVENT_COLUMNS = `id, title, description, image_url, event_type, start_date, end_date,
-       location, organizer_id, status, capacity, created_at, updated_at`;
+       location, organizer_id, status, capacity, google_calendar_event_id, created_at, updated_at`;
 /**
  * Maps a raw database row to the Event interface,
  * converting snake_case column names to camelCase.
@@ -30,6 +31,7 @@ function rowToEvent(row) {
         organizerId: row.organizer_id,
         status: row.status,
         capacity: row.capacity,
+        googleCalendarEventId: row.google_calendar_event_id,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -141,5 +143,16 @@ async function dbUpdateEvent(eventId, input) {
 async function dbDeleteEvent(eventId) {
     const result = await pool.query(`DELETE FROM events WHERE id = $1 RETURNING id`, [eventId]);
     return (result.rowCount ?? 0) > 0;
+}
+/**
+ * Records which Google Calendar event a row was mirrored to. Kept separate
+ * from dbUpdateEvent so this can't be set through the public update API —
+ * only the calendar-sync flow in functions/events.ts writes it.
+ */
+async function dbSetGoogleCalendarEventId(eventId, googleCalendarEventId) {
+    await pool.query(`UPDATE events SET google_calendar_event_id = $1 WHERE id = $2`, [
+        googleCalendarEventId,
+        eventId,
+    ]);
 }
 //# sourceMappingURL=events.js.map

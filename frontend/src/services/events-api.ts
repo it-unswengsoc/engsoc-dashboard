@@ -39,3 +39,32 @@ export async function getEvents(): Promise<EventItem[]> {
   if (!res.ok) throw new Error(data.message || 'Failed to load events');
   return (data.data as RawEvent[]).map(toEventItem);
 }
+
+export interface CreateEventInput {
+  title: string;
+  startDate: string; // ISO date string
+  eventType: 'internal' | 'external';
+  location?: string;
+  capacity?: number;
+  description?: string;
+}
+
+/* Called client-side from the "New event" dialog, so the token comes from
+   the signed-in member's own session rather than being read here. The
+   backend mirrors the created event to the shared Google Calendar itself
+   (see backend/src/functions/calendar-sync.ts) — nothing more to do here
+   once this resolves. */
+export async function createEvent(token: string, input: CreateEventInput): Promise<EventItem> {
+  const res = await fetch(apiUrl('/events'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(input),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to create event');
+  return toEventItem(data.data as RawEvent);
+}

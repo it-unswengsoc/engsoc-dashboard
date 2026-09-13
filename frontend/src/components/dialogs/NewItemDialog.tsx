@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ClipboardList, Calendar, Megaphone, Inbox, type LucideIcon } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
-import FormDialog, { type FieldDef, type FieldValues } from '@/components/dialogs/FormDialog';
+import FormDialog, { type FieldDef, type FieldValues, type FieldPayload } from '@/components/dialogs/FormDialog';
+import { createEvent } from '@/services/events-api';
 
 interface NewItemDialogProps {
   open: boolean;
@@ -130,9 +132,9 @@ function requestForm(values: FieldValues): FieldDef[] {
   ];
 }
 
-/* Mirrors POST /api/event's body, plus the INTERNAL/EXTERNAL split the
-   dashboard renders — values match EventType, though note the API and the
-   events table have no column to store it. */
+/* Field names match POST /events's body except eventDate (-> startDate) and
+   type (INTERNAL/EXTERNAL -> internal/external) — mapped in
+   handleCreateEvent below. */
 const eventForm: FieldDef[] = [
   { kind: 'text', name: 'title', label: 'Event title', required: true },
   { kind: 'datetime', name: 'eventDate', label: 'Date and time', required: true },
@@ -174,6 +176,7 @@ const forms: Record<
 };
 
 export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
+  const router = useRouter();
   const [view, setView] = useState<View>('chooser');
 
   function handleClose() {
@@ -181,22 +184,48 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     onClose();
   }
 
+  /* Backend maps 1:1 onto eventForm's fields except eventDate -> startDate
+     and INTERNAL/EXTERNAL -> internal/external — matching the casing
+     EventType already uses on the calendar. The backend mirrors the created
+     event to the shared Google Calendar itself; refresh() is enough to pick
+     up both once this resolves. */
+  async function handleCreateEvent(payload: FieldPayload) {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    await createEvent(token, {
+      title: payload.title as string,
+      startDate: payload.eventDate as string,
+      eventType: payload.type === 'EXTERNAL' ? 'external' : 'internal',
+      location: payload.location as string | undefined,
+      capacity: payload.capacity as number | undefined,
+      description: payload.description as string | undefined,
+    });
+
+    router.refresh();
+  }
+
+  /* Only "New event" is wired up — tasks, announcements and requests have no
+     backend route mounted yet, so their submit stays disabled. */
+  const onSubmit: Partial<Record<Exclude<View, 'chooser'>, (payload: FieldPayload) => Promise<void>>> = {
+    event: handleCreateEvent,
+  };
+
   if (!open) return null;
 
   if (view !== 'chooser') {
     const form = forms[view];
 
-    /* TODO: pass an onSubmit per view to wire these up — that also re-enables
-       the submit button. Nothing is postable yet: POST /events exists but its
-       createEvent is an unimplemented stub, and tasks, announcements and
-       requests have no route mounted. Uploads additionally need the File
-       object itself (values carry only the filename) sent as FormData. */
     return (
       <FormDialog
         open
         title={form.title}
         submitLabel={form.submitLabel}
         fields={form.fields}
+        onSubmit={onSubmit[view]}
         onClose={handleClose}
         onBack={() => setView('chooser')}
       />

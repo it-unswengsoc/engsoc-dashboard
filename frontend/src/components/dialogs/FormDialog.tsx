@@ -39,8 +39,10 @@ interface FormDialogProps {
      swaps its whole body based on the chosen request type. */
   fields: FieldDef[] | ((values: FieldValues) => FieldDef[]);
   /* Omitted while a form has nowhere to submit to, which disables the submit
-     button rather than letting it close as though it saved. */
-  onSubmit?: (payload: FieldPayload) => void;
+     button rather than letting it close as though it saved. May return a
+     promise — the dialog waits for it and only closes on success, showing
+     a thrown Error's message inline otherwise. */
+  onSubmit?: (payload: FieldPayload) => void | Promise<void>;
   onClose: () => void;
   onBack: () => void;
 }
@@ -89,6 +91,8 @@ export default function FormDialog({
 }: FormDialogProps) {
   const [values, setValues] = useState<FieldValues>({});
   const [missing, setMissing] = useState<Record<string, boolean>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const resolvedFields = typeof fields === 'function' ? fields(values) : fields;
   const shownNames = resolvedFields.map((field) => field.name).join('\n');
@@ -115,12 +119,12 @@ export default function FormDialog({
     setMissing((prev) => (prev[name] ? { ...prev, [name]: false } : prev));
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
     /* Pressing Enter in a field submits the form even while the button is
        disabled, so the missing-handler case is guarded here too. */
-    if (!onSubmit) return;
+    if (!onSubmit || submitting) return;
 
     /* The form is noValidate: the custom dropdown and segmented toggle render
        as buttons, which the browser can't validate, so every field is checked
@@ -135,8 +139,16 @@ export default function FormDialog({
       return;
     }
 
-    onSubmit(buildPayload(resolvedFields, values));
-    onClose();
+    setSubmitError('');
+    setSubmitting(true);
+    try {
+      await onSubmit(buildPayload(resolvedFields, values));
+      onClose();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -237,6 +249,12 @@ export default function FormDialog({
           );
         })}
 
+        {submitError && (
+          <p role="alert" className="text-xs font-bold text-[#ED6672]">
+            {submitError}
+          </p>
+        )}
+
         <div className="mt-2 flex gap-3">
           <button
             type="button"
@@ -247,10 +265,10 @@ export default function FormDialog({
           </button>
           <button
             type="submit"
-            disabled={!onSubmit}
+            disabled={!onSubmit || submitting}
             className="flex-1 rounded-xl bg-[#B1C9DC] py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#B1C9DC] disabled:hover:shadow-sm disabled:active:scale-100"
           >
-            {submitLabel}
+            {submitting ? 'Saving…' : submitLabel}
           </button>
         </div>
       </form>
