@@ -6,13 +6,18 @@ const pool = new Pool({
   ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
 });
 
+export type EventType = 'internal' | 'external';
+
 export interface Event {
   id: number;
   title: string;
   description: string | null;
-  eventDate: string;
+  imageUrl: string | null;
+  eventType: EventType;
+  startDate: string;
+  endDate: string | null;
   location: string | null;
-  organizerId: number;
+  organizerId: number | null; // nullable: ON DELETE SET NULL if the organizer's account is removed
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
   capacity: number | null;
   createdAt: string;
@@ -22,7 +27,10 @@ export interface Event {
 export interface CreateEventInput {
   title: string;
   description?: string;
-  eventDate: string;
+  imageUrl?: string;
+  eventType?: EventType; // defaults to 'internal' at the DB layer
+  startDate: string;
+  endDate?: string;
   location?: string;
   organizerId: number;
   capacity?: number;
@@ -31,7 +39,10 @@ export interface CreateEventInput {
 export interface UpdateEventInput {
   title?: string;
   description?: string;
-  eventDate?: string;
+  imageUrl?: string;
+  eventType?: EventType;
+  startDate?: string;
+  endDate?: string;
   location?: string;
   status?: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
   capacity?: number;

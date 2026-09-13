@@ -7,6 +7,9 @@ const pool = new Pool({
   ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
 });
 
+const EVENT_COLUMNS = `id, title, description, image_url, event_type, start_date, end_date,
+       location, organizer_id, status, capacity, created_at, updated_at`;
+
 /**
  * Maps a raw database row to the Event interface,
  * converting snake_case column names to camelCase.
@@ -16,7 +19,10 @@ function rowToEvent(row: any): Event {
     id: row.id,
     title: row.title,
     description: row.description,
-    eventDate: row.event_date,
+    imageUrl: row.image_url,
+    eventType: row.event_type,
+    startDate: row.start_date,
+    endDate: row.end_date,
     location: row.location,
     organizerId: row.organizer_id,
     status: row.status,
@@ -27,15 +33,12 @@ function rowToEvent(row: any): Event {
 }
 
 /**
- * Fetches every event from the database, ordered by event date ascending.
+ * Fetches every event from the database, ordered by start date ascending.
  * Returns an array of Event objects (empty array if no events exist).
  */
 export async function dbGetAllEvents(): Promise<Event[]> {
   const result: QueryResult = await pool.query(
-    `SELECT id, title, description, event_date, location, organizer_id,
-            status, capacity, created_at, updated_at
-     FROM events
-     ORDER BY event_date ASC`
+    `SELECT ${EVENT_COLUMNS} FROM events ORDER BY start_date ASC`
   );
   return result.rows.map(rowToEvent);
 }
@@ -46,10 +49,7 @@ export async function dbGetAllEvents(): Promise<Event[]> {
  */
 export async function dbGetEventById(eventId: number): Promise<Event | null> {
   const result: QueryResult = await pool.query(
-    `SELECT id, title, description, event_date, location, organizer_id,
-            status, capacity, created_at, updated_at
-     FROM events
-     WHERE id = $1`,
+    `SELECT ${EVENT_COLUMNS} FROM events WHERE id = $1`,
     [eventId]
   );
   if (result.rows.length === 0) return null;
@@ -63,14 +63,16 @@ export async function dbGetEventById(eventId: number): Promise<Event | null> {
 export async function dbCreateEvent(input: CreateEventInput): Promise<Event | null> {
   const result: QueryResult = await pool.query(
     `INSERT INTO events
-       (title, description, event_date, location, organizer_id, capacity, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-     RETURNING id, title, description, event_date, location, organizer_id,
-               status, capacity, created_at, updated_at`,
+       (title, description, image_url, event_type, start_date, end_date, location, organizer_id, capacity, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+     RETURNING ${EVENT_COLUMNS}`,
     [
       input.title,
       input.description ?? null,
-      input.eventDate,
+      input.imageUrl ?? null,
+      input.eventType ?? 'internal',
+      input.startDate,
+      input.endDate ?? null,
       input.location ?? null,
       input.organizerId,
       input.capacity ?? null,
@@ -101,9 +103,21 @@ export async function dbUpdateEvent(
     setClauses.push(`description = $${paramIndex++}`);
     values.push(input.description);
   }
-  if (input.eventDate !== undefined) {
-    setClauses.push(`event_date = $${paramIndex++}`);
-    values.push(input.eventDate);
+  if (input.imageUrl !== undefined) {
+    setClauses.push(`image_url = $${paramIndex++}`);
+    values.push(input.imageUrl);
+  }
+  if (input.eventType !== undefined) {
+    setClauses.push(`event_type = $${paramIndex++}`);
+    values.push(input.eventType);
+  }
+  if (input.startDate !== undefined) {
+    setClauses.push(`start_date = $${paramIndex++}`);
+    values.push(input.startDate);
+  }
+  if (input.endDate !== undefined) {
+    setClauses.push(`end_date = $${paramIndex++}`);
+    values.push(input.endDate);
   }
   if (input.location !== undefined) {
     setClauses.push(`location = $${paramIndex++}`);
@@ -130,8 +144,7 @@ export async function dbUpdateEvent(
     `UPDATE events
      SET ${setClauses.join(', ')}
      WHERE id = $${paramIndex}
-     RETURNING id, title, description, event_date, location, organizer_id,
-               status, capacity, created_at, updated_at`,
+     RETURNING ${EVENT_COLUMNS}`,
     values
   );
 

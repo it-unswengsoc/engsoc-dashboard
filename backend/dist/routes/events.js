@@ -64,17 +64,20 @@ router.get('/:eventId', async (req, res) => {
 router.post('/', auth_1.verifyAuthToken, async (req, res) => {
     try {
         const user = req.user;
-        const { title, description, eventDate, location, capacity } = req.body;
-        if (!title || !eventDate) {
+        const { title, description, imageUrl, eventType, startDate, endDate, location, capacity } = req.body;
+        if (!title || !startDate) {
             return res.status(400).json({
                 status: 'error',
-                message: 'Missing required fields: title, eventDate',
+                message: 'Missing required fields: title, startDate',
             });
         }
         const event = await (0, events_1.createEvent)({
             title,
             description,
-            eventDate,
+            imageUrl,
+            eventType,
+            startDate,
+            endDate,
             location,
             organizerId: user.userId,
             capacity,
@@ -112,11 +115,14 @@ router.put('/:eventId', auth_1.verifyAuthToken, async (req, res) => {
                 message: 'Invalid event ID',
             });
         }
-        const { title, description, eventDate, location, status, capacity } = req.body;
+        const { title, description, imageUrl, eventType, startDate, endDate, location, status, capacity } = req.body;
         const event = await (0, events_1.updateEvent)(eventId, {
             title,
             description,
-            eventDate,
+            imageUrl,
+            eventType,
+            startDate,
+            endDate,
             location,
             status,
             capacity,
