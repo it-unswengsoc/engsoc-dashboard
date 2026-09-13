@@ -12,7 +12,7 @@ export async function getDriveFolders(): Promise<DriveFolder[]> {
     return mockGetDriveFolders();
   }
 
-  const res = await fetch(apiUrl('/drive/folders'));
+  const res = await fetch(apiUrl('/drive/folders'), { cache: 'no-store' });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load Drive folders');
   return data.data;
@@ -24,7 +24,7 @@ export async function getRecentFiles(limit = 20): Promise<DriveFile[]> {
     return mockGetRecentFiles(limit);
   }
 
-  const res = await fetch(apiUrl(`/drive/files/recent?limit=${limit}`));
+  const res = await fetch(apiUrl(`/drive/files/recent?limit=${limit}`), { cache: 'no-store' });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load recent files');
   return data.data;

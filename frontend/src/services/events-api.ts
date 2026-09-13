@@ -34,10 +34,8 @@ export async function getEvents(): Promise<EventItem[]> {
     return mockGetEvents();
   }
 
-  const url = apiUrl('/events');
-  const res = await fetch(url, { cache: 'no-store' });
+  const res = await fetch(apiUrl('/events'), { cache: 'no-store' });
   const data = await res.json();
-  console.log('[getEvents] url=%s status=%d body=%s', url, res.status, JSON.stringify(data).slice(0, 500));
   if (!res.ok) throw new Error(data.message || 'Failed to load events');
   return (data.data as RawEvent[]).map(toEventItem);
 }
