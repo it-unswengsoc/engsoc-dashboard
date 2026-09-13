@@ -16,6 +16,7 @@ export default async function CalendarLayout({ children }: { children: React.Rea
   ]);
 
   const items = toCalendarItems(events, tasks);
+  console.log('[CalendarLayout] events=%s items=%s', JSON.stringify(events), JSON.stringify(items));
 
   return (
     <CalendarShell items={items} dueTasks={dueTasks}>
