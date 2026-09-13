@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* Tailwind v4's preflight gives buttons `cursor: default`, so every control in
+   the app renders an arrow unless told otherwise. Covers role="button" too —
+   the calendar's day cells are divs. */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 @theme {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-ibm-plex-mono), ui-monospace, monospace;
