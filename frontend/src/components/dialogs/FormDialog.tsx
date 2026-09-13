@@ -22,11 +22,14 @@ export type FieldDef =
       placeholder?: string;
       required?: boolean;
     }
+  /* Renders as a yes/no toggle but leaves the payload a real boolean — a
+     "false" string would be truthy to anything checking it server-side. */
+  | { kind: 'boolean'; name: string; label: string; required?: boolean }
   | { kind: 'file'; name: string; label: string; accept?: string; required?: boolean };
 
 /* Raw DOM input values — always strings. `buildPayload` converts them. */
 export type FieldValues = Record<string, string>;
-export type FieldPayload = Record<string, string | number>;
+export type FieldPayload = Record<string, string | number | boolean>;
 
 interface FormDialogProps {
   open: boolean;
@@ -35,10 +38,17 @@ interface FormDialogProps {
   /* A function when later fields depend on earlier answers — the request form
      swaps its whole body based on the chosen request type. */
   fields: FieldDef[] | ((values: FieldValues) => FieldDef[]);
-  onSubmit: (payload: FieldPayload) => void;
+  /* Omitted while a form has nowhere to submit to, which disables the submit
+     button rather than letting it close as though it saved. */
+  onSubmit?: (payload: FieldPayload) => void;
   onClose: () => void;
   onBack: () => void;
 }
+
+const BOOLEAN_OPTIONS: FieldOption[] = [
+  { value: 'true', label: 'Yes' },
+  { value: 'false', label: 'No' },
+];
 
 const inputStyles =
   'w-full rounded-lg border border-transparent bg-gray-100 px-3 py-2 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]';
@@ -56,6 +66,8 @@ function buildPayload(fields: FieldDef[], values: FieldValues): FieldPayload {
 
     if (field.kind === 'number') {
       payload[field.name] = Number(raw);
+    } else if (field.kind === 'boolean') {
+      payload[field.name] = raw === 'true';
     } else if (field.kind === 'datetime') {
       payload[field.name] = new Date(raw).toISOString();
     } else {
@@ -106,6 +118,10 @@ export default function FormDialog({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
+    /* Pressing Enter in a field submits the form even while the button is
+       disabled, so the missing-handler case is guarded here too. */
+    if (!onSubmit) return;
+
     /* The form is noValidate: the custom dropdown and segmented toggle render
        as buttons, which the browser can't validate, so every field is checked
        here instead to keep one consistent error style. Only visible fields
@@ -129,8 +145,9 @@ export default function FormDialog({
         {resolvedFields.map((field) => {
           /* Only wrap real form controls in a label — a label would forward
              clicks on a dropdown option back to the toggle button. */
-          const Wrapper =
-            field.kind === 'select' || field.kind === 'segmented' ? 'div' : 'label';
+          const isChoice =
+            field.kind === 'select' || field.kind === 'segmented' || field.kind === 'boolean';
+          const Wrapper = isChoice ? 'div' : 'label';
           const invalid = missing[field.name] === true;
           const controlStyles = invalid ? `${inputStyles} ring-2 ring-[#ED6672]` : inputStyles;
 
@@ -160,14 +177,14 @@ export default function FormDialog({
                   invalid={invalid}
                   onChange={(value) => setValue(field.name, value)}
                 />
-              ) : field.kind === 'segmented' ? (
+              ) : field.kind === 'boolean' || field.kind === 'segmented' ? (
                 <div
                   role="radiogroup"
                   aria-required={field.required}
                   aria-invalid={invalid}
                   className={`flex gap-2 rounded-lg ${invalid ? 'ring-2 ring-[#ED6672]' : ''}`}
                 >
-                  {field.options.map((option) => (
+                  {(field.kind === 'boolean' ? BOOLEAN_OPTIONS : field.options).map((option) => (
                     <button
                       key={option.value}
                       type="button"
@@ -230,7 +247,8 @@ export default function FormDialog({
           </button>
           <button
             type="submit"
-            className="flex-1 rounded-xl bg-[#B1C9DC] py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98]"
+            disabled={!onSubmit}
+            className="flex-1 rounded-xl bg-[#B1C9DC] py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-[#B1C9DC] disabled:hover:shadow-sm disabled:active:scale-100"
           >
             {submitLabel}
           </button>

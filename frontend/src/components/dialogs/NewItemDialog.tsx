@@ -3,11 +3,7 @@
 import { useState } from 'react';
 import { ClipboardList, Calendar, Megaphone, Inbox, type LucideIcon } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
-import FormDialog, {
-  type FieldDef,
-  type FieldPayload,
-  type FieldValues,
-} from '@/components/dialogs/FormDialog';
+import FormDialog, { type FieldDef, type FieldValues } from '@/components/dialogs/FormDialog';
 
 interface NewItemDialogProps {
   open: boolean;
@@ -91,15 +87,7 @@ const requestTypes: { value: string; label: string; fields: FieldDef[] }[] = [
       { kind: 'text', name: 'title', label: 'Subject', required: true },
       { kind: 'textarea', name: 'description', label: 'What happened', required: true },
       { kind: 'text', name: 'involved', label: 'Who was involved' },
-      {
-        kind: 'segmented',
-        name: 'anonymous',
-        label: 'Submit anonymously',
-        options: [
-          { value: 'true', label: 'Yes' },
-          { value: 'false', label: 'No' },
-        ],
-      },
+      { kind: 'boolean', name: 'anonymous', label: 'Submit anonymously' },
       { kind: 'file', name: 'attachment', label: 'Attachment' },
     ],
   },
@@ -193,27 +181,22 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     onClose();
   }
 
-  /* The one seam backend wiring plugs into: `payload` is already pruned to the
-     fields on screen, with numbers coerced and datetimes pinned to ISO. */
-  function handleSubmit(payload: FieldPayload) {
-    /* TODO: POST per view. /api/event exists (title, description, eventDate,
-       location, capacity); requests, announcements and tasks have no endpoint
-       yet. File fields still carry only the filename, so uploads need the File
-       object itself sent as FormData. */
-  }
-
   if (!open) return null;
 
   if (view !== 'chooser') {
     const form = forms[view];
 
+    /* TODO: pass an onSubmit per view to wire these up — that also re-enables
+       the submit button. Nothing is postable yet: POST /events exists but its
+       createEvent is an unimplemented stub, and tasks, announcements and
+       requests have no route mounted. Uploads additionally need the File
+       object itself (values carry only the filename) sent as FormData. */
     return (
       <FormDialog
         open
         title={form.title}
         submitLabel={form.submitLabel}
         fields={form.fields}
-        onSubmit={handleSubmit}
         onClose={handleClose}
         onBack={() => setView('chooser')}
       />

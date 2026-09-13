@@ -24,6 +24,7 @@ export default function Dialog({
   const [mounted, setMounted] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const pressStartedOutside = useRef(false);
+  const releasedOutside = useRef(false);
 
   useEffect(() => setMounted(true), []);
 
@@ -50,13 +51,20 @@ export default function Dialog({
     <div
       className="fixed inset-0 z-50 overflow-y-auto bg-black/15"
       /* A click is dispatched to the common ancestor of press and release, so
-         dragging a text selection from an input out onto the backdrop would
-         otherwise read as a backdrop click and discard the whole form. */
+         a drag between the card and the backdrop — in either direction — lands
+         on the overlay and would otherwise read as a backdrop click, discarding
+         a filled-in form. Both ends of the press have to be outside the card. */
       onMouseDown={(e) => {
         pressStartedOutside.current = outsideCard(e.target);
       }}
-      onClick={(e) => {
-        if (pressStartedOutside.current && outsideCard(e.target)) onClose();
+      onMouseUp={(e) => {
+        releasedOutside.current = outsideCard(e.target);
+      }}
+      onClick={() => {
+        const clickedBackdrop = pressStartedOutside.current && releasedOutside.current;
+        pressStartedOutside.current = false;
+        releasedOutside.current = false;
+        if (clickedBackdrop) onClose();
       }}
     >
       <div className="flex min-h-full items-center justify-center p-4">
