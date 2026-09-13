@@ -74,6 +74,34 @@ CREATE TABLE event_attendees (
   UNIQUE(event_id, user_id)
 );
 
+-- Announcements table
+-- authorName/authorRole are not stored here; join to users (first_name, last_name, role)
+-- via author_id at query time so they stay in sync with the user's profile.
+CREATE TABLE announcements (
+  id SERIAL PRIMARY KEY,
+  author_id INTEGER NOT NULL,
+  content TEXT NOT NULL,
+  image_url VARCHAR(500),
+  like_count INTEGER DEFAULT 0,
+  comment_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Announcement likes join table
+-- Existence of a row = that user likes that announcement.
+-- isLikedByMe is derived by checking this table for the authenticated user's id.
+CREATE TABLE announcement_likes (
+  id SERIAL PRIMARY KEY,
+  announcement_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (announcement_id) REFERENCES announcements(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(announcement_id, user_id)
+);
+
 -- User roles table (for future role management)
 CREATE TABLE user_roles (
   id SERIAL PRIMARY KEY,
