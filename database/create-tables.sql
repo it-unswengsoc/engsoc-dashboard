@@ -35,6 +35,11 @@ CREATE TABLE users (
   last_name VARCHAR(100) NOT NULL,
   role user_role DEFAULT 'member',
   port port_type,
+  -- Captured on every Google sign-in (see findOrCreateGoogleUser) — lets the
+  -- backend read this member's own Google Calendar on their behalf later,
+  -- without them needing to be present in a browser. Null for password-only
+  -- accounts, or a Google account that hasn't signed in since this was added.
+  google_refresh_token TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

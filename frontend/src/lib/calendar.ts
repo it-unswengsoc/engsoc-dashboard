@@ -1,5 +1,11 @@
-import type { EventItem, EventType } from '@/types/events';
+import type { EventType } from '@/types/events';
 import type { TaskItem } from '@/types/tasks';
+import type { UserCalendarEvent } from '@/services/user-calendar-api';
+
+/* Dispatched on window after an event is created elsewhere in the app (see
+   NewItemDialog) — CalendarShell listens for it to refetch the signed-in
+   member's Google Calendar without needing a full page reload. */
+export const CALENDAR_EVENTS_CHANGED_EVENT = 'engsoc:calendar-events-changed';
 
 export type CalendarItem =
   | { kind: 'event'; id: string; name: string; start: Date; type: EventType }
@@ -8,16 +14,8 @@ export type CalendarItem =
 /* Events/tasks carry no end time yet, so the grid views render every item as
    a fixed-height block positioned by start time only. */
 
-export function toCalendarItems(events: EventItem[], tasks: TaskItem[]): CalendarItem[] {
-  const eventItems: CalendarItem[] = events.map((e) => ({
-    kind: 'event',
-    id: `event-${e.id}`,
-    name: e.name,
-    start: new Date(e.startsAt),
-    type: e.type,
-  }));
-
-  const taskItems: CalendarItem[] = tasks
+export function toTaskCalendarItems(tasks: TaskItem[]): CalendarItem[] {
+  return tasks
     .filter((t) => !t.completed)
     .map((t) => ({
       kind: 'task',
@@ -26,8 +24,20 @@ export function toCalendarItems(events: EventItem[], tasks: TaskItem[]): Calenda
       start: new Date(t.dueAt),
       daysTillDue: daysBetween(new Date(), new Date(t.dueAt)),
     }));
+}
 
-  return [...eventItems, ...taskItems];
+/* Every calendar the signed-in member can see in their own Google account —
+   personal events plus anything they've added, including the shared EngSoc
+   calendar once they've subscribed to it themselves (isSharedEngSocEvent
+   flags which is which, so it can render like an official EngSoc event). */
+export function toGoogleCalendarItems(events: UserCalendarEvent[]): CalendarItem[] {
+  return events.map((e) => ({
+    kind: 'event',
+    id: `gcal-${e.id}`,
+    name: e.title,
+    start: new Date(e.startsAt),
+    type: e.isSharedEngSocEvent ? 'INTERNAL' : 'EXTERNAL',
+  }));
 }
 
 function daysBetween(from: Date, to: Date): number {

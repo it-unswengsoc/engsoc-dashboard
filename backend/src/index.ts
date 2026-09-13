@@ -28,6 +28,7 @@ import eventRoutes from './routes/events';
 import notificationRoutes from './routes/notifications';
 import driveRoutes from './routes/drive';
 import announcementRoutes from './routes/announcements';
+import calendarRoutes from './routes/calendar';
 
 const app: Application = express();
 // Frontend owns port 3000 by Next.js convention; this backend now runs as
@@ -55,6 +56,7 @@ app.use('/events', eventRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/drive', driveRoutes);
 app.use('/announcements', announcementRoutes);
+app.use('/calendar', calendarRoutes);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

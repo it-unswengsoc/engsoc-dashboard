@@ -228,7 +228,7 @@ router.get('/google/callback', async (req, res) => {
                 data: { ...profile, refreshToken },
             });
         }
-        const user = await (0, auth_1.findOrCreateGoogleUser)(profile.googleId, profile.email, profile.firstName, profile.lastName);
+        const user = await (0, auth_1.findOrCreateGoogleUser)(profile.googleId, profile.email, profile.firstName, profile.lastName, refreshToken);
         if (!user) {
             return res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
         }

@@ -1,16 +1,26 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import TaskRow from '@/components/TaskRow';
 import { CalendarContext } from './CalendarContext';
 import CalendarToolbar, { type CalendarView } from './CalendarToolbar';
 import CalendarItemDetail from './CalendarItemDetail';
-import { addDays, addMonths, addYears, startOfWeek, MONTHS_LONG, type CalendarItem } from '@/lib/calendar';
+import {
+  addDays,
+  addMonths,
+  addYears,
+  startOfWeek,
+  MONTHS_LONG,
+  toGoogleCalendarItems,
+  CALENDAR_EVENTS_CHANGED_EVENT,
+  type CalendarItem,
+} from '@/lib/calendar';
 import type { TaskRowData } from '@/types/dashboard';
+import { getMyCalendarEvents } from '@/services/user-calendar-api';
 
 interface CalendarShellProps {
-  items: CalendarItem[];
+  taskItems: CalendarItem[];
   dueTasks: TaskRowData[];
   children: React.ReactNode;
 }
@@ -40,13 +50,49 @@ function formatTitle(anchor: Date, view: CalendarView): string {
   return `${MONTHS_LONG[anchor.getMonth()]} ${anchor.getFullYear()}`;
 }
 
-export default function CalendarShell({ items, dueTasks, children }: CalendarShellProps) {
+export default function CalendarShell({ taskItems, dueTasks, children }: CalendarShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const view = viewFromPathname(pathname);
 
   const [anchor, setAnchor] = useState(() => new Date());
   const [selected, setSelected] = useState<CalendarItem | null>(null);
+  const [eventItems, setEventItems] = useState<CalendarItem[]>([]);
+  const [googleConnected, setGoogleConnected] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function loadEvents() {
+      const token = sessionStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      getMyCalendarEvents(token)
+        .then(({ events, connected }) => {
+          if (cancelled) return;
+          setEventItems(toGoogleCalendarItems(events));
+          setGoogleConnected(connected);
+          setLoadError('');
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setLoadError(err instanceof Error ? err.message : 'Failed to load your Google Calendar');
+        });
+    }
+
+    loadEvents();
+    window.addEventListener(CALENDAR_EVENTS_CHANGED_EVENT, loadEvents);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(CALENDAR_EVENTS_CHANGED_EVENT, loadEvents);
+    };
+  }, [router]);
+
+  const items = useMemo(() => [...eventItems, ...taskItems], [eventItems, taskItems]);
 
   const title = useMemo(() => formatTitle(anchor, view), [anchor, view]);
 
@@ -63,6 +109,16 @@ export default function CalendarShell({ items, dueTasks, children }: CalendarShe
             onPrev={() => setAnchor((d) => shift(d, view, -1))}
             onNext={() => setAnchor((d) => shift(d, view, 1))}
           />
+          {!googleConnected && (
+            <p className="border-b border-gray-200 bg-[#F4EFD3] px-4 py-2 font-mono text-xs font-bold text-[#7A6A2E]">
+              Your Google Calendar isn't connected — sign out and back in with Google to see your events here.
+            </p>
+          )}
+          {loadError && (
+            <p className="border-b border-gray-200 bg-[#F1C4C9] px-4 py-2 font-mono text-xs font-bold text-[#8B2E38]">
+              {loadError}
+            </p>
+          )}
           <div className="flex flex-1 flex-col overflow-hidden">{children}</div>
         </div>
 

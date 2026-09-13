@@ -6,6 +6,7 @@ import { ClipboardList, Calendar, Megaphone, Inbox, type LucideIcon } from 'luci
 import Dialog from '@/components/dialogs/Dialog';
 import FormDialog, { type FieldDef, type FieldValues, type FieldPayload } from '@/components/dialogs/FormDialog';
 import { createEvent } from '@/services/events-api';
+import { CALENDAR_EVENTS_CHANGED_EVENT } from '@/lib/calendar';
 
 interface NewItemDialogProps {
   open: boolean;
@@ -187,8 +188,12 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   /* Backend maps 1:1 onto eventForm's fields except eventDate -> startDate
      and INTERNAL/EXTERNAL -> internal/external — matching the casing
      EventType already uses on the calendar. The backend mirrors the created
-     event to the shared Google Calendar itself; refresh() is enough to pick
-     up both once this resolves. */
+     event to the shared EngSoc Google Calendar itself. router.refresh() picks
+     up the dashboard's own Postgres-backed "upcoming events" widget; the
+     calendar page reads each member's own Google Calendar client-side
+     instead, so it needs the separate CALENDAR_EVENTS_CHANGED_EVENT nudge —
+     and even then, this new event only appears there for someone who has
+     already added the shared EngSoc calendar to their own Google account. */
   async function handleCreateEvent(payload: FieldPayload) {
     const token = sessionStorage.getItem('token');
     if (!token) {
@@ -206,6 +211,7 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     });
 
     router.refresh();
+    window.dispatchEvent(new Event(CALENDAR_EVENTS_CHANGED_EVENT));
   }
 
   /* Only "New event" is wired up — tasks, announcements and requests have no

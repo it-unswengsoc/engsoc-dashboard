@@ -269,7 +269,8 @@ router.get('/google/callback', async (req: Request, res: Response) => {
       profile.googleId,
       profile.email,
       profile.firstName,
-      profile.lastName
+      profile.lastName,
+      refreshToken
     );
 
     if (!user) {

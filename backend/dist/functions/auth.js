@@ -10,6 +10,7 @@ exports.verifyToken = verifyToken;
 exports.registerUser = registerUser;
 exports.loginUser = loginUser;
 exports.findOrCreateGoogleUser = findOrCreateGoogleUser;
+exports.getUserGoogleRefreshToken = getUserGoogleRefreshToken;
 exports.getUserProfile = getUserProfile;
 exports.updateUserProfile = updateUserProfile;
 const bcrypt_1 = __importDefault(require("bcrypt"));
@@ -129,27 +130,57 @@ async function loginUser(email, password) {
  * Find the user for a verified Google identity, linking it to an existing
  * local-password account with the same email, or creating a Google-only
  * account (no password_hash) if neither exists.
+ *
+ * refreshToken, when present, is stored so the backend can later read this
+ * member's own Google Calendar on their behalf (see functions/user-calendar.ts).
+ * Google only issues one when the consent screen is actually shown, which
+ * getGoogleAuthUrl forces on every sign-in via prompt: 'consent' — so this
+ * is expected to arrive on every login, not just the first.
  */
-async function findOrCreateGoogleUser(googleId, email, firstName, lastName) {
+async function findOrCreateGoogleUser(googleId, email, firstName, lastName, refreshToken) {
     try {
         const byGoogleId = await pool.query('SELECT id, email FROM users WHERE google_id = $1', [googleId]);
         if (byGoogleId.rows.length > 0) {
             const user = byGoogleId.rows[0];
-            await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+            if (refreshToken) {
+                await pool.query('UPDATE users SET last_login = NOW(), google_refresh_token = $2 WHERE id = $1', [user.id, refreshToken]);
+            }
+            else {
+                await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+            }
             return { userId: user.id, email: user.email };
         }
         const byEmail = await pool.query('SELECT id, email FROM users WHERE email = $1', [email]);
         if (byEmail.rows.length > 0) {
             const user = byEmail.rows[0];
-            await pool.query('UPDATE users SET google_id = $1, last_login = NOW() WHERE id = $2', [googleId, user.id]);
+            await pool.query(`UPDATE users
+         SET google_id = $1, last_login = NOW()${refreshToken ? ', google_refresh_token = $3' : ''}
+         WHERE id = $2`, refreshToken ? [googleId, user.id, refreshToken] : [googleId, user.id]);
             return { userId: user.id, email: user.email };
         }
-        const result = await pool.query(`INSERT INTO users (email, google_id, first_name, last_name, created_at, last_login)
-       VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id, email`, [email, googleId, firstName || 'Google', lastName || 'User']);
+        const result = await pool.query(`INSERT INTO users (email, google_id, first_name, last_name, google_refresh_token, created_at, last_login)
+       VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, email`, [email, googleId, firstName || 'Google', lastName || 'User', refreshToken ?? null]);
         return { userId: result.rows[0].id, email: result.rows[0].email };
     }
     catch (error) {
         console.error('findOrCreateGoogleUser error:', error);
+        return null;
+    }
+}
+/**
+ * Looks up the Google refresh token captured at this member's last Google
+ * sign-in, if any. Null for password-only accounts, or a Google account that
+ * hasn't signed in since this was added.
+ */
+async function getUserGoogleRefreshToken(userId) {
+    try {
+        const result = await pool.query('SELECT google_refresh_token FROM users WHERE id = $1', [userId]);
+        if (result.rows.length === 0)
+            return null;
+        return result.rows[0].google_refresh_token ?? null;
+    }
+    catch (error) {
+        console.error('Get user Google refresh token error:', error);
         return null;
     }
 }
