@@ -72,7 +72,7 @@ export default function Header() {
 
         {/* User avatar — links to profile page */}
         <Link
-          href="/profile"
+          href="/dashboard/profile"
           className="w-9 h-9 rounded-full bg-[#B1C9DC] text-white text-sm font-bold flex items-center justify-center hover:bg-[#9db8cd] transition-colors"
         >
           {initials || '?'}
