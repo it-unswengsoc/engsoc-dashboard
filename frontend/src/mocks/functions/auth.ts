@@ -8,3 +8,11 @@ export async function login(_email: string, _password: string): Promise<AuthResp
 export async function getProfile(_token: string): Promise<Profile> {
   return mockProfile;
 }
+
+export async function updateProfile(
+  _token: string,
+  firstName: string,
+  lastName: string,
+): Promise<Profile> {
+  return { ...mockProfile, firstName, lastName };
+}
