@@ -4,6 +4,8 @@ import { dbGetAllEvents } from '../database/events';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  // RDS requires SSL — see functions/auth.ts's pool for why.
+  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
 });
 
 export interface Notification {

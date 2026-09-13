@@ -1,22 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { getProfile } from '@/services/auth';
-
-const pageTitles: Record<string, string> = {
-  '/': 'Dashboard',
-  '/calendar': 'Calendar',
-  '/documents': 'Documents',
-  '/settings': 'Settings',
-};
+import { getProfile } from '@/services/auth-api';
+import NewItemDialog from '@/components/dialogs/NewItemDialog';
 
 export default function Header() {
-  const pathname = usePathname();
   const [initials, setInitials] = useState('');
-
-  const title = pageTitles[pathname] ?? 'Dashboard';
+  const [newDialogOpen, setNewDialogOpen] = useState(false);
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
@@ -32,26 +23,45 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="flex items-center justify-between px-8 py-4 bg-white border-b border-gray-200">
-      <h1 className="text-xl font-semibold text-gray-900">{title}</h1>
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-4 px-8 py-2 bg-white border-b border-gray-200">
+      {/* Search bar — TODO: wire up to search API */}
+      <div className="relative flex-1 max-w-md ml-6">
+        <input
+          type="text"
+          placeholder="Search..."
+          className="pl-9 pr-4 py-2 text-sm bg-gray-100 border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white w-full transition-colors"
+        />
+        <svg
+          className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
 
       <div className="flex items-center gap-3">
-        {/* Search bar — TODO: wire up to search API */}
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search..."
-            className="pl-9 pr-4 py-2 text-sm bg-gray-100 border border-transparent rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white w-56 transition-colors"
-          />
+        {/* New button */}
+        <button
+          onClick={() => setNewDialogOpen(true)}
+          className="flex items-center gap-2 rounded-xl bg-[#B1C9DC] px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98]"
+        >
           <svg
-            className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"
+            className="h-4 w-4"
             fill="none"
             stroke="currentColor"
+            strokeWidth={2.5}
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 4v16m8-8H4"
+            />
           </svg>
-        </div>
+          New
+        </button>
 
         {/* Notifications — TODO: wire up to notifications API, add red dot for unread */}
         <button className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors">
@@ -62,12 +72,14 @@ export default function Header() {
 
         {/* User avatar — links to profile page */}
         <Link
-          href="/profile"
-          className="w-9 h-9 rounded-md bg-blue-600 text-white text-sm font-bold flex items-center justify-center hover:bg-blue-700 transition-colors"
+          href="/dashboard/profile"
+          className="w-9 h-9 rounded-full bg-[#B1C9DC] text-white text-sm font-bold flex items-center justify-center hover:bg-[#9db8cd] transition-colors"
         >
           {initials || '?'}
         </Link>
       </div>
+
+      <NewItemDialog open={newDialogOpen} onClose={() => setNewDialogOpen(false)} />
     </header>
   );
 }

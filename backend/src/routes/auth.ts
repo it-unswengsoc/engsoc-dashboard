@@ -5,9 +5,13 @@ import {
   getUserProfile,
   updateUserProfile,
   verifyToken,
+  findOrCreateGoogleUser,
+  generateToken,
 } from '../functions/auth';
+import { getGoogleAuthUrl, exchangeGoogleCode, GoogleDomainError } from '../functions/google';
 
 const router = Router();
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 // Middleware to verify JWT token
 export function verifyAuthToken(req: Request, res: Response, next: Function) {
@@ -209,6 +213,78 @@ router.post('/logout', verifyAuthToken, (req: Request, res: Response) => {
     status: 'success',
     message: 'Logout successful. Please remove the token from client storage.',
   });
+});
+
+/**
+ * GET /api/auth/google
+ * Redirects to Google's OAuth consent screen. Plain "Sign in with Google"
+ * needs no query param; the one-time admin flow that connects the shared
+ * EngSoc Drive account passes ?intent=drive-connect (see .env.example).
+ */
+router.get('/google', (req: Request, res: Response) => {
+  const intent = typeof req.query.intent === 'string' ? req.query.intent : undefined;
+  res.redirect(getGoogleAuthUrl(intent));
+});
+
+/**
+ * GET /api/auth/google/callback
+ * Google's OAuth redirect target — this exact path is registered in Google
+ * Cloud Console as the authorized redirect URI. Exchanges the auth code for
+ * tokens, verifies the signed-in user's identity, and either:
+ *   - signs them in (default) — finds/creates their `users` row and redirects
+ *     back to the frontend with a JWT
+ *   - or (state=drive-connect) returns the profile + refresh token as JSON,
+ *     for the one-time admin setup that connects the shared EngSoc Drive.
+ */
+router.get('/google/callback', async (req: Request, res: Response) => {
+  const state = typeof req.query.state === 'string' ? req.query.state : undefined;
+
+  try {
+    const { code, error } = req.query;
+
+    if (error) {
+      return res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+    }
+
+    if (!code || typeof code !== 'string') {
+      return res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+    }
+
+    const { profile, refreshToken } = await exchangeGoogleCode(code);
+
+    if (state === 'drive-connect') {
+      // refreshToken is only ever present on the first consent for an
+      // account (Google omits it on repeat logins) — surfaced here so
+      // whoever authorizes the club's shared Drive account can copy it once
+      // into GOOGLE_DRIVE_REFRESH_TOKEN (see .env.example). It's sensitive:
+      // treat it like a password, never commit it.
+      return res.status(200).json({
+        status: 'success',
+        message: 'Google account verified',
+        data: { ...profile, refreshToken },
+      });
+    }
+
+    const user = await findOrCreateGoogleUser(
+      profile.googleId,
+      profile.email,
+      profile.firstName,
+      profile.lastName
+    );
+
+    if (!user) {
+      return res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+    }
+
+    const token = generateToken(user.userId, user.email);
+    res.redirect(`${FRONTEND_URL}/login?token=${encodeURIComponent(token)}`);
+  } catch (error) {
+    if (error instanceof GoogleDomainError) {
+      return res.redirect(`${FRONTEND_URL}/login?error=domain_not_allowed`);
+    }
+    console.error('Google OAuth callback error:', error);
+    res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+  }
 });
 
 export default router;

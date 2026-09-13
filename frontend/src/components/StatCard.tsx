@@ -4,18 +4,13 @@ interface StatCardProps {
   colour: string; // e.g "#ED6672"
 }
 
-// TODO: Style this component to match the design
-// - white card with rounded corners and a subtle border
-// - small uppercase label in muted grey at the top
-// - large bold number/value below the label
 export default function StatCard({ label, value, colour }: StatCardProps) {
   return (
-    // bg-white = white background, rounded-lg = rounded corners, border = subtle outline, p-5 = space inside 5pixels
-    <div className="bg-white rounded-xl border border-[#8A94A3] flex flex-1 overflow-hidden">
-      <div className="w-2 shrink-0" style={{ backgroundColor: colour }}></div>
+    <div className="flex flex-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+      <div className="w-1.5 shrink-0" style={{ backgroundColor: colour }}></div>
 
-      <div className="p-5">
-        <p className="font-medium font-mono text-base text-[#8A94A3]">{label}</p>
+      <div className="px-4 py-4">
+        <p className="font-medium font-mono text-xs text-[#8A94A3] mb-2">{label}</p>
         <p className="font-bold text-3xl tracking-widest">{value}</p>
       </div>
     </div>

@@ -75,19 +75,22 @@ router.get('/:eventId', async (req: Request, res: Response) => {
 router.post('/', verifyAuthToken, async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const { title, description, eventDate, location, capacity } = req.body;
+    const { title, description, imageUrl, eventType, startDate, endDate, location, capacity } = req.body;
 
-    if (!title || !eventDate) {
+    if (!title || !startDate) {
       return res.status(400).json({
         status: 'error',
-        message: 'Missing required fields: title, eventDate',
+        message: 'Missing required fields: title, startDate',
       });
     }
 
     const event = await createEvent({
       title,
       description,
-      eventDate,
+      imageUrl,
+      eventType,
+      startDate,
+      endDate,
       location,
       organizerId: user.userId,
       capacity,
@@ -106,10 +109,12 @@ router.post('/', verifyAuthToken, async (req: Request, res: Response) => {
       data: event,
     });
   } catch (error) {
+    // createEvent only throws for invalid input (see functions/events.ts) —
+    // a DB or Google Calendar failure resolves to null instead, handled above.
     console.error('Create event error:', error);
-    res.status(500).json({
+    res.status(400).json({
       status: 'error',
-      message: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Failed to create event',
     });
   }
 });
@@ -129,12 +134,15 @@ router.put('/:eventId', verifyAuthToken, async (req: Request, res: Response) => 
       });
     }
 
-    const { title, description, eventDate, location, status, capacity } = req.body;
+    const { title, description, imageUrl, eventType, startDate, endDate, location, status, capacity } = req.body;
 
     const event = await updateEvent(eventId, {
       title,
       description,
-      eventDate,
+      imageUrl,
+      eventType,
+      startDate,
+      endDate,
       location,
       status,
       capacity,
