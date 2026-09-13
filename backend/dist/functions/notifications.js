@@ -20,7 +20,13 @@ const pool = new pg_1.Pool({
  */
 async function getNotificationsForUser(userId) {
     // TODO: implement
-    throw new Error('Not implemented');
+    try {
+        const result = await (0, notifications_1.dbGetNotificationsForUser)(userId);
+        return result;
+    }
+    catch (error) {
+        throw error;
+    }
 }
 /**
  * Stuart
@@ -52,8 +58,13 @@ async function createNotification(input) {
  * Returns the updated notification if found, or null if no notification exists with the given ID.
  */
 async function markNotificationRead(notificationId) {
-    // TODO: implement
-    throw new Error('Not implemented');
+    try {
+        const result = await (0, notifications_1.dbMarkNotificationRead)(notificationId);
+        return result;
+    }
+    catch (error) {
+        throw error;
+    }
 }
 /**
  * Stuart

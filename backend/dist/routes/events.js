@@ -95,10 +95,12 @@ router.post('/', auth_1.verifyAuthToken, async (req, res) => {
         });
     }
     catch (error) {
+        // createEvent only throws for invalid input (see functions/events.ts) —
+        // a DB or Google Calendar failure resolves to null instead, handled above.
         console.error('Create event error:', error);
-        res.status(500).json({
+        res.status(400).json({
             status: 'error',
-            message: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Failed to create event',
         });
     }
 });

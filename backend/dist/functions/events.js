@@ -46,16 +46,52 @@ async function getEventById(eventId) {
     }
 }
 /**
- * Ethan
- * Creates a new event with the provided details, then mirrors it to the
- * shared EngSoc Google Calendar. Postgres is the source of truth — the
- * calendar mirror is best-effort and never blocks the event from being
+ * Ethan / Stuart
+ * Validates the provided details, then creates a new event and mirrors it
+ * to the shared EngSoc Google Calendar. Postgres is the source of truth —
+ * the calendar mirror is best-effort and never blocks the event from being
  * created, even if the Google Calendar sync fails.
- * Returns the newly created event, or null if creation failed.
+ *
+ * Throws on invalid input (caught by the route handler and surfaced as a
+ * 400 with the specific reason). Returns null only if the DB insert or the
+ * calendar mirror itself unexpectedly fails, matching the other functions
+ * in this file.
  */
 async function createEvent(input) {
+    const title = input.title?.trim();
+    if (!title) {
+        throw new Error('Title is required');
+    }
+    if (title.length > 30) {
+        throw new Error('Title must be 30 characters or fewer');
+    }
+    if (input.description && input.description.length > 300) {
+        throw new Error('Description must be 300 characters or fewer');
+    }
+    if (input.location && input.location.length > 100) {
+        throw new Error('Location must be 100 characters or fewer');
+    }
+    if (input.capacity !== undefined && input.capacity !== null) {
+        if (!Number.isInteger(input.capacity) || input.capacity <= 0) {
+            throw new Error('Capacity must be a positive integer');
+        }
+    }
+    if (!input.startDate || isNaN(new Date(input.startDate).getTime())) {
+        throw new Error('A valid start date is required');
+    }
+    if (new Date(input.startDate) <= new Date()) {
+        throw new Error('Event start date must be in the future');
+    }
+    if (input.endDate !== undefined) {
+        if (isNaN(new Date(input.endDate).getTime())) {
+            throw new Error('End date must be a valid date');
+        }
+        if (new Date(input.endDate) < new Date(input.startDate)) {
+            throw new Error('End date must not be before the start date');
+        }
+    }
     try {
-        const event = await (0, events_1.dbCreateEvent)(input);
+        const event = await (0, events_1.dbCreateEvent)({ ...input, title });
         if (!event)
             return null;
         const googleCalendarEventId = await (0, calendar_sync_1.syncEventCreate)(event);
