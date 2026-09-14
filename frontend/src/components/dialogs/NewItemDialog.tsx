@@ -101,7 +101,7 @@ const requestTypes: {
     ],
   },
   {
-    value: 'mass-email',
+    value: 'mass_email',
     label: 'Mass emailing',
     icon: Mail,
     fields: [
@@ -153,7 +153,7 @@ const requestTypes: {
     ],
   },
   {
-    value: 'event-photos',
+    value: 'event_photos',
     label: 'Event photo request',
     icon: Camera,
     fields: [
