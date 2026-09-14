@@ -2,9 +2,22 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ClipboardList, Calendar, Megaphone, Inbox, type LucideIcon } from 'lucide-react';
+import {
+  Camera,
+  ChevronRight,
+  ClipboardList,
+  Calendar,
+  Mail,
+  Megaphone,
+  Inbox,
+  Palette,
+  Receipt,
+  ShieldAlert,
+  Video,
+  type LucideIcon,
+} from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
-import FormDialog, { type FieldDef, type FieldValues, type FieldPayload } from '@/components/dialogs/FormDialog';
+import FormDialog, { type FieldDef, type FieldPayload } from '@/components/dialogs/FormDialog';
 import { createEvent } from '@/services/events-api';
 
 interface NewItemDialogProps {
@@ -12,62 +25,186 @@ interface NewItemDialogProps {
   onClose: () => void;
 }
 
-type View = 'chooser' | 'request' | 'event' | 'announcement' | 'task';
+type View = 'chooser' | 'request-list' | 'event' | 'announcement' | 'task';
 
 const options: { view: Exclude<View, 'chooser'>; label: string; icon: LucideIcon }[] = [
-  { view: 'request', label: 'New request', icon: Inbox },
+  { view: 'request-list', label: 'New request', icon: Inbox },
   { view: 'event', label: 'New event', icon: Calendar },
   { view: 'announcement', label: 'New announcement', icon: Megaphone },
   { view: 'task', label: 'New task', icon: ClipboardList },
 ];
 
+const PORT_OPTIONS = [
+  { value: 'careers', label: 'Careers' },
+  { value: 'sponsorships', label: 'Sponsorships' },
+  { value: 'it', label: 'IT' },
+  { value: 'publications', label: 'Publications' },
+  { value: 'cabinet', label: 'Cabinet' },
+  { value: 'socials', label: 'Socials' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'outreach', label: 'Outreach' },
+  { value: 'programs', label: 'Programs' },
+];
+
 /* Each request type swaps in its own fields below the type selector. `value`
    is what the API will receive, so the labels stay free to be reworded. */
-const requestTypes: { value: string; label: string; fields: FieldDef[] }[] = [
+const requestTypes: {
+  value: string;
+  label: string;
+  icon: LucideIcon;
+  fields: FieldDef[];
+}[] = [
   {
     value: 'marketing',
     label: 'Marketing request',
+    icon: Palette,
     fields: [
-      { kind: 'text', name: 'eventName', label: 'Event Name', required: true },
-      { kind: 'date', name: 'eventLaunchDate', label: 'Event Launch Date' },
-      { kind: 'date', name: 'eventDate', label: 'Event Date' },
+      {
+        kind: 'notice',
+        name: 'noticePeriod',
+        text: '📝 Fill this form with at least 2 weeks notice (strict). For flagship events, at least 4 weeks notice please.',
+      },
+      { kind: 'text', name: 'eventName', label: 'Event Name', required: true, span: 'half' },
+      {
+        kind: 'select',
+        name: 'port',
+        label: 'Port',
+        placeholder: 'Select a port...',
+        options: PORT_OPTIONS,
+        span: 'half',
+      },
+      { kind: 'date', name: 'eventLaunchDate', label: 'Event Launch Date', span: 'half' },
+      { kind: 'date', name: 'eventDate', label: 'Event Date', span: 'half' },
       { kind: 'textarea', name: 'eventTheme', label: 'Event Theme', required: true },
+      {
+        kind: 'checkboxes',
+        name: 'materials',
+        label: 'Marketing material(s) needed',
+        required: true,
+        options: [
+          { value: 'cover-photo', label: 'Cover Photo [IG & FB]' },
+          { value: 'countdowns', label: 'Countdowns [IG] (1 week, 5 days, 3 days, 1 day)' },
+          { value: 'infographics', label: 'Infographics (please specify in GC)' },
+          { value: 'form-banner', label: 'Google Form Banner' },
+          { value: 'flyers', label: 'Flyers/Posters' },
+        ],
+      },
+      { kind: 'text', name: 'otherMaterial', label: 'Other (please specify)' },
     ],
   },
   {
-    value: 'it',
-    label: 'IT request',
+    value: 'mass-email',
+    label: 'Mass emailing',
+    icon: Mail,
     fields: [
-      { kind: 'text', name: 'title', label: 'Title', required: true },
-      { kind: 'textarea', name: 'description', label: 'Description', required: true },
+      {
+        kind: 'notice',
+        name: 'massEmailNotice',
+        text: '📧 If your event requires mass emailing, please submit this at least 2 weeks in advance. Following these two things makes the process a lot easier:',
+        steps: [
+          'Provide a Google Sheet link with the categories you want repeated in each email. Emails always go in the first column — anything else (name, port, time, date, room) can follow in the columns after.',
+          'Provide the email template as a Google Doc link. Put anything that changes in square brackets, like "Dear [Name], … the event will be at [Time]."',
+        ],
+        footer: 'Thank you so much for your patience filling this out 🤠',
+      },
+      {
+        kind: 'textarea',
+        name: 'reason',
+        label: 'Reason for mass emailing',
+        required: true,
+      },
+      {
+        kind: 'date',
+        name: 'releaseDate',
+        label: 'Date for mass emailing to be released',
+        required: true,
+        span: 'half',
+      },
       {
         kind: 'select',
-        name: 'category',
-        label: 'Category',
-        options: [
-          { value: 'website', label: 'Website' },
-          { value: 'accounts', label: 'Email / accounts' },
-          { value: 'hardware', label: 'Hardware' },
-          { value: 'access', label: 'Access / permissions' },
-          { value: 'other', label: 'Other' },
-        ],
+        name: 'port',
+        label: 'Port',
+        placeholder: 'Select a port...',
+        options: PORT_OPTIONS,
+        span: 'half',
       },
       {
-        kind: 'segmented',
-        name: 'urgency',
-        label: 'Urgency',
-        options: [
-          { value: 'low', label: 'Low' },
-          { value: 'medium', label: 'Medium' },
-          { value: 'high', label: 'High' },
-        ],
+        kind: 'text',
+        name: 'sheetUrl',
+        label: 'Link to Google Sheet',
+        placeholder: 'https://docs.google.com/spreadsheets/...',
+        required: true,
       },
-      { kind: 'file', name: 'attachment', label: 'Attachment' },
+      {
+        kind: 'text',
+        name: 'templateUrl',
+        label: 'Email template Google Doc link',
+        placeholder: 'https://docs.google.com/document/...',
+        required: true,
+      },
+    ],
+  },
+  {
+    value: 'event-photos',
+    label: 'Event photo request',
+    icon: Camera,
+    fields: [
+      {
+        kind: 'notice',
+        name: 'eventPhotoNotice',
+        text: '📸 Need photos at your event? Say no more. Please submit at least 2 weeks before the due date. The earlier the better.',
+      },
+      {
+        kind: 'select',
+        name: 'port',
+        label: 'Port',
+        placeholder: 'Select a port...',
+        options: PORT_OPTIONS,
+        required: true,
+        span: 'half',
+      },
+      { kind: 'date', name: 'eventDate', label: 'Date of event', required: true, span: 'half' },
+      {
+        kind: 'textarea',
+        name: 'eventDetails',
+        label: 'Event details (plus FB link if applicable)',
+        required: true,
+      },
+    ],
+  },
+  {
+    value: 'multimedia',
+    label: 'Multimedia request',
+    icon: Video,
+    fields: [
+      {
+        kind: 'notice',
+        name: 'multimediaNotice',
+        text: '🎬 Want a viral video to market your upcoming event? No worries, PUBS got you. Please submit at least 2 weeks before the due date; the earlier it comes in, the better.',
+      },
+      {
+        kind: 'select',
+        name: 'port',
+        label: 'Port',
+        placeholder: 'Select a port...',
+        options: PORT_OPTIONS,
+        required: true,
+        span: 'half',
+      },
+      { kind: 'date', name: 'dueDate', label: 'Due date', required: true, span: 'half' },
+      {
+        kind: 'textarea',
+        name: 'eventDetails',
+        label: 'Event details (plus FB link if applicable)',
+        required: true,
+      },
+      { kind: 'textarea', name: 'ideas', label: 'Any ideas you might have?' },
     ],
   },
   {
     value: 'reimbursement',
     label: 'Reimbursement form',
+    icon: Receipt,
     fields: [
       { kind: 'text', name: 'title', label: 'Title', required: true },
       { kind: 'textarea', name: 'description', label: 'Description', required: true },
@@ -77,78 +214,50 @@ const requestTypes: { value: string; label: string; fields: FieldDef[] }[] = [
         label: 'Amount (AUD)',
         placeholder: '0.00',
         required: true,
+        span: 'half',
       },
-      { kind: 'date', name: 'purchasedOn', label: 'Date of purchase', required: true },
+      {
+        kind: 'date',
+        name: 'purchasedOn',
+        label: 'Date of purchase',
+        required: true,
+        span: 'half',
+      },
       { kind: 'file', name: 'receipt', label: 'Receipt', accept: 'image/*,.pdf', required: true },
     ],
   },
   {
     value: 'grievance',
     label: 'Grievance form',
+    icon: ShieldAlert,
     fields: [
       { kind: 'text', name: 'title', label: 'Subject', required: true },
       { kind: 'textarea', name: 'description', label: 'What happened', required: true },
-      { kind: 'text', name: 'involved', label: 'Who was involved' },
-      { kind: 'boolean', name: 'anonymous', label: 'Submit anonymously' },
+      { kind: 'text', name: 'involved', label: 'Who was involved', span: 'half' },
+      { kind: 'boolean', name: 'anonymous', label: 'Submit anonymously', span: 'half' },
       { kind: 'file', name: 'attachment', label: 'Attachment' },
     ],
   },
-  {
-    value: 'publications',
-    label: 'Publications request',
-    fields: [
-      { kind: 'text', name: 'title', label: 'Title', required: true },
-      { kind: 'textarea', name: 'description', label: 'Description', required: true },
-      {
-        kind: 'select',
-        name: 'publication',
-        label: 'Publication',
-        options: [
-          { value: 'handbook', label: 'Handbook' },
-          { value: 'newsletter', label: 'Newsletter' },
-          { value: 'blog', label: 'Blog' },
-          { value: 'social', label: 'Social' },
-        ],
-      },
-      { kind: 'date', name: 'deadline', label: 'Deadline' },
-      { kind: 'file', name: 'draft', label: 'Draft' },
-    ],
-  },
 ];
-
-function requestForm(values: FieldValues): FieldDef[] {
-  const selected = requestTypes.find((type) => type.value === values.requestType);
-
-  return [
-    {
-      kind: 'select',
-      name: 'requestType',
-      label: 'Request type',
-      placeholder: 'Select a request type...',
-      options: requestTypes.map(({ value, label }) => ({ value, label })),
-      required: true,
-    },
-    ...(selected?.fields ?? []),
-  ];
-}
 
 /* Field names match POST /events's body except eventDate (-> startDate) and
    type (INTERNAL/EXTERNAL -> internal/external) — mapped in
    handleCreateEvent below. */
 const eventForm: FieldDef[] = [
   { kind: 'text', name: 'title', label: 'Event title', required: true },
-  { kind: 'datetime', name: 'eventDate', label: 'Date and time', required: true },
+  { kind: 'datetime', name: 'eventDate', label: 'Date and time', required: true, span: 'half' },
   {
     kind: 'segmented',
     name: 'type',
     label: 'Type',
+    span: 'half',
     options: [
       { value: 'INTERNAL', label: 'Internal' },
       { value: 'EXTERNAL', label: 'External' },
     ],
   },
-  { kind: 'text', name: 'location', label: 'Location' },
-  { kind: 'number', name: 'capacity', label: 'Capacity' },
+  { kind: 'text', name: 'location', label: 'Location', span: 'half' },
+  { kind: 'number', name: 'capacity', label: 'Capacity', span: 'half' },
   { kind: 'textarea', name: 'description', label: 'Description' },
 ];
 
@@ -159,17 +268,13 @@ const announcementForm: FieldDef[] = [
 ];
 
 const taskForm: FieldDef[] = [
-  { kind: 'text', name: 'name', label: 'Task name', required: true },
-  { kind: 'datetime', name: 'dueAt', label: 'Due date and time', required: true },
+  { kind: 'text', name: 'name', label: 'Task name', required: true, span: 'half' },
+  { kind: 'datetime', name: 'dueAt', label: 'Due date and time', required: true, span: 'half' },
 ];
 
-type FormFields = FieldDef[] | ((values: FieldValues) => FieldDef[]);
+type FormView = Exclude<View, 'chooser' | 'request-list'>;
 
-const forms: Record<
-  Exclude<View, 'chooser'>,
-  { title: string; submitLabel: string; fields: FormFields }
-> = {
-  request: { title: 'New request', submitLabel: 'Submit request', fields: requestForm },
+const forms: Record<FormView, { title: string; submitLabel: string; fields: FieldDef[] }> = {
   event: { title: 'New event', submitLabel: 'Create event', fields: eventForm },
   announcement: { title: 'New announcement', submitLabel: 'Post', fields: announcementForm },
   task: { title: 'New task', submitLabel: 'Add task', fields: taskForm },
@@ -178,9 +283,11 @@ const forms: Record<
 export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   const router = useRouter();
   const [view, setView] = useState<View>('chooser');
+  const [requestType, setRequestType] = useState<string | null>(null);
 
   function handleClose() {
     setView('chooser');
+    setRequestType(null);
     onClose();
   }
 
@@ -210,11 +317,51 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
 
   /* Only "New event" is wired up — tasks, announcements and requests have no
      backend route mounted yet, so their submit stays disabled. */
-  const onSubmit: Partial<Record<Exclude<View, 'chooser'>, (payload: FieldPayload) => Promise<void>>> = {
+  const onSubmit: Partial<Record<FormView, (payload: FieldPayload) => Promise<void>>> = {
     event: handleCreateEvent,
   };
 
   if (!open) return null;
+
+  /* A chosen request type's own form. Which type it is lives in state rather
+     than in the payload now that the selector is gone — whoever wires the
+     submit will need to send `requestType` alongside it. */
+  const selectedRequest = requestTypes.find((type) => type.value === requestType);
+
+  if (selectedRequest) {
+    return (
+      <FormDialog
+        open
+        title={selectedRequest.label}
+        submitLabel="Submit request"
+        fields={selectedRequest.fields}
+        onClose={handleClose}
+        onBack={() => setRequestType(null)}
+      />
+    );
+  }
+
+  if (view === 'request-list') {
+    return (
+      <Dialog open title="New request" onClose={handleClose} onBack={() => setView('chooser')}>
+        <div className="mt-5 flex flex-col">
+          {requestTypes.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => setRequestType(value)}
+              className="group flex items-center gap-3 rounded-xl px-2 py-2.5 text-left text-sm font-bold text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#B1C9DC]/30 transition-colors group-hover:bg-[#B1C9DC]/60">
+                <Icon className="h-4 w-4 text-[#3D6C94]" />
+              </span>
+              <span className="flex-1">{label}</span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-gray-300 transition-colors group-hover:text-gray-400" />
+            </button>
+          ))}
+        </div>
+      </Dialog>
+    );
+  }
 
   if (view !== 'chooser') {
     const form = forms[view];

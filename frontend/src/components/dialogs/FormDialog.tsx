@@ -6,30 +6,59 @@ import Select, { type FieldOption } from '@/components/dialogs/Select';
 
 export type { FieldOption };
 
-export type FieldDef =
-  | {
-      kind: 'text' | 'textarea' | 'number' | 'date' | 'datetime';
-      name: string;
-      label: string;
-      placeholder?: string;
-      required?: boolean;
-    }
-  | {
-      kind: 'select' | 'segmented';
-      name: string;
-      label: string;
-      options: FieldOption[];
-      placeholder?: string;
-      required?: boolean;
-    }
-  /* Renders as a yes/no toggle but leaves the payload a real boolean — a
-     "false" string would be truthy to anything checking it server-side. */
-  | { kind: 'boolean'; name: string; label: string; required?: boolean }
-  | { kind: 'file'; name: string; label: string; accept?: string; required?: boolean };
+/* Fields sit in a two-column grid. `span: 'half'` pairs a field with the next
+   one — dates and short numbers — and everything else runs full width. */
+type Spanned = { span?: 'half' | 'full' };
+
+export type FieldDef = Spanned &
+  (
+    | {
+        kind: 'text' | 'textarea' | 'number' | 'date' | 'datetime';
+        name: string;
+        label: string;
+        placeholder?: string;
+        required?: boolean;
+      }
+    | {
+        kind: 'select' | 'segmented';
+        name: string;
+        label: string;
+        options: FieldOption[];
+        placeholder?: string;
+        required?: boolean;
+      }
+    /* Renders as a yes/no toggle but leaves the payload a real boolean — a
+       "false" string would be truthy to anything checking it server-side. */
+    | { kind: 'boolean'; name: string; label: string; required?: boolean }
+    /* Multi-select. Selections live in FieldValues as a single separator-joined
+       string so the prune and required checks keep working on plain strings;
+       buildPayload splits it back into an array. Option values are ours, so
+       they can't contain the separator. */
+    | {
+        kind: 'checkboxes';
+        name: string;
+        label: string;
+        options: FieldOption[];
+        required?: boolean;
+      }
+    | { kind: 'file'; name: string; label: string; accept?: string; required?: boolean }
+    /* Static copy, not an input — carries no value and never reaches the
+       payload. Sits in the field list so it can appear and disappear with the
+       request type like everything else. */
+    | {
+        kind: 'notice';
+        name: string;
+        text: string;
+        steps?: string[];
+        footer?: string;
+      }
+  );
 
 /* Raw DOM input values — always strings. `buildPayload` converts them. */
 export type FieldValues = Record<string, string>;
-export type FieldPayload = Record<string, string | number | boolean>;
+export type FieldPayload = Record<string, string | number | boolean | string[]>;
+
+const MULTI_SEPARATOR = '\u001F';
 
 interface FormDialogProps {
   open: boolean;
@@ -70,6 +99,8 @@ function buildPayload(fields: FieldDef[], values: FieldValues): FieldPayload {
       payload[field.name] = Number(raw);
     } else if (field.kind === 'boolean') {
       payload[field.name] = raw === 'true';
+    } else if (field.kind === 'checkboxes') {
+      payload[field.name] = raw.split(MULTI_SEPARATOR);
     } else if (field.kind === 'datetime') {
       payload[field.name] = new Date(raw).toISOString();
     } else {
@@ -119,6 +150,14 @@ export default function FormDialog({
     setMissing((prev) => (prev[name] ? { ...prev, [name]: false } : prev));
   }
 
+  function toggleMulti(name: string, option: string) {
+    const selected = values[name] ? values[name].split(MULTI_SEPARATOR) : [];
+    const next = selected.includes(option)
+      ? selected.filter((value) => value !== option)
+      : [...selected, option];
+    setValue(name, next.join(MULTI_SEPARATOR));
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
@@ -131,7 +170,8 @@ export default function FormDialog({
        here instead to keep one consistent error style. Only visible fields
        count — switching request type swaps which ones are required. */
     const empty = resolvedFields.filter(
-      (field) => field.required && !values[field.name]?.trim(),
+      (field) =>
+        field.kind !== 'notice' && field.required && !values[field.name]?.trim(),
     );
 
     if (empty.length > 0) {
@@ -152,19 +192,49 @@ export default function FormDialog({
   }
 
   return (
-    <Dialog open={open} title={title} onClose={onClose} onBack={onBack}>
+    <Dialog open={open} title={title} size="2xl" onClose={onClose} onBack={onBack}>
       <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-4">
+        {/* Only the fields scroll, so Cancel/Submit stay put on a long form.
+            Select portals its dropdown out of here — this is a scroll
+            container, which would otherwise clip it. */}
+        {/* Symmetric padding: overflow-y clips the x-axis too, so focus rings
+            need room on both sides, not just the scrollbar's side. */}
+        <div className="-mx-2 max-h-[68vh] overflow-y-auto px-2">
+        <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
         {resolvedFields.map((field) => {
+          if (field.kind === 'notice') {
+            return (
+              <div
+                key={field.name}
+                className="text-sm leading-relaxed text-gray-500 sm:col-span-2"
+              >
+                <p>{field.text}</p>
+                {field.steps && (
+                  <ol className="mt-1.5 list-decimal space-y-1 pl-5">
+                    {field.steps.map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ol>
+                )}
+                {field.footer && <p className="mt-1.5">{field.footer}</p>}
+              </div>
+            );
+          }
+
           /* Only wrap real form controls in a label — a label would forward
              clicks on a dropdown option back to the toggle button. */
           const isChoice =
-            field.kind === 'select' || field.kind === 'segmented' || field.kind === 'boolean';
+            field.kind === 'select' ||
+            field.kind === 'segmented' ||
+            field.kind === 'boolean' ||
+            field.kind === 'checkboxes';
           const Wrapper = isChoice ? 'div' : 'label';
+          const span = field.span === 'half' ? '' : 'sm:col-span-2';
           const invalid = missing[field.name] === true;
           const controlStyles = invalid ? `${inputStyles} ring-2 ring-[#ED6672]` : inputStyles;
 
           return (
-            <Wrapper key={field.name} className="flex flex-col gap-1.5">
+            <Wrapper key={field.name} className={`flex min-w-0 flex-col gap-1.5 ${span}`}>
               <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
                 {field.label}
                 {field.required && <span className="text-[#ED6672]"> *</span>}
@@ -213,6 +283,32 @@ export default function FormDialog({
                     </button>
                   ))}
                 </div>
+              ) : field.kind === 'checkboxes' ? (
+                <div
+                  role="group"
+                  aria-required={field.required}
+                  aria-invalid={invalid}
+                  className={`grid gap-x-5 gap-y-0.5 sm:grid-cols-2 ${
+                    invalid ? 'rounded-lg p-1 ring-2 ring-[#ED6672]' : ''
+                  }`}
+                >
+                  {field.options.map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1.5 text-sm text-gray-900 transition-colors hover:bg-gray-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={(values[field.name] ?? '')
+                          .split(MULTI_SEPARATOR)
+                          .includes(option.value)}
+                        onChange={() => toggleMulti(field.name, option.value)}
+                        className="h-4 w-4 shrink-0 cursor-pointer accent-[#3D6C94]"
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
               ) : field.kind === 'file' ? (
                 <input
                   type="file"
@@ -248,6 +344,8 @@ export default function FormDialog({
             </Wrapper>
           );
         })}
+        </div>
+        </div>
 
         {submitError && (
           <p role="alert" className="text-xs font-bold text-[#ED6672]">
