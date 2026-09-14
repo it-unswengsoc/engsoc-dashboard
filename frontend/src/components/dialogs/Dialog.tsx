@@ -4,10 +4,18 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, X } from 'lucide-react';
 
+/* Spelled out rather than interpolated so Tailwind can see each class. */
+const MAX_WIDTHS = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  '2xl': 'max-w-2xl',
+} as const;
+
 interface DialogProps {
   open: boolean;
   title: string;
-  size?: 'sm' | 'md';
+  size?: keyof typeof MAX_WIDTHS;
   onClose: () => void;
   onBack?: () => void;
   children: ReactNode;
@@ -40,8 +48,15 @@ export default function Dialog({
   /* createPortal needs a real document, which the server render doesn't have. */
   if (!open || !mounted) return null;
 
-  const outsideCard = (target: EventTarget | null) =>
-    !cardRef.current?.contains(target as Node);
+  /* A Select portals its dropdown to <body> to escape the dialog's scrolling
+     field area, so the list sits outside the card. Without exempting it, picking
+     an option would read as a backdrop click and close the whole dialog. */
+  const outsideCard = (target: EventTarget | null) => {
+    const node = target as Node | null;
+    if (node && cardRef.current?.contains(node)) return false;
+    const element = node instanceof Element ? node : (node?.parentElement ?? null);
+    return !element?.closest('[data-dialog-popover]');
+  };
 
   return createPortal(
     /* Portalled to <body> because the header is `sticky z-10`, and a sticky
@@ -70,9 +85,7 @@ export default function Dialog({
       <div className="flex min-h-full items-center justify-center p-4">
         <div
           ref={cardRef}
-          className={`relative w-full animate-dialog-in rounded-2xl bg-white p-8 shadow-xl motion-reduce:animate-none ${
-            size === 'sm' ? 'max-w-sm' : 'max-w-md'
-          }`}
+          className={`relative w-full animate-dialog-in rounded-2xl bg-white p-8 shadow-xl motion-reduce:animate-none ${MAX_WIDTHS[size]}`}
         >
           <button
             onClick={onClose}
