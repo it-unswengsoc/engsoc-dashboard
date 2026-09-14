@@ -17,7 +17,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
-import FormDialog, { type FieldDef, type FieldPayload } from '@/components/dialogs/FormDialog';
+import FormDialog, {
+  type FieldDef,
+  type FieldPayload,
+  type FieldValues,
+} from '@/components/dialogs/FormDialog';
 import { createEvent } from '@/services/events-api';
 
 interface NewItemDialogProps {
@@ -34,16 +38,20 @@ const options: { view: Exclude<View, 'chooser'>; label: string; icon: LucideIcon
   { view: 'task', label: 'New task', icon: ClipboardList },
 ];
 
+/* Values must match the port_type enum in database/create-tables.sql exactly:
+   Postgres enums are case-sensitive, so 'IT' and 'publication' are not
+   interchangeable with 'it' and 'publications'. Labels are display copy. */
 const PORT_OPTIONS = [
   { value: 'careers', label: 'Careers' },
   { value: 'sponsorships', label: 'Sponsorships' },
-  { value: 'it', label: 'IT' },
-  { value: 'publications', label: 'Publications' },
+  { value: 'IT', label: 'IT' },
+  { value: 'publication', label: 'Publications' },
   { value: 'cabinet', label: 'Cabinet' },
   { value: 'socials', label: 'Socials' },
   { value: 'marketing', label: 'Marketing' },
   { value: 'outreach', label: 'Outreach' },
   { value: 'programs', label: 'Programs' },
+  { value: 'HR', label: 'HR' },
 ];
 
 /* Each request type swaps in its own fields below the type selector. `value`
@@ -267,14 +275,59 @@ const announcementForm: FieldDef[] = [
   { kind: 'file', name: 'image', label: 'Picture', accept: 'image/*' },
 ];
 
-const taskForm: FieldDef[] = [
-  { kind: 'text', name: 'name', label: 'Task name', required: true, span: 'half' },
-  { kind: 'datetime', name: 'dueAt', label: 'Due date and time', required: true, span: 'half' },
-];
+/* Assignment is one-of, so the toggle picks the target and only that control
+   follows — showing a port dropdown and a person box side by side read as
+   "both". `assignee` is free text because naming a person needs a users
+   listing, and no such endpoint exists yet; swap it for a select once one does. */
+function taskForm(values: FieldValues): FieldDef[] {
+  const target: FieldDef[] =
+    values.assignTo === 'port'
+      ? [
+          {
+            kind: 'select',
+            name: 'port',
+            label: 'Which port',
+            placeholder: 'Select a port...',
+            options: PORT_OPTIONS,
+            required: true,
+          },
+        ]
+      : values.assignTo === 'person'
+        ? [
+            {
+              kind: 'text',
+              name: 'assignee',
+              label: 'Who',
+              placeholder: 'Name or email',
+              required: true,
+            },
+          ]
+        : [];
+
+  return [
+    { kind: 'text', name: 'name', label: 'Task name', required: true, span: 'half' },
+    { kind: 'datetime', name: 'dueAt', label: 'Due date and time', required: true, span: 'half' },
+    {
+      kind: 'segmented',
+      name: 'assignTo',
+      label: 'Assign to',
+      options: [
+        { value: 'me', label: 'Just me' },
+        { value: 'port', label: 'A port' },
+        { value: 'person', label: 'A person' },
+      ],
+    },
+    ...target,
+    { kind: 'textarea', name: 'description', label: 'Description' },
+  ];
+}
 
 type FormView = Exclude<View, 'chooser' | 'request-list'>;
 
-const forms: Record<FormView, { title: string; submitLabel: string; fields: FieldDef[] }> = {
+const forms: Record<
+  FormView,
+  { title: string; submitLabel: string; fields: FieldDef[] | ((values: FieldValues) => FieldDef[]) }
+> = {
   event: { title: 'New event', submitLabel: 'Create event', fields: eventForm },
   announcement: { title: 'New announcement', submitLabel: 'Post', fields: announcementForm },
   task: { title: 'New task', submitLabel: 'Add task', fields: taskForm },
