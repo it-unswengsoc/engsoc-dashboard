@@ -17,20 +17,18 @@ function getDriveClient(): drive_v3.Drive {
   return google.drive({ version: 'v3', auth });
 }
 
-/* EngSoc's Drive is organised as top-level Shared Drives (Arc Delegate,
-   Careers, HR, IT, ...) — there's no single "root folder" containing them.
-   This is the allow-list of which ones become "Port Directories" on the
-   documents page: anything the connected account can see but isn't listed
-   here (HR, Executive, Chairperson, ...) is deliberately never shown or
-   queried, since this page is visible to every signed-in member. Rename or
-   add entries here to change what shows up — matched against the Shared
-   Drive's exact name in Google Drive. */
-const PORT_DIRECTORIES: Record<string, { colour: string; access: 'editable' | 'view-only' | 'restricted' }> = {
+/* Purely cosmetic — a colour swatch and access badge for Shared Drives whose
+   name is recognised, so the ones the club actually curates keep their
+   existing look. Every Shared Drive the connected account can see is listed
+   now, not just these; anything not in this map falls back to
+   DEFAULT_DRIVE_STYLE rather than being hidden. */
+const DRIVE_STYLES: Record<string, { colour: string; access: 'editable' | 'view-only' | 'restricted' }> = {
   IT: { colour: '#F1C4C9', access: 'editable' },
   Marketing: { colour: '#F4EFD3', access: 'view-only' },
   Cabinet: { colour: '#E5E7EB', access: 'restricted' },
   Spons: { colour: '#B1C9DC', access: 'view-only' },
 };
+const DEFAULT_DRIVE_STYLE = { colour: '#D9DEE5', access: 'view-only' as const };
 
 export interface DriveFolderSummary {
   id: string;
@@ -40,9 +38,10 @@ export interface DriveFolderSummary {
   access: 'editable' | 'view-only' | 'restricted';
 }
 
-export interface DriveFileSummary {
+export interface DriveEntry {
   id: string;
   name: string;
+  type: 'folder' | 'file';
   mimeType: string;
   modifiedTime: string;
   size: string | null;
@@ -50,18 +49,17 @@ export interface DriveFileSummary {
 }
 
 /**
- * Lists the Shared Drives in PORT_DIRECTORIES that the connected account can
- * actually see, with each one's file count and curated colour/access badge.
+ * Lists every Shared Drive the connected account can see, with each one's
+ * item count and a curated (or default) colour/access badge.
  */
 export async function listPortDirectories(): Promise<DriveFolderSummary[]> {
   const drive = getDriveClient();
 
   const drivesRes = await drive.drives.list({ fields: 'drives(id, name)', pageSize: 100 });
   const allDrives = drivesRes.data.drives ?? [];
-  const allowedDrives = allDrives.filter((d) => d.name && PORT_DIRECTORIES[d.name]);
 
   return Promise.all(
-    allowedDrives.map(async (sharedDrive) => {
+    allDrives.map(async (sharedDrive) => {
       const countRes = await drive.files.list({
         q: 'trashed = false',
         driveId: sharedDrive.id!,
@@ -72,58 +70,54 @@ export async function listPortDirectories(): Promise<DriveFolderSummary[]> {
         pageSize: 1000,
       });
 
-      const meta = PORT_DIRECTORIES[sharedDrive.name!];
+      const style = (sharedDrive.name && DRIVE_STYLES[sharedDrive.name]) || DEFAULT_DRIVE_STYLE;
 
       return {
         id: sharedDrive.id!,
         name: sharedDrive.name!,
         fileCount: countRes.data.files?.length ?? 0,
-        colour: meta.colour,
-        access: meta.access,
+        colour: style.colour,
+        access: style.access,
       };
     })
   );
 }
 
 /**
- * Lists the most recently modified files across the allow-listed Shared
- * Drives (see PORT_DIRECTORIES) — deliberately not every drive the
- * connected account can see.
+ * Lists the immediate children (folders and files, folders first) of a
+ * Shared Drive — its own root if folderId is omitted, or a specific folder
+ * within it otherwise. This is what lets the documents page work like a real
+ * directory browser: select a drive, then navigate into its folders.
+ *
+ * Only the first page (up to 1000 items, Drive's own per-request max) of a
+ * folder is fetched — a folder with more than that in one level won't
+ * paginate. Acceptable for a club's shared drive, not for a folder with
+ * many thousands of files sitting flat in one place.
  */
-export async function listRecentFiles(limit = 20): Promise<DriveFileSummary[]> {
+export async function listDriveEntries(driveId: string, folderId?: string): Promise<DriveEntry[]> {
   const drive = getDriveClient();
+  // A Shared Drive's own ID doubles as the parent ID for whatever sits at
+  // its root — there's no separate synthetic "root folder" object to ask for.
+  const parentId = folderId || driveId;
 
-  const drivesRes = await drive.drives.list({ fields: 'drives(id, name)', pageSize: 100 });
-  const allowedDriveIds = (drivesRes.data.drives ?? [])
-    .filter((d) => d.name && PORT_DIRECTORIES[d.name])
-    .map((d) => d.id!);
+  const res = await drive.files.list({
+    q: `'${parentId}' in parents and trashed = false`,
+    driveId,
+    corpora: 'drive',
+    includeItemsFromAllDrives: true,
+    supportsAllDrives: true,
+    orderBy: 'folder,name',
+    pageSize: 1000,
+    fields: 'files(id, name, mimeType, modifiedTime, size, webViewLink)',
+  });
 
-  const perDriveResults = await Promise.all(
-    allowedDriveIds.map((driveId) =>
-      drive.files.list({
-        q: "mimeType != 'application/vnd.google-apps.folder' and trashed = false",
-        driveId,
-        corpora: 'drive',
-        includeItemsFromAllDrives: true,
-        supportsAllDrives: true,
-        orderBy: 'modifiedTime desc',
-        pageSize: limit,
-        fields: 'files(id, name, mimeType, modifiedTime, size, webViewLink)',
-      })
-    )
-  );
-
-  const files = perDriveResults.flatMap((res) => res.data.files ?? []);
-
-  return files
-    .sort((a, b) => new Date(b.modifiedTime!).getTime() - new Date(a.modifiedTime!).getTime())
-    .slice(0, limit)
-    .map((f) => ({
-      id: f.id!,
-      name: f.name!,
-      mimeType: f.mimeType!,
-      modifiedTime: f.modifiedTime!,
-      size: f.size ?? null,
-      webViewLink: f.webViewLink ?? null,
-    }));
+  return (res.data.files ?? []).map((f) => ({
+    id: f.id!,
+    name: f.name!,
+    type: f.mimeType === 'application/vnd.google-apps.folder' ? 'folder' : 'file',
+    mimeType: f.mimeType!,
+    modifiedTime: f.modifiedTime!,
+    size: f.size ?? null,
+    webViewLink: f.webViewLink ?? null,
+  }));
 }

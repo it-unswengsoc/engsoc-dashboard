@@ -1,13 +1,18 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import type { DriveFolderCardData, DriveFileRowData, DriveFileCategory } from '@/types/documents';
+import { useEffect, useMemo, useState } from 'react';
+import type { DriveFolderCardData, DriveEntryRowData, DriveFileCategory } from '@/types/documents';
+import { getDirectoryContents } from '@/services/documents';
 import DriveFolderCard from './DriveFolderCard';
-import DriveFileRow from './DriveFileRow';
+import DriveEntryRow from './DriveEntryRow';
 
 interface DocumentsViewProps {
   folders: DriveFolderCardData[];
-  recentFiles: DriveFileRowData[];
+}
+
+interface PathSegment {
+  id: string; // the drive's own id for the root segment, a folder id otherwise
+  name: string;
 }
 
 const FILTERS: { label: string; category: DriveFileCategory | 'ALL' }[] = [
@@ -18,18 +23,66 @@ const FILTERS: { label: string; category: DriveFileCategory | 'ALL' }[] = [
   { label: 'Videos', category: 'VIDEO' },
 ];
 
-export default function DocumentsView({ folders, recentFiles }: DocumentsViewProps) {
+export default function DocumentsView({ folders }: DocumentsViewProps) {
   const [category, setCategory] = useState<DriveFileCategory | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
 
-  const filteredFiles = useMemo(() => {
+  const [selectedDriveId, setSelectedDriveId] = useState<string | null>(null);
+  // path[0] is the drive root; path[i] for i > 0 is a folder navigated into.
+  const [path, setPath] = useState<PathSegment[]>([]);
+  const [entries, setEntries] = useState<DriveEntryRowData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const currentFolderId = path.length > 1 ? path[path.length - 1].id : undefined;
+
+  useEffect(() => {
+    if (!selectedDriveId) return;
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+
+    getDirectoryContents(selectedDriveId, currentFolderId)
+      .then((result) => {
+        if (cancelled) return;
+        setEntries(result);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load this directory');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDriveId, currentFolderId]);
+
+  function selectDrive(folder: DriveFolderCardData) {
+    setSelectedDriveId(folder.id);
+    setPath([{ id: folder.id, name: folder.name }]);
+  }
+
+  function openFolder(entry: DriveEntryRowData) {
+    setPath((prev) => [...prev, { id: entry.id, name: entry.name }]);
+  }
+
+  function jumpTo(index: number) {
+    setPath((prev) => prev.slice(0, index + 1));
+  }
+
+  const filteredEntries = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return recentFiles.filter((file) => {
-      const matchesCategory = category === 'ALL' || file.category === category;
-      const matchesQuery = q === '' || file.name.toLowerCase().includes(q);
+    return entries.filter((entry) => {
+      // A folder always passes the type filter — filtering to "Photos"
+      // shouldn't make the directory structure itself disappear.
+      const matchesCategory = category === 'ALL' || entry.type === 'folder' || entry.category === category;
+      const matchesQuery = q === '' || entry.name.toLowerCase().includes(q);
       return matchesCategory && matchesQuery;
     });
-  }, [recentFiles, category, query]);
+  }, [entries, category, query]);
 
   return (
     <div>
@@ -83,14 +136,26 @@ export default function DocumentsView({ folders, recentFiles }: DocumentsViewPro
 
       {/* PORT DIRECTORIES */}
       <h2 className="mt-8 font-mono text-xs font-bold uppercase tracking-wide text-[#8A94A3]">Port Directories</h2>
-      <div className="mt-3 grid grid-cols-4 gap-5">
-        {folders.map((folder) => (
-          <DriveFolderCard key={folder.id} folder={folder} />
-        ))}
+      {folders.length === 0 ? (
+        <p className="mt-3 font-mono text-xs text-gray-400">No shared drives found.</p>
+      ) : (
+        <div className="mt-3 grid grid-cols-4 gap-5">
+          {folders.map((folder) => (
+            <DriveFolderCard
+              key={folder.id}
+              folder={folder}
+              selected={selectedDriveId === folder.id}
+              onClick={() => selectDrive(folder)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* DIRECTORY CONTENTS */}
+      <div className="mt-8">
+        <Breadcrumbs path={path} onJump={jumpTo} />
       </div>
 
-      {/* RECENT FILES */}
-      <h2 className="mt-8 font-mono text-xs font-bold uppercase tracking-wide text-[#8A94A3]">Recent Files</h2>
       <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2.5">
           <div className="w-9" />
@@ -101,14 +166,50 @@ export default function DocumentsView({ folders, recentFiles }: DocumentsViewPro
         </div>
 
         <div className="divide-y divide-gray-100">
-          {filteredFiles.length === 0 ? (
-            <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">No files match.</p>
+          {!selectedDriveId ? (
+            <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">
+              Select a directory above to browse its files.
+            </p>
+          ) : loading ? (
+            <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">Loading…</p>
+          ) : error ? (
+            <p className="px-4 py-10 text-center font-mono text-xs text-[#8B2E38]">{error}</p>
+          ) : filteredEntries.length === 0 ? (
+            <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">This folder is empty.</p>
           ) : (
-            filteredFiles.map((file) => <DriveFileRow key={file.id} file={file} />)
+            filteredEntries.map((entry) => (
+              <DriveEntryRow key={entry.id} entry={entry} onOpenFolder={() => openFolder(entry)} />
+            ))
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function Breadcrumbs({ path, onJump }: { path: PathSegment[]; onJump: (index: number) => void }) {
+  if (path.length === 0) {
+    return <h2 className="font-mono text-xs font-bold uppercase tracking-wide text-[#8A94A3]">Directory</h2>;
+  }
+
+  return (
+    <nav className="flex flex-wrap items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wide text-[#8A94A3]">
+      {path.map((segment, i) => {
+        const isCurrent = i === path.length - 1;
+        return (
+          <span key={segment.id} className="flex items-center gap-1.5">
+            {i > 0 && <span className="text-gray-300">/</span>}
+            <button
+              onClick={() => onJump(i)}
+              disabled={isCurrent}
+              className={isCurrent ? 'text-gray-900' : 'transition-colors hover:text-gray-600'}
+            >
+              {segment.name}
+            </button>
+          </span>
+        );
+      })}
+    </nav>
   );
 }
 

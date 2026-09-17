@@ -1,14 +1,14 @@
-import { getDriveFolders, getRecentFiles } from '@/services/documents-api';
+import { getDriveFolders, getDriveEntries } from '@/services/documents-api';
 import type {
   DriveFolder,
-  DriveFile,
+  DriveEntry,
   DriveAccessLevel,
   DriveFileCategory,
   DriveFolderCardData,
-  DriveFileRowData,
+  DriveEntryRowData,
 } from '@/types/documents';
 
-export type { DriveFolderCardData, DriveFileRowData, DriveFileCategory };
+export type { DriveFolderCardData, DriveEntryRowData, DriveFileCategory };
 
 /* ---------- Folder mapper ---------- */
 
@@ -28,7 +28,7 @@ export function toDriveFolderCard(folder: DriveFolder): DriveFolderCardData {
   };
 }
 
-/* ---------- File mapper ---------- */
+/* ---------- Entry (folder or file row) mapper ---------- */
 
 const EXTENSION_ALIASES: Record<string, string> = {
   DOCX: 'DOC', XLSX: 'XLS', PPTX: 'PPT', JPEG: 'JPG',
@@ -41,19 +41,19 @@ const GOOGLE_MIME_LABELS: Record<string, string> = {
   'application/vnd.google-apps.form': 'FORM',
 };
 
-function extensionLabel(file: DriveFile): string {
-  const match = file.name.match(/\.([a-zA-Z0-9]+)$/);
+function extensionLabel(entry: DriveEntry): string {
+  const match = entry.name.match(/\.([a-zA-Z0-9]+)$/);
   if (match) {
     const ext = match[1].toUpperCase();
     return EXTENSION_ALIASES[ext] ?? ext.slice(0, 4);
   }
-  return GOOGLE_MIME_LABELS[file.mimeType] ?? 'FILE';
+  return GOOGLE_MIME_LABELS[entry.mimeType] ?? 'FILE';
 }
 
-function categoryOf(file: DriveFile): DriveFileCategory {
-  if (file.mimeType === 'application/vnd.google-apps.form') return 'FORM';
-  if (file.mimeType.startsWith('image/')) return 'PHOTO';
-  if (file.mimeType.startsWith('video/')) return 'VIDEO';
+function categoryOf(entry: DriveEntry): DriveFileCategory {
+  if (entry.mimeType === 'application/vnd.google-apps.form') return 'FORM';
+  if (entry.mimeType.startsWith('image/')) return 'PHOTO';
+  if (entry.mimeType.startsWith('video/')) return 'VIDEO';
   return 'FILE';
 }
 
@@ -82,31 +82,27 @@ function formatSize(bytes: number | null): string {
   return `${rounded} ${units[unitIndex]}`;
 }
 
-export function toDriveFileRow(file: DriveFile): DriveFileRowData {
+export function toDriveEntryRow(entry: DriveEntry): DriveEntryRowData {
   return {
-    id: file.id,
-    name: file.name,
-    category: categoryOf(file),
-    extensionLabel: extensionLabel(file),
-    modifiedLabel: formatModified(file.modifiedAt),
-    sizeLabel: formatSize(file.sizeBytes),
-    webViewLink: file.webViewLink,
+    id: entry.id,
+    name: entry.name,
+    type: entry.type,
+    category: entry.type === 'folder' ? 'FILE' : categoryOf(entry),
+    extensionLabel: entry.type === 'folder' ? '' : extensionLabel(entry),
+    modifiedLabel: formatModified(entry.modifiedAt),
+    sizeLabel: entry.type === 'folder' ? '—' : formatSize(entry.sizeBytes),
+    webViewLink: entry.webViewLink,
   };
 }
 
-/* ---------- Page-shaped getter ---------- */
+/* ---------- Page-shaped getters ---------- */
 
-export async function getDocumentsPageData(): Promise<{
-  folders: DriveFolderCardData[];
-  recentFiles: DriveFileRowData[];
-}> {
-  const [folders, files] = await Promise.all([getDriveFolders(), getRecentFiles()]);
+export async function getPortDirectories(): Promise<DriveFolderCardData[]> {
+  const folders = await getDriveFolders();
+  return folders.map(toDriveFolderCard);
+}
 
-  return {
-    folders: folders.map(toDriveFolderCard),
-    recentFiles: files
-      .slice()
-      .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
-      .map(toDriveFileRow),
-  };
+export async function getDirectoryContents(driveId: string, folderId?: string): Promise<DriveEntryRowData[]> {
+  const entries = await getDriveEntries(driveId, folderId);
+  return entries.map(toDriveEntryRow);
 }

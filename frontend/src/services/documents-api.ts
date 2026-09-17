@@ -1,11 +1,11 @@
-import type { DriveFolder, DriveFile } from '@/types/documents';
+import type { DriveFolder, DriveEntry } from '@/types/documents';
 import { apiUrl } from '@/services/api-config';
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
-export type { DriveFolder, DriveFile };
+export type { DriveFolder, DriveEntry };
 
-/* The "Port Directories" — top-level folders of the shared EngSoc Drive. */
+/* The "Port Directories" — every Shared Drive in the EngSoc Drive. */
 export async function getDriveFolders(): Promise<DriveFolder[]> {
   if (USE_MOCK) {
     const { getDriveFolders: mockGetDriveFolders } = await import('@/mocks/functions/documents');
@@ -18,14 +18,21 @@ export async function getDriveFolders(): Promise<DriveFolder[]> {
   return data.data;
 }
 
-export async function getRecentFiles(limit = 20): Promise<DriveFile[]> {
+/* Lists a Shared Drive's immediate contents — its root if folderId is
+   omitted, a specific folder within it otherwise. Called client-side as the
+   member clicks into directories, so the page can behave like a real file
+   browser instead of one static list. */
+export async function getDriveEntries(driveId: string, folderId?: string): Promise<DriveEntry[]> {
   if (USE_MOCK) {
-    const { getRecentFiles: mockGetRecentFiles } = await import('@/mocks/functions/documents');
-    return mockGetRecentFiles(limit);
+    const { getDriveEntries: mockGetDriveEntries } = await import('@/mocks/functions/documents');
+    return mockGetDriveEntries(driveId, folderId);
   }
 
-  const res = await fetch(apiUrl(`/drive/files/recent?limit=${limit}`), { cache: 'no-store' });
+  const params = new URLSearchParams({ driveId });
+  if (folderId) params.set('folderId', folderId);
+
+  const res = await fetch(apiUrl(`/drive/entries?${params.toString()}`), { cache: 'no-store' });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load recent files');
+  if (!res.ok) throw new Error(data.message || 'Failed to load Drive contents');
   return data.data;
 }

@@ -13,7 +13,7 @@ const router = (0, express_1.Router)();
    client-side login check in dashboard/layout.tsx. */
 /**
  * GET /api/drive/folders
- * Lists the shared EngSoc Drive's top-level "port directories".
+ * Lists every Shared Drive the connected account can see.
  */
 router.get('/folders', async (req, res) => {
     try {
@@ -26,18 +26,23 @@ router.get('/folders', async (req, res) => {
     }
 });
 /**
- * GET /api/drive/files/recent
- * Lists the most recently modified files in the shared drive.
+ * GET /api/drive/entries?driveId=...&folderId=...
+ * Lists the immediate contents (folders and files) of a Shared Drive —
+ * its root if folderId is omitted, a specific folder within it otherwise.
  */
-router.get('/files/recent', async (req, res) => {
+router.get('/entries', async (req, res) => {
     try {
-        const limit = Number(req.query.limit) || 20;
-        const files = await (0, drive_1.listRecentFiles)(limit);
-        res.status(200).json({ status: 'success', data: files });
+        const driveId = typeof req.query.driveId === 'string' ? req.query.driveId : undefined;
+        const folderId = typeof req.query.folderId === 'string' ? req.query.folderId : undefined;
+        if (!driveId) {
+            return res.status(400).json({ status: 'error', message: 'Missing required query param: driveId' });
+        }
+        const entries = await (0, drive_1.listDriveEntries)(driveId, folderId);
+        res.status(200).json({ status: 'success', data: entries });
     }
     catch (error) {
-        console.error('List recent drive files error:', error);
-        res.status(500).json({ status: 'error', message: 'Failed to load recent files' });
+        console.error('List drive entries error:', error);
+        res.status(500).json({ status: 'error', message: 'Failed to load Drive contents' });
     }
 });
 exports.default = router;
