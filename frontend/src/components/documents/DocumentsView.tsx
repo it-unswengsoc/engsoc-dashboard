@@ -1,14 +1,11 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import type { DriveFolderCardData, DriveEntryRowData, DriveFileCategory } from '@/types/documents';
-import { getDirectoryContents } from '@/services/documents';
+import { getPortDirectories, getDirectoryContents } from '@/services/documents';
 import DriveFolderCard from './DriveFolderCard';
 import DriveEntryRow from './DriveEntryRow';
-
-interface DocumentsViewProps {
-  folders: DriveFolderCardData[];
-}
 
 interface PathSegment {
   id: string; // the drive's own id for the root segment, a folder id otherwise
@@ -23,42 +20,76 @@ const FILTERS: { label: string; category: DriveFileCategory | 'ALL' }[] = [
   { label: 'Videos', category: 'VIDEO' },
 ];
 
-export default function DocumentsView({ folders }: DocumentsViewProps) {
+export default function DocumentsView() {
+  const router = useRouter();
   const [category, setCategory] = useState<DriveFileCategory | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
+
+  const [folders, setFolders] = useState<DriveFolderCardData[]>([]);
+  const [googleConnected, setGoogleConnected] = useState(true);
+  const [foldersLoading, setFoldersLoading] = useState(true);
+  const [foldersError, setFoldersError] = useState('');
 
   const [selectedDriveId, setSelectedDriveId] = useState<string | null>(null);
   // path[0] is the drive root; path[i] for i > 0 is a folder navigated into.
   const [path, setPath] = useState<PathSegment[]>([]);
   const [entries, setEntries] = useState<DriveEntryRowData[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [entriesLoading, setEntriesLoading] = useState(false);
+  const [entriesError, setEntriesError] = useState('');
 
   const currentFolderId = path.length > 1 ? path[path.length - 1].id : undefined;
 
+  // Drive reads as the signed-in member's own Google account, so this needs
+  // their JWT (sessionStorage) — fetched here rather than server-side, same
+  // reason as the calendar page (see CalendarShell).
+  useEffect(() => {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    getPortDirectories(token)
+      .then(({ folders, connected }) => {
+        setFolders(folders);
+        setGoogleConnected(connected);
+      })
+      .catch((err) => {
+        setFoldersError(err instanceof Error ? err.message : 'Failed to load Drive folders');
+      })
+      .finally(() => setFoldersLoading(false));
+  }, [router]);
+
   useEffect(() => {
     if (!selectedDriveId) return;
-    let cancelled = false;
-    setLoading(true);
-    setError('');
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
 
-    getDirectoryContents(selectedDriveId, currentFolderId)
-      .then((result) => {
+    let cancelled = false;
+    setEntriesLoading(true);
+    setEntriesError('');
+
+    getDirectoryContents(token, selectedDriveId, currentFolderId)
+      .then(({ entries, connected }) => {
         if (cancelled) return;
-        setEntries(result);
+        setEntries(entries);
+        setGoogleConnected(connected);
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Failed to load this directory');
+        setEntriesError(err instanceof Error ? err.message : 'Failed to load this directory');
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setEntriesLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [selectedDriveId, currentFolderId]);
+  }, [selectedDriveId, currentFolderId, router]);
 
   function selectDrive(folder: DriveFolderCardData) {
     setSelectedDriveId(folder.id);
@@ -117,6 +148,12 @@ export default function DocumentsView({ folders }: DocumentsViewProps) {
         </div>
       </div>
 
+      {!googleConnected && (
+        <p className="mt-4 rounded-xl border border-gray-200 bg-[#F4EFD3] px-4 py-2 font-mono text-xs font-bold text-[#7A6A2E]">
+          Your Google Drive isn't connected — sign out and back in with Google to see your files here.
+        </p>
+      )}
+
       {/* FILTER PILLS */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
@@ -136,7 +173,11 @@ export default function DocumentsView({ folders }: DocumentsViewProps) {
 
       {/* PORT DIRECTORIES */}
       <h2 className="mt-8 font-mono text-xs font-bold uppercase tracking-wide text-[#8A94A3]">Port Directories</h2>
-      {folders.length === 0 ? (
+      {foldersLoading ? (
+        <p className="mt-3 font-mono text-xs text-gray-400">Loading…</p>
+      ) : foldersError ? (
+        <p className="mt-3 font-mono text-xs text-[#8B2E38]">{foldersError}</p>
+      ) : folders.length === 0 ? (
         <p className="mt-3 font-mono text-xs text-gray-400">No shared drives found.</p>
       ) : (
         <div className="mt-3 grid grid-cols-4 gap-5">
@@ -170,10 +211,10 @@ export default function DocumentsView({ folders }: DocumentsViewProps) {
             <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">
               Select a directory above to browse its files.
             </p>
-          ) : loading ? (
+          ) : entriesLoading ? (
             <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">Loading…</p>
-          ) : error ? (
-            <p className="px-4 py-10 text-center font-mono text-xs text-[#8B2E38]">{error}</p>
+          ) : entriesError ? (
+            <p className="px-4 py-10 text-center font-mono text-xs text-[#8B2E38]">{entriesError}</p>
           ) : filteredEntries.length === 0 ? (
             <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">This folder is empty.</p>
           ) : (

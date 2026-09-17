@@ -1,24 +1,27 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+const auth_1 = require("./auth");
+const auth_2 = require("../functions/auth");
 const drive_1 = require("../functions/drive");
 const router = (0, express_1.Router)();
-/* No verifyAuthToken here (unlike most other routes) — the documents page
-   fetches this server-side from a Next.js Server Component, which has no
-   access to the browser's sessionStorage-held JWT at all, so an
-   auth-gated route would 401 every single time regardless of whether
-   Drive is even connected. This mirrors GET /events, which is public for
-   the same reason. Fine for now since this is read-only, shared (not
-   per-user) data, and the frontend page itself is already gated by the
-   client-side login check in dashboard/layout.tsx. */
 /**
- * GET /api/drive/folders
- * Lists every Shared Drive the connected account can see.
+ * GET /drive/folders
+ * Lists every Shared Drive the signed-in member's own Google account can
+ * see. `connected: false` means this account has no stored Google refresh
+ * token yet (a password-only account, or a Google account that hasn't
+ * signed in since this feature shipped) — the frontend prompts them to sign
+ * out and back in with Google in that case.
  */
-router.get('/folders', async (req, res) => {
+router.get('/folders', auth_1.verifyAuthToken, async (req, res) => {
     try {
-        const folders = await (0, drive_1.listPortDirectories)();
-        res.status(200).json({ status: 'success', data: folders });
+        const user = req.user;
+        const refreshToken = await (0, auth_2.getUserGoogleRefreshToken)(user.userId);
+        if (!refreshToken) {
+            return res.status(200).json({ status: 'success', data: [], connected: false });
+        }
+        const folders = await (0, drive_1.listPortDirectories)(refreshToken);
+        res.status(200).json({ status: 'success', data: folders, connected: true });
     }
     catch (error) {
         console.error('List drive folders error:', error);
@@ -26,19 +29,25 @@ router.get('/folders', async (req, res) => {
     }
 });
 /**
- * GET /api/drive/entries?driveId=...&folderId=...
+ * GET /drive/entries?driveId=...&folderId=...
  * Lists the immediate contents (folders and files) of a Shared Drive —
- * its root if folderId is omitted, a specific folder within it otherwise.
+ * its root if folderId is omitted, a specific folder within it otherwise —
+ * as visible to the signed-in member's own Google account.
  */
-router.get('/entries', async (req, res) => {
+router.get('/entries', auth_1.verifyAuthToken, async (req, res) => {
     try {
+        const user = req.user;
         const driveId = typeof req.query.driveId === 'string' ? req.query.driveId : undefined;
         const folderId = typeof req.query.folderId === 'string' ? req.query.folderId : undefined;
         if (!driveId) {
             return res.status(400).json({ status: 'error', message: 'Missing required query param: driveId' });
         }
-        const entries = await (0, drive_1.listDriveEntries)(driveId, folderId);
-        res.status(200).json({ status: 'success', data: entries });
+        const refreshToken = await (0, auth_2.getUserGoogleRefreshToken)(user.userId);
+        if (!refreshToken) {
+            return res.status(200).json({ status: 'success', data: [], connected: false });
+        }
+        const entries = await (0, drive_1.listDriveEntries)(refreshToken, driveId, folderId);
+        res.status(200).json({ status: 'success', data: entries, connected: true });
     }
     catch (error) {
         console.error('List drive entries error:', error);

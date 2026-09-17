@@ -6,22 +6,19 @@ const googleapis_1 = require("googleapis");
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
-const GOOGLE_DRIVE_REFRESH_TOKEN = process.env.GOOGLE_DRIVE_REFRESH_TOKEN || '';
-/* EngSoc Drive is one shared club drive, not a personal drive per signed-in
-   user — so this connects with a single service-level refresh token (the
-   club's own Google account, authorized once via
-   GET /api/auth/google?intent=drive-connect and its refresh_token saved to
-   GOOGLE_DRIVE_REFRESH_TOKEN) rather than each user's own OAuth session.
-   Every request reuses the same connection. */
-function getDriveClient() {
+/* Reads as the signed-in member's own Google identity (their stored
+   google_refresh_token — see functions/auth.ts) rather than one shared
+   service account, so a drive only shows up here if that member can
+   actually see it in their own Google Drive — same access boundary Google
+   itself already enforces, not a second one this app has to maintain. */
+function getDriveClient(refreshToken) {
     const auth = new googleapis_1.google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
-    auth.setCredentials({ refresh_token: GOOGLE_DRIVE_REFRESH_TOKEN });
+    auth.setCredentials({ refresh_token: refreshToken });
     return googleapis_1.google.drive({ version: 'v3', auth });
 }
 /* Purely cosmetic — a colour swatch and access badge for Shared Drives whose
    name is recognised, so the ones the club actually curates keep their
-   existing look. Every Shared Drive the connected account can see is listed
-   now, not just these; anything not in this map falls back to
+   existing look. Anything not in this map falls back to
    DEFAULT_DRIVE_STYLE rather than being hidden. */
 const DRIVE_STYLES = {
     IT: { colour: '#F1C4C9', access: 'editable' },
@@ -31,11 +28,11 @@ const DRIVE_STYLES = {
 };
 const DEFAULT_DRIVE_STYLE = { colour: '#D9DEE5', access: 'view-only' };
 /**
- * Lists every Shared Drive the connected account can see, with each one's
- * item count and a curated (or default) colour/access badge.
+ * Lists every Shared Drive the given member's own Google account can see,
+ * with each one's item count and a curated (or default) colour/access badge.
  */
-async function listPortDirectories() {
-    const drive = getDriveClient();
+async function listPortDirectories(refreshToken) {
+    const drive = getDriveClient(refreshToken);
     const drivesRes = await drive.drives.list({ fields: 'drives(id, name)', pageSize: 100 });
     const allDrives = drivesRes.data.drives ?? [];
     return Promise.all(allDrives.map(async (sharedDrive) => {
@@ -61,16 +58,17 @@ async function listPortDirectories() {
 /**
  * Lists the immediate children (folders and files, folders first) of a
  * Shared Drive — its own root if folderId is omitted, or a specific folder
- * within it otherwise. This is what lets the documents page work like a real
- * directory browser: select a drive, then navigate into its folders.
+ * within it otherwise — as visible to the given member's own Google account.
+ * This is what lets the documents page work like a real directory browser:
+ * select a drive, then navigate into its folders.
  *
  * Only the first page (up to 1000 items, Drive's own per-request max) of a
  * folder is fetched — a folder with more than that in one level won't
  * paginate. Acceptable for a club's shared drive, not for a folder with
  * many thousands of files sitting flat in one place.
  */
-async function listDriveEntries(driveId, folderId) {
-    const drive = getDriveClient();
+async function listDriveEntries(refreshToken, driveId, folderId) {
+    const drive = getDriveClient(refreshToken);
     // A Shared Drive's own ID doubles as the parent ID for whatever sits at
     // its root — there's no separate synthetic "root folder" object to ask for.
     const parentId = folderId || driveId;

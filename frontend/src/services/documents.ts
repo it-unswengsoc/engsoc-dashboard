@@ -97,12 +97,26 @@ export function toDriveEntryRow(entry: DriveEntry): DriveEntryRowData {
 
 /* ---------- Page-shaped getters ---------- */
 
-export async function getPortDirectories(): Promise<DriveFolderCardData[]> {
-  const folders = await getDriveFolders();
-  return folders.map(toDriveFolderCard);
+export interface PortDirectoriesResult {
+  folders: DriveFolderCardData[];
+  connected: boolean;
 }
 
-export async function getDirectoryContents(driveId: string, folderId?: string): Promise<DriveEntryRowData[]> {
-  const entries = await getDriveEntries(driveId, folderId);
-  return entries.map(toDriveEntryRow);
+export interface DirectoryContentsResult {
+  entries: DriveEntryRowData[];
+  connected: boolean;
+}
+
+export async function getPortDirectories(token: string): Promise<PortDirectoriesResult> {
+  const { folders, connected } = await getDriveFolders(token);
+  return { folders: folders.map(toDriveFolderCard), connected };
+}
+
+export async function getDirectoryContents(
+  token: string,
+  driveId: string,
+  folderId?: string
+): Promise<DirectoryContentsResult> {
+  const { entries, connected } = await getDriveEntries(token, driveId, folderId);
+  return { entries: entries.map(toDriveEntryRow), connected };
 }
