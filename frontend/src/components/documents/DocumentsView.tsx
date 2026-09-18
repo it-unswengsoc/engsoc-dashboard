@@ -6,6 +6,7 @@ import type { DriveFolderCardData, DriveEntryRowData, DriveFileCategory } from '
 import { getPortDirectories, getDirectoryContents } from '@/services/documents';
 import DriveFolderCard from './DriveFolderCard';
 import DriveEntryRow from './DriveEntryRow';
+import StaggerReveal from '@/components/StaggerReveal';
 
 interface PathSegment {
   id: string; // the drive's own id for the root segment, a folder id otherwise
@@ -180,7 +181,7 @@ export default function DocumentsView() {
       ) : folders.length === 0 ? (
         <p className="mt-3 font-mono text-xs text-gray-400">No shared drives found.</p>
       ) : (
-        <div className="mt-3 grid grid-cols-4 gap-5">
+        <StaggerReveal className="mt-3 grid grid-cols-4 gap-5" replayKey={folders.length} y={16}>
           {folders.map((folder) => (
             <DriveFolderCard
               key={folder.id}
@@ -189,7 +190,7 @@ export default function DocumentsView() {
               onClick={() => selectDrive(folder)}
             />
           ))}
-        </div>
+        </StaggerReveal>
       )}
 
       {/* DIRECTORY CONTENTS */}
@@ -206,23 +207,28 @@ export default function DocumentsView() {
           <span className="w-16 shrink-0 text-right font-mono text-[10px] font-bold uppercase tracking-wide text-gray-400">Size</span>
         </div>
 
-        <div className="divide-y divide-gray-100">
-          {!selectedDriveId ? (
-            <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">
-              Select a directory above to browse its files.
-            </p>
-          ) : entriesLoading ? (
-            <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">Loading…</p>
-          ) : entriesError ? (
-            <p className="px-4 py-10 text-center font-mono text-xs text-[#8B2E38]">{entriesError}</p>
-          ) : filteredEntries.length === 0 ? (
-            <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">This folder is empty.</p>
-          ) : (
-            filteredEntries.map((entry) => (
+        {!selectedDriveId ? (
+          <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">
+            Select a directory above to browse its files.
+          </p>
+        ) : entriesLoading ? (
+          <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">Loading…</p>
+        ) : entriesError ? (
+          <p className="px-4 py-10 text-center font-mono text-xs text-[#8B2E38]">{entriesError}</p>
+        ) : filteredEntries.length === 0 ? (
+          <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">This folder is empty.</p>
+        ) : (
+          <StaggerReveal
+            className="divide-y divide-gray-100"
+            replayKey={`${selectedDriveId}/${currentFolderId ?? ''}`}
+            y={8}
+            stagger={0.03}
+          >
+            {filteredEntries.map((entry) => (
               <DriveEntryRow key={entry.id} entry={entry} onOpenFolder={() => openFolder(entry)} />
-            ))
-          )}
-        </div>
+            ))}
+          </StaggerReveal>
+        )}
       </div>
     </div>
   );

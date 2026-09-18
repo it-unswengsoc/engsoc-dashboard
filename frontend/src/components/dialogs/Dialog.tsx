@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowLeft, X } from 'lucide-react';
+import gsap from 'gsap';
 
 /* Spelled out rather than interpolated so Tailwind can see each class. */
 const MAX_WIDTHS = {
@@ -30,11 +31,48 @@ export default function Dialog({
   children,
 }: DialogProps) {
   const [mounted, setMounted] = useState(false);
+  // Whether the portal's DOM should exist at all — stays true a little past
+  // `open` going false so the close animation below has something to
+  // animate; `open` alone would unmount it instantly, same as before.
+  const [rendered, setRendered] = useState(open);
   const cardRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const pressStartedOutside = useRef(false);
   const releasedOutside = useRef(false);
 
   useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (open) setRendered(true);
+  }, [open]);
+
+  useEffect(() => {
+    if (!rendered || !mounted) return;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (open) {
+      if (reduceMotion) return;
+      gsap.fromTo(backdropRef.current, { opacity: 0 }, { opacity: 1, duration: 0.2, ease: 'power1.out' });
+      gsap.fromTo(
+        cardRef.current,
+        { opacity: 0, scale: 0.92, y: 10 },
+        { opacity: 1, scale: 1, y: 0, duration: 0.32, ease: 'back.out(1.7)' }
+      );
+      return;
+    }
+
+    // Closing: play the exit animation, then actually unmount.
+    if (reduceMotion) {
+      setRendered(false);
+      return;
+    }
+    const tl = gsap.timeline({ onComplete: () => setRendered(false) });
+    tl.to(cardRef.current, { opacity: 0, scale: 0.95, y: 6, duration: 0.18, ease: 'power1.in' }, 0);
+    tl.to(backdropRef.current, { opacity: 0, duration: 0.18, ease: 'power1.in' }, 0);
+    return () => {
+      tl.kill();
+    };
+  }, [open, rendered, mounted]);
 
   useEffect(() => {
     if (!open) return;
@@ -46,7 +84,7 @@ export default function Dialog({
   }, [open, onClose]);
 
   /* createPortal needs a real document, which the server render doesn't have. */
-  if (!open || !mounted) return null;
+  if (!rendered || !mounted) return null;
 
   /* A Select portals its dropdown to <body> to escape the dialog's scrolling
      field area, so the list sits outside the card. Without exempting it, picking
@@ -64,6 +102,7 @@ export default function Dialog({
        this overlay's z-50 is only compared against the header's contents, so
        the calendar's own sticky header would paint over it. */
     <div
+      ref={backdropRef}
       className="fixed inset-0 z-50 overflow-y-auto bg-black/15"
       /* A click is dispatched to the common ancestor of press and release, so
          a drag between the card and the backdrop — in either direction — lands
@@ -85,7 +124,7 @@ export default function Dialog({
       <div className="flex min-h-full items-center justify-center p-4">
         <div
           ref={cardRef}
-          className={`relative w-full animate-dialog-in rounded-2xl bg-white p-8 shadow-xl motion-reduce:animate-none ${MAX_WIDTHS[size]}`}
+          className={`relative w-full rounded-2xl bg-white p-8 shadow-xl ${MAX_WIDTHS[size]}`}
         >
           <button
             onClick={onClose}

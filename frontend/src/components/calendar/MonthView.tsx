@@ -1,4 +1,5 @@
 import { getMonthGrid, itemsOnDay, itemColor, isSameDay, DAYS_SHORT, type CalendarItem } from '@/lib/calendar';
+import StaggerReveal from '@/components/StaggerReveal';
 
 interface MonthViewProps {
   anchor: Date;
@@ -24,7 +25,12 @@ export default function MonthView({ anchor, items, onSelectItem, onSelectDay }: 
         ))}
       </div>
 
-      <div className="grid flex-1 grid-cols-7 grid-rows-6">
+      <StaggerReveal
+        className="grid flex-1 grid-cols-7 grid-rows-6"
+        replayKey={`${anchor.getFullYear()}-${anchor.getMonth()}`}
+        y={8}
+        stagger={0.012}
+      >
         {days.map((day) => {
           const inMonth = day.getMonth() === anchor.getMonth();
           const isToday = isSameDay(day, today);
@@ -73,7 +79,7 @@ export default function MonthView({ anchor, items, onSelectItem, onSelectDay }: 
             </div>
           );
         })}
-      </div>
+      </StaggerReveal>
     </div>
   );
 }

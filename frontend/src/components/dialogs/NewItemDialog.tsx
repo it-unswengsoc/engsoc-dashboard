@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Camera,
@@ -339,11 +339,17 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   const [view, setView] = useState<View>('chooser');
   const [requestType, setRequestType] = useState<string | null>(null);
 
-  function handleClose() {
-    setView('chooser');
-    setRequestType(null);
-    onClose();
-  }
+  /* Reset to the chooser on each *re*-open rather than in handleClose — Dialog
+     now plays an exit animation before actually unmounting (see Dialog.tsx),
+     which needs this same component instance to keep rendering whatever was
+     on screen for the duration of that animation instead of jumping back to
+     the chooser view the instant the user clicks away. */
+  useEffect(() => {
+    if (open) {
+      setView('chooser');
+      setRequestType(null);
+    }
+  }, [open]);
 
   /* Backend maps 1:1 onto eventForm's fields except eventDate -> startDate
      and INTERNAL/EXTERNAL -> internal/external — matching the casing
@@ -380,8 +386,6 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     event: handleCreateEvent,
   };
 
-  if (!open) return null;
-
   /* A chosen request type's own form. Which type it is lives in state rather
      than in the payload now that the selector is gone — whoever wires the
      submit will need to send `requestType` alongside it. */
@@ -390,11 +394,11 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   if (selectedRequest) {
     return (
       <FormDialog
-        open
+        open={open}
         title={selectedRequest.label}
         submitLabel="Submit request"
         fields={selectedRequest.fields}
-        onClose={handleClose}
+        onClose={onClose}
         onBack={() => setRequestType(null)}
       />
     );
@@ -402,7 +406,7 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
 
   if (view === 'request-list') {
     return (
-      <Dialog open title="New request" onClose={handleClose} onBack={() => setView('chooser')}>
+      <Dialog open={open} title="New request" onClose={onClose} onBack={() => setView('chooser')}>
         <div className="mt-5 flex flex-col">
           {requestTypes.map(({ value, label, icon: Icon }) => (
             <button
@@ -427,19 +431,19 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
 
     return (
       <FormDialog
-        open
+        open={open}
         title={form.title}
         submitLabel={form.submitLabel}
         fields={form.fields}
         onSubmit={onSubmit[view]}
-        onClose={handleClose}
+        onClose={onClose}
         onBack={() => setView('chooser')}
       />
     );
   }
 
   return (
-    <Dialog open title="What would you like to work on?" size="sm" onClose={handleClose}>
+    <Dialog open={open} title="What would you like to work on?" size="sm" onClose={onClose}>
       <div className="mt-6 grid grid-cols-2 gap-4">
         {options.map(({ view: target, label, icon: Icon }) => (
           <button

@@ -3,6 +3,7 @@ import StatCard from "@/components/StatCard";
 import TaskRow from "@/components/TaskRow";
 import AnnouncementRow from "@/components/AnnouncementRow";
 import WelcomeHeading from "@/components/WelcomeHeading";
+import StaggerReveal from "@/components/StaggerReveal";
 import {
   getUpcomingEvents,
   getOpenTasks,
@@ -45,7 +46,7 @@ export default async function HomePage() {
         <WelcomeHeading />
 
         {/* UPPER BOX SECTION */}
-        <div className="mt-6 flex flex-wrap justify-evenly gap-5">
+        <StaggerReveal className="mt-6 flex flex-wrap justify-evenly gap-5" y={18}>
           <StatCard
             label={"OPEN TASKS"}
             value={stats.openTasks}
@@ -61,16 +62,16 @@ export default async function HomePage() {
             value={stats.newAnnouncements}
             colour={"#ED6672"}
           />
-        </div>
+        </StaggerReveal>
 
         {/* ANNOUNCEMENTS SECTION */}
         <div className="mt-6">
           {/* ANNOUNCEMENT ROWS */}
-          <div className="flex flex-col gap-4">
+          <StaggerReveal className="flex flex-col gap-4" replayKey={announcements.length}>
             {announcements.map((announcement) => (
               <AnnouncementRow key={announcement.id} {...announcement} />
             ))}
-          </div>
+          </StaggerReveal>
         </div>
       </div>
 
@@ -83,7 +84,10 @@ export default async function HomePage() {
             Upcoming Events
           </h2>
 
-          <div className="max-h-72 divide-y divide-gray-200 overflow-y-auto border-t border-gray-200">
+          <StaggerReveal
+            className="max-h-72 divide-y divide-gray-200 overflow-y-auto border-t border-gray-200"
+            replayKey={events.length}
+          >
             {groupEventsByDay(events).map((group) => (
               <EventRow
                 key={`${group.month}-${group.day}`}
@@ -92,7 +96,7 @@ export default async function HomePage() {
                 events={group.events}
               />
             ))}
-          </div>
+          </StaggerReveal>
         </div>
 
         {/* TASKS */}
@@ -104,11 +108,14 @@ export default async function HomePage() {
             </h2>
           </div>
 
-          <div className="max-h-56 divide-y divide-gray-200 overflow-y-auto border-t border-gray-200">
+          <StaggerReveal
+            className="max-h-56 divide-y divide-gray-200 overflow-y-auto border-t border-gray-200"
+            replayKey={tasks.length}
+          >
             {tasks.map((task) => (
               <TaskRow key={task.id} {...task} />
             ))}
-          </div>
+          </StaggerReveal>
         </div>
       </div>
     </div>

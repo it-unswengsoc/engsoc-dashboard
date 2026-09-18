@@ -1,5 +1,6 @@
 import { getMonthGrid, itemsOnDay, isSameDay, MONTHS_LONG, DAYS_MIN } from '@/lib/calendar';
 import type { CalendarItem } from '@/lib/calendar';
+import StaggerReveal from '@/components/StaggerReveal';
 
 interface YearViewProps {
   anchor: Date; // any date within the displayed year
@@ -12,7 +13,7 @@ export default function YearView({ anchor, items, onSelectMonth }: YearViewProps
   const today = new Date();
 
   return (
-    <div className="grid flex-1 grid-cols-3 gap-6 overflow-y-auto p-6">
+    <StaggerReveal className="grid flex-1 grid-cols-3 gap-6 overflow-y-auto p-6" replayKey={year} y={16}>
       {MONTHS_LONG.map((label, monthIndex) => {
         const monthDate = new Date(year, monthIndex, 1);
         const days = getMonthGrid(monthDate);
@@ -52,6 +53,6 @@ export default function YearView({ anchor, items, onSelectMonth }: YearViewProps
           </button>
         );
       })}
-    </div>
+    </StaggerReveal>
   );
 }
