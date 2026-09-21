@@ -8,6 +8,7 @@ import {
   Home,
   Calendar,
   FileText,
+  Inbox,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -16,6 +17,7 @@ const dashboardLinks: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Home", href: "/dashboard", icon: Home },
   { label: "Calendar", href: "/dashboard/calendar", icon: Calendar },
   { label: "Documents", href: "/dashboard/documents", icon: FileText },
+  { label: "Requests", href: "/dashboard/requests", icon: Inbox },
 ];
 
 export default function Sidebar() {

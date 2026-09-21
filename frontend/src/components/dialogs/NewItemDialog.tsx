@@ -23,6 +23,7 @@ import FormDialog, {
   type FieldValues,
 } from '@/components/dialogs/FormDialog';
 import { createEvent } from '@/services/events-api';
+import { PORT_OPTIONS } from '@/lib/ports';
 import { CALENDAR_EVENTS_CHANGED_EVENT } from '@/lib/calendar';
 
 interface NewItemDialogProps {
@@ -39,21 +40,6 @@ const options: { view: Exclude<View, 'chooser'>; label: string; icon: LucideIcon
   { view: 'task', label: 'New task', icon: ClipboardList },
 ];
 
-/* Values must match the port_type enum in database/create-tables.sql exactly:
-   Postgres enums are case-sensitive, so 'IT' and 'publication' are not
-   interchangeable with 'it' and 'publications'. Labels are display copy. */
-const PORT_OPTIONS = [
-  { value: 'careers', label: 'Careers' },
-  { value: 'sponsorships', label: 'Sponsorships' },
-  { value: 'IT', label: 'IT' },
-  { value: 'publication', label: 'Publications' },
-  { value: 'cabinet', label: 'Cabinet' },
-  { value: 'socials', label: 'Socials' },
-  { value: 'marketing', label: 'Marketing' },
-  { value: 'outreach', label: 'Outreach' },
-  { value: 'programs', label: 'Programs' },
-  { value: 'HR', label: 'HR' },
-];
 
 /* Each request type swaps in its own fields below the type selector. `value`
    is what the API will receive, so the labels stay free to be reworded. */
