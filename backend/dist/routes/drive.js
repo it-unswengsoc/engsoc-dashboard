@@ -8,10 +8,11 @@ const router = (0, express_1.Router)();
 /**
  * GET /drive/folders
  * Lists every Shared Drive the signed-in member's own Google account can
- * see. `connected: false` means this account has no stored Google refresh
- * token yet (a password-only account, or a Google account that hasn't
- * signed in since this feature shipped) — the frontend prompts them to sign
- * out and back in with Google in that case.
+ * see, grouped into departments (see listDepartments). `connected: false`
+ * means this account has no stored Google refresh token yet (a
+ * password-only account, or a Google account that hasn't signed in since
+ * this feature shipped) — the frontend prompts them to sign out and back in
+ * with Google in that case.
  */
 router.get('/folders', auth_1.verifyAuthToken, async (req, res) => {
     try {
@@ -20,8 +21,8 @@ router.get('/folders', auth_1.verifyAuthToken, async (req, res) => {
         if (!refreshToken) {
             return res.status(200).json({ status: 'success', data: [], connected: false });
         }
-        const folders = await (0, drive_1.listPortDirectories)(refreshToken);
-        res.status(200).json({ status: 'success', data: folders, connected: true });
+        const departments = await (0, drive_1.listDepartments)(refreshToken);
+        res.status(200).json({ status: 'success', data: departments, connected: true });
     }
     catch (error) {
         console.error('List drive folders error:', error);

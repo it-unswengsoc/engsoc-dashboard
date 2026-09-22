@@ -33,6 +33,13 @@ export interface DriveFolderSummary {
   fileCount: number;
   colour: string;
   access: 'editable' | 'view-only' | 'restricted';
+  webViewLink: string;
+}
+
+export interface DriveDepartment {
+  name: string;
+  colour: string;
+  drives: DriveFolderSummary[];
 }
 
 export interface DriveEntry {
@@ -45,17 +52,43 @@ export interface DriveEntry {
   webViewLink: string | null;
 }
 
+interface DepartmentDef {
+  name: string;
+  colour: string;
+  match: (driveName: string) => boolean;
+}
+
+/* Groups the flat list of Shared Drives into department buckets purely by
+   name — EngSoc's Drive naming convention already clusters related drives
+   under a shared prefix ("Careers", "Careers Directors", "Careers
+   External", ...). Evaluated in order, first match wins; the trailing entry
+   matches everything so a drive that fits no named department (Arc
+   Delegate, Key Resources, ...) still shows up somewhere instead of being
+   silently dropped. */
+const DEPARTMENT_DEFS: DepartmentDef[] = [
+  { name: 'Governance', colour: '#8B2E38', match: (n) => /^(Executive|Chairperson|EngSoc Directors)/.test(n) },
+  { name: 'IT', colour: '#3D6C94', match: (n) => n.startsWith('IT') },
+  { name: 'Careers', colour: '#2A7D6F', match: (n) => n.startsWith('Careers') },
+  { name: 'Marketing & Publications', colour: '#C9862E', match: (n) => n.startsWith('Marketing') || n.startsWith('Publications') },
+  { name: 'Outreach & Programs', colour: '#6B4FA0', match: (n) => n.startsWith('Outreach') || n.startsWith('Programs') },
+  { name: 'Socials & Sponsorships', colour: '#B1698C', match: (n) => n.startsWith('Socials') || n.startsWith('Sponsorships') },
+  { name: 'HR & Treasury', colour: '#ED6672', match: (n) => n.startsWith('HR') || n.startsWith('Treasury') },
+  { name: 'Resources', colour: '#8A94A3', match: () => true },
+];
+
 /**
  * Lists every Shared Drive the given member's own Google account can see,
- * with each one's item count and a curated (or default) colour/access badge.
+ * grouped into departments (see DEPARTMENT_DEFS), with each drive's item
+ * count and a curated (or default) colour/access badge. A department with
+ * no matching drives is omitted rather than shown empty.
  */
-export async function listPortDirectories(refreshToken: string): Promise<DriveFolderSummary[]> {
+export async function listDepartments(refreshToken: string): Promise<DriveDepartment[]> {
   const drive = getDriveClient(refreshToken);
 
   const drivesRes = await drive.drives.list({ fields: 'drives(id, name)', pageSize: 100 });
   const allDrives = drivesRes.data.drives ?? [];
 
-  return Promise.all(
+  const summaries = await Promise.all(
     allDrives.map(async (sharedDrive) => {
       const countRes = await drive.files.list({
         q: 'trashed = false',
@@ -75,9 +108,26 @@ export async function listPortDirectories(refreshToken: string): Promise<DriveFo
         fileCount: countRes.data.files?.length ?? 0,
         colour: style.colour,
         access: style.access,
+        // Shared Drives don't carry a webViewLink of their own the way files
+        // and folders do (drives.list has no such field) — this is Drive's
+        // own stable URL scheme for opening one directly.
+        webViewLink: `https://drive.google.com/drive/folders/${sharedDrive.id}`,
       };
     })
   );
+
+  const departments: DriveDepartment[] = DEPARTMENT_DEFS.map((def) => ({
+    name: def.name,
+    colour: def.colour,
+    drives: [],
+  }));
+
+  for (const summary of summaries) {
+    const deptIndex = DEPARTMENT_DEFS.findIndex((def) => def.match(summary.name));
+    departments[deptIndex === -1 ? departments.length - 1 : deptIndex].drives.push(summary);
+  }
+
+  return departments.filter((department) => department.drives.length > 0);
 }
 
 /**

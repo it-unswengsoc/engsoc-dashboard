@@ -1,17 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { DriveFolderCardData, DriveEntryRowData, DriveFileCategory } from '@/types/documents';
-import { getPortDirectories, getDirectoryContents } from '@/services/documents';
-import DriveFolderCard from './DriveFolderCard';
-import DriveEntryRow from './DriveEntryRow';
-import StaggerReveal from '@/components/StaggerReveal';
-
-interface PathSegment {
-  id: string; // the drive's own id for the root segment, a folder id otherwise
-  name: string;
-}
+import type { DriveDepartmentData, DriveFileCategory, BrowserNode } from '@/types/documents';
+import { getDepartments, getDirectoryContents, driveToBrowserNode, entryToBrowserNode } from '@/services/documents';
+import DepartmentSidebar from './DepartmentSidebar';
+import DriveColumn from './DriveColumn';
+import DrivePreviewPane from './DrivePreviewPane';
 
 const FILTERS: { label: string; category: DriveFileCategory | 'ALL' }[] = [
   { label: 'All', category: 'ALL' },
@@ -21,28 +16,32 @@ const FILTERS: { label: string; category: DriveFileCategory | 'ALL' }[] = [
   { label: 'Videos', category: 'VIDEO' },
 ];
 
+/* A Finder-style column browser: pick a department in the sidebar, then
+   drill through its Shared Drives and folders one column at a time.
+   Clicking a row selects + previews it on the right; the preview pane's
+   "Open" button is what actually reveals the next column (or opens a file
+   in Drive) — a plain click never cascades a new column on its own, so
+   browsing and previewing stay two distinct, predictable actions. */
 export default function DocumentsView() {
   const router = useRouter();
   const [category, setCategory] = useState<DriveFileCategory | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
 
-  const [folders, setFolders] = useState<DriveFolderCardData[]>([]);
+  const [departments, setDepartments] = useState<DriveDepartmentData[]>([]);
   const [googleConnected, setGoogleConnected] = useState(true);
-  const [foldersLoading, setFoldersLoading] = useState(true);
-  const [foldersError, setFoldersError] = useState('');
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [departmentsError, setDepartmentsError] = useState('');
+  const [activeDepartment, setActiveDepartment] = useState<DriveDepartmentData | null>(null);
 
-  const [selectedDriveId, setSelectedDriveId] = useState<string | null>(null);
-  // path[0] is the drive root; path[i] for i > 0 is a folder navigated into.
-  const [path, setPath] = useState<PathSegment[]>([]);
-  const [entries, setEntries] = useState<DriveEntryRowData[]>([]);
-  const [entriesLoading, setEntriesLoading] = useState(false);
-  const [entriesError, setEntriesError] = useState('');
+  // columns[0] is always the active department's drives; columns[i] for
+  // i > 0 is the contents of selected[i - 1].
+  const [columns, setColumns] = useState<BrowserNode[][]>([]);
+  const [selected, setSelected] = useState<BrowserNode[]>([]);
+  const [opening, setOpening] = useState(false);
+  const [openError, setOpenError] = useState('');
 
-  const currentFolderId = path.length > 1 ? path[path.length - 1].id : undefined;
+  const columnsScrollRef = useRef<HTMLDivElement>(null);
 
-  // Drive reads as the signed-in member's own Google account, so this needs
-  // their JWT (sessionStorage) — fetched here rather than server-side, same
-  // reason as the calendar page (see CalendarShell).
   useEffect(() => {
     const token = sessionStorage.getItem('token');
     if (!token) {
@@ -50,74 +49,92 @@ export default function DocumentsView() {
       return;
     }
 
-    getPortDirectories(token)
-      .then(({ folders, connected }) => {
-        setFolders(folders);
+    getDepartments(token)
+      .then(({ departments, connected }) => {
+        setDepartments(departments);
         setGoogleConnected(connected);
+        if (departments.length > 0) {
+          setActiveDepartment(departments[0]);
+          setColumns([departments[0].drives.map(driveToBrowserNode)]);
+        }
       })
       .catch((err) => {
-        setFoldersError(err instanceof Error ? err.message : 'Failed to load Drive folders');
+        setDepartmentsError(err instanceof Error ? err.message : 'Failed to load Drive departments');
       })
-      .finally(() => setFoldersLoading(false));
+      .finally(() => setDepartmentsLoading(false));
   }, [router]);
 
-  useEffect(() => {
-    if (!selectedDriveId) return;
+  function selectDepartment(department: DriveDepartmentData) {
+    setActiveDepartment(department);
+    setColumns([department.drives.map(driveToBrowserNode)]);
+    setSelected([]);
+    setOpenError('');
+  }
+
+  function selectNode(colIdx: number, node: BrowserNode) {
+    setSelected((prev) => [...prev.slice(0, colIdx), node]);
+    // A fresh selection at an earlier column invalidates whatever was
+    // drilled into from the old one — drop any columns beyond it.
+    setColumns((prev) => prev.slice(0, colIdx + 1));
+    setOpenError('');
+  }
+
+  async function openSelected() {
+    const node = selected[selected.length - 1];
+    if (!node) return;
+
+    if (!node.navigable) {
+      if (node.webViewLink) window.open(node.webViewLink, '_blank', 'noopener');
+      return;
+    }
+
     const token = sessionStorage.getItem('token');
     if (!token) {
       router.push('/login');
       return;
     }
 
-    let cancelled = false;
-    setEntriesLoading(true);
-    setEntriesError('');
-
-    getDirectoryContents(token, selectedDriveId, currentFolderId)
-      .then(({ entries, connected }) => {
-        if (cancelled) return;
-        setEntries(entries);
-        setGoogleConnected(connected);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setEntriesError(err instanceof Error ? err.message : 'Failed to load this directory');
-      })
-      .finally(() => {
-        if (!cancelled) setEntriesLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedDriveId, currentFolderId, router]);
-
-  function selectDrive(folder: DriveFolderCardData) {
-    setSelectedDriveId(folder.id);
-    setPath([{ id: folder.id, name: folder.name }]);
+    const colIdx = selected.length - 1;
+    setOpening(true);
+    setOpenError('');
+    try {
+      const folderId = node.kind === 'entry' ? node.id : undefined;
+      const { entries, connected } = await getDirectoryContents(token, node.driveId, folderId);
+      setGoogleConnected(connected);
+      setColumns((prev) => [
+        ...prev.slice(0, colIdx + 1),
+        entries.map((entry) => entryToBrowserNode(node.driveId, node.accessLabel, entry)),
+      ]);
+    } catch (err) {
+      setOpenError(err instanceof Error ? err.message : 'Failed to open this folder');
+    } finally {
+      setOpening(false);
+    }
   }
 
-  function openFolder(entry: DriveEntryRowData) {
-    setPath((prev) => [...prev, { id: entry.id, name: entry.name }]);
-  }
+  // Scrolls a freshly-opened column into view — otherwise it'd render off
+  // the right edge of the (horizontally scrollable) columns strip.
+  useEffect(() => {
+    columnsScrollRef.current?.scrollTo({ left: columnsScrollRef.current.scrollWidth, behavior: 'smooth' });
+  }, [columns.length]);
 
-  function jumpTo(index: number) {
-    setPath((prev) => prev.slice(0, index + 1));
-  }
-
-  const filteredEntries = useMemo(() => {
+  const matchesFilter = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return entries.filter((entry) => {
-      // A folder always passes the type filter — filtering to "Photos"
-      // shouldn't make the directory structure itself disappear.
-      const matchesCategory = category === 'ALL' || entry.type === 'folder' || entry.category === category;
-      const matchesQuery = q === '' || entry.name.toLowerCase().includes(q);
-      return matchesCategory && matchesQuery;
-    });
-  }, [entries, category, query]);
+    return (node: BrowserNode) => {
+      if (q !== '' && !node.name.toLowerCase().includes(q)) return false;
+      // A drive/folder always passes the type filter — filtering to
+      // "Photos" shouldn't make the browsable structure itself disappear.
+      if (category === 'ALL' || node.navigable) return true;
+      return node.kind === 'entry' && node.category === category;
+    };
+  }, [query, category]);
+
+  const previewNode = selected[selected.length - 1] ?? null;
+  const previewPath = ['EngSoc Drive', ...selected.map((n) => n.name)];
+  const previewLocation = selected.length <= 1 ? (activeDepartment?.name ?? '') : selected[selected.length - 2].name;
 
   return (
-    <div>
+    <div className="flex h-full flex-col">
       {/* HEADER */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
@@ -131,7 +148,7 @@ export default function DocumentsView() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search files..."
+              placeholder="Search files and folders..."
               className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm transition-colors focus:border-transparent focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <svg className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -155,108 +172,77 @@ export default function DocumentsView() {
         </p>
       )}
 
-      {/* FILTER PILLS */}
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f.category}
-            onClick={() => setCategory(f.category)}
-            className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors ${
-              category === f.category
-                ? 'bg-gray-900 text-white'
-                : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* PORT DIRECTORIES */}
-      <h2 className="mt-8 font-mono text-xs font-bold uppercase tracking-wide text-[#8A94A3]">Port Directories</h2>
-      {foldersLoading ? (
-        <p className="mt-3 font-mono text-xs text-gray-400">Loading…</p>
-      ) : foldersError ? (
-        <p className="mt-3 font-mono text-xs text-[#8B2E38]">{foldersError}</p>
-      ) : folders.length === 0 ? (
-        <p className="mt-3 font-mono text-xs text-gray-400">No shared drives found.</p>
-      ) : (
-        <StaggerReveal className="mt-3 grid grid-cols-4 gap-5" replayKey={folders.length} y={16}>
-          {folders.map((folder) => (
-            <DriveFolderCard
-              key={folder.id}
-              folder={folder}
-              selected={selectedDriveId === folder.id}
-              onClick={() => selectDrive(folder)}
-            />
+      {/* BREADCRUMB + FILTER PILLS */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <nav className="flex flex-wrap items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wide text-[#8A94A3]">
+          {previewPath.map((name, i) => (
+            <span key={i} className="flex items-center gap-1.5">
+              {i > 0 && <span className="text-gray-300">/</span>}
+              <span className={i === previewPath.length - 1 ? 'text-gray-900' : ''}>{name}</span>
+            </span>
           ))}
-        </StaggerReveal>
-      )}
+        </nav>
 
-      {/* DIRECTORY CONTENTS */}
-      <div className="mt-8">
-        <Breadcrumbs path={path} onJump={jumpTo} />
+        <div className="flex flex-wrap items-center gap-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f.category}
+              onClick={() => setCategory(f.category)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+                category === f.category
+                  ? 'bg-gray-900 text-white'
+                  : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center gap-3 border-b border-gray-200 bg-gray-50 px-4 py-2.5">
-          <div className="w-9" />
-          <span className="flex-1 font-mono text-[10px] font-bold uppercase tracking-wide text-gray-400">Name</span>
-          <span className="w-20 shrink-0 text-center font-mono text-[10px] font-bold uppercase tracking-wide text-gray-400">Type</span>
-          <span className="w-28 shrink-0 text-right font-mono text-[10px] font-bold uppercase tracking-wide text-gray-400">Modified</span>
-          <span className="w-16 shrink-0 text-right font-mono text-[10px] font-bold uppercase tracking-wide text-gray-400">Size</span>
-        </div>
-
-        {!selectedDriveId ? (
-          <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">
-            Select a directory above to browse its files.
-          </p>
-        ) : entriesLoading ? (
-          <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">Loading…</p>
-        ) : entriesError ? (
-          <p className="px-4 py-10 text-center font-mono text-xs text-[#8B2E38]">{entriesError}</p>
-        ) : filteredEntries.length === 0 ? (
-          <p className="px-4 py-10 text-center font-mono text-xs text-gray-400">This folder is empty.</p>
+      {/* BROWSER */}
+      <div className="mt-4 flex flex-1 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        {departmentsLoading ? (
+          <p className="p-6 font-mono text-xs text-gray-400">Loading…</p>
+        ) : departmentsError ? (
+          <p className="p-6 font-mono text-xs text-[#8B2E38]">{departmentsError}</p>
+        ) : departments.length === 0 ? (
+          <p className="p-6 font-mono text-xs text-gray-400">No shared drives found.</p>
         ) : (
-          <StaggerReveal
-            className="divide-y divide-gray-100"
-            replayKey={`${selectedDriveId}/${currentFolderId ?? ''}`}
-            y={8}
-            stagger={0.03}
-          >
-            {filteredEntries.map((entry) => (
-              <DriveEntryRow key={entry.id} entry={entry} onOpenFolder={() => openFolder(entry)} />
-            ))}
-          </StaggerReveal>
+          <>
+            <div className="py-4 pl-4">
+              <DepartmentSidebar
+                departments={departments}
+                activeDepartment={activeDepartment?.name ?? null}
+                onSelect={selectDepartment}
+              />
+            </div>
+
+            <div ref={columnsScrollRef} className="flex flex-1 overflow-x-auto">
+              {columns.map((nodes, colIdx) => (
+                <DriveColumn
+                  key={colIdx}
+                  title={colIdx === 0 ? (activeDepartment?.name ?? '') : (selected[colIdx - 1]?.name ?? '')}
+                  nodes={nodes.filter(matchesFilter)}
+                  selectedId={selected[colIdx]?.id ?? null}
+                  onSelect={(node) => selectNode(colIdx, node)}
+                />
+              ))}
+            </div>
+
+            <DrivePreviewPane
+              node={previewNode}
+              path={previewPath}
+              locationLabel={previewLocation}
+              loading={opening}
+              onOpen={openSelected}
+            />
+          </>
         )}
       </div>
+
+      {openError && <p className="mt-2 font-mono text-xs text-[#8B2E38]">{openError}</p>}
     </div>
-  );
-}
-
-function Breadcrumbs({ path, onJump }: { path: PathSegment[]; onJump: (index: number) => void }) {
-  if (path.length === 0) {
-    return <h2 className="font-mono text-xs font-bold uppercase tracking-wide text-[#8A94A3]">Directory</h2>;
-  }
-
-  return (
-    <nav className="flex flex-wrap items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wide text-[#8A94A3]">
-      {path.map((segment, i) => {
-        const isCurrent = i === path.length - 1;
-        return (
-          <span key={segment.id} className="flex items-center gap-1.5">
-            {i > 0 && <span className="text-gray-300">/</span>}
-            <button
-              onClick={() => onJump(i)}
-              disabled={isCurrent}
-              className={isCurrent ? 'text-gray-900' : 'transition-colors hover:text-gray-600'}
-            >
-              {segment.name}
-            </button>
-          </span>
-        );
-      })}
-    </nav>
   );
 }
 

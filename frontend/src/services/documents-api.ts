@@ -1,12 +1,12 @@
-import type { DriveFolder, DriveEntry } from '@/types/documents';
+import type { DriveDepartment, DriveEntry } from '@/types/documents';
 import { apiUrl } from '@/services/api-config';
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
-export type { DriveFolder, DriveEntry };
+export type { DriveDepartment, DriveEntry };
 
-export interface DriveFoldersResult {
-  folders: DriveFolder[];
+export interface DriveDepartmentsResult {
+  departments: DriveDepartment[];
   // False if this account has no Google refresh token stored yet — a
   // password-only account, or a Google account that hasn't signed in since
   // this feature shipped. The documents page prompts a re-login in that case.
@@ -21,12 +21,12 @@ export interface DriveEntriesResult {
 /* Client-side only: Drive now reads as the signed-in member's own Google
    account (so a drive only shows up if they can actually see it in Google
    Drive themselves), which needs the JWT held in sessionStorage — a Server
-   Component can't reach that. The "Port Directories" are every Shared Drive
-   their account can see. */
-export async function getDriveFolders(token: string): Promise<DriveFoldersResult> {
+   Component can't reach that. Every Shared Drive their account can see,
+   grouped into departments by the backend. */
+export async function getDriveDepartments(token: string): Promise<DriveDepartmentsResult> {
   if (USE_MOCK) {
-    const { getDriveFolders: mockGetDriveFolders } = await import('@/mocks/functions/documents');
-    return { folders: await mockGetDriveFolders(), connected: true };
+    const { getDriveDepartments: mockGetDriveDepartments } = await import('@/mocks/functions/documents');
+    return { departments: await mockGetDriveDepartments(), connected: true };
   }
 
   const res = await fetch(apiUrl('/drive/folders'), {
@@ -35,7 +35,7 @@ export async function getDriveFolders(token: string): Promise<DriveFoldersResult
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load Drive folders');
-  return { folders: data.data as DriveFolder[], connected: data.connected as boolean };
+  return { departments: data.data as DriveDepartment[], connected: data.connected as boolean };
 }
 
 /* Lists a Shared Drive's immediate contents — its root if folderId is

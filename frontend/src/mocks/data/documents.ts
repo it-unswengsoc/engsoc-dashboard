@@ -1,11 +1,51 @@
-import type { DriveFolder, DriveEntry } from '@/types/documents';
+import type { DriveDepartment, DriveEntry } from '@/types/documents';
 import { at, minutesAgo } from '@/mocks/data/date-helpers';
 
-export const mockDriveFolders: DriveFolder[] = [
-  { id: 'folder-it', name: 'IT', fileCount: 24, access: 'editable', colour: '#F1C4C9' },
-  { id: 'folder-marketing', name: 'Marketing', fileCount: 24, access: 'view-only', colour: '#F4EFD3' },
-  { id: 'folder-cabinet', name: 'Cabinet', fileCount: 24, access: 'restricted', colour: '#E5E7EB' },
-  { id: 'folder-spons', name: 'Spons', fileCount: 24, access: 'view-only', colour: '#B1C9DC' },
+export const mockDepartments: DriveDepartment[] = [
+  {
+    name: 'Operations',
+    colour: '#3D6C94',
+    drives: [
+      {
+        id: 'folder-it',
+        name: 'IT',
+        fileCount: 24,
+        access: 'editable',
+        colour: '#F1C4C9',
+        webViewLink: 'https://drive.google.com/drive/folders/folder-it',
+      },
+      {
+        id: 'folder-marketing',
+        name: 'Marketing',
+        fileCount: 24,
+        access: 'view-only',
+        colour: '#F4EFD3',
+        webViewLink: 'https://drive.google.com/drive/folders/folder-marketing',
+      },
+    ],
+  },
+  {
+    name: 'Leadership',
+    colour: '#8B2E38',
+    drives: [
+      {
+        id: 'folder-cabinet',
+        name: 'Cabinet',
+        fileCount: 24,
+        access: 'restricted',
+        colour: '#E5E7EB',
+        webViewLink: 'https://drive.google.com/drive/folders/folder-cabinet',
+      },
+      {
+        id: 'folder-spons',
+        name: 'Spons',
+        fileCount: 24,
+        access: 'view-only',
+        colour: '#B1C9DC',
+        webViewLink: 'https://drive.google.com/drive/folders/folder-spons',
+      },
+    ],
+  },
 ];
 
 /* Keyed by "<driveId>" for a drive's root, or "<driveId>/<folderId>" for a

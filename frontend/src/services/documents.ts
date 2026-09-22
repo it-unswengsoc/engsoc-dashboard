@@ -1,16 +1,19 @@
-import { getDriveFolders, getDriveEntries } from '@/services/documents-api';
+import { getDriveDepartments, getDriveEntries } from '@/services/documents-api';
 import type {
   DriveFolder,
+  DriveDepartment,
   DriveEntry,
   DriveAccessLevel,
   DriveFileCategory,
   DriveFolderCardData,
+  DriveDepartmentData,
   DriveEntryRowData,
+  BrowserNode,
 } from '@/types/documents';
 
-export type { DriveFolderCardData, DriveEntryRowData, DriveFileCategory };
+export type { DriveFolderCardData, DriveDepartmentData, DriveEntryRowData, DriveFileCategory, BrowserNode };
 
-/* ---------- Folder mapper ---------- */
+/* ---------- Folder / department mapper ---------- */
 
 const ACCESS_LABELS: Record<DriveAccessLevel, string> = {
   editable: 'Editable',
@@ -25,6 +28,15 @@ export function toDriveFolderCard(folder: DriveFolder): DriveFolderCardData {
     fileCount: folder.fileCount,
     accessLabel: ACCESS_LABELS[folder.access],
     colour: folder.colour,
+    webViewLink: folder.webViewLink,
+  };
+}
+
+export function toDriveDepartment(department: DriveDepartment): DriveDepartmentData {
+  return {
+    name: department.name,
+    colour: department.colour,
+    drives: department.drives.map(toDriveFolderCard),
   };
 }
 
@@ -95,10 +107,44 @@ export function toDriveEntryRow(entry: DriveEntry): DriveEntryRowData {
   };
 }
 
+/* ---------- Browser node mappers (Finder-style column browser) ---------- */
+
+export function driveToBrowserNode(drive: DriveFolderCardData): BrowserNode {
+  return {
+    kind: 'drive',
+    id: drive.id,
+    driveId: drive.id,
+    name: drive.name,
+    navigable: true,
+    accessLabel: drive.accessLabel,
+    fileCount: drive.fileCount,
+    webViewLink: drive.webViewLink,
+  };
+}
+
+/* accessLabel is threaded through from the owning drive — Drive has no
+   concept of a folder having its own access level distinct from its drive's. */
+export function entryToBrowserNode(driveId: string, accessLabel: string, entry: DriveEntryRowData): BrowserNode {
+  return {
+    kind: 'entry',
+    id: entry.id,
+    driveId,
+    name: entry.name,
+    navigable: entry.type === 'folder',
+    type: entry.type,
+    category: entry.category,
+    extensionLabel: entry.extensionLabel,
+    modifiedLabel: entry.modifiedLabel,
+    sizeLabel: entry.sizeLabel,
+    webViewLink: entry.webViewLink,
+    accessLabel,
+  };
+}
+
 /* ---------- Page-shaped getters ---------- */
 
-export interface PortDirectoriesResult {
-  folders: DriveFolderCardData[];
+export interface DepartmentsResult {
+  departments: DriveDepartmentData[];
   connected: boolean;
 }
 
@@ -107,9 +153,9 @@ export interface DirectoryContentsResult {
   connected: boolean;
 }
 
-export async function getPortDirectories(token: string): Promise<PortDirectoriesResult> {
-  const { folders, connected } = await getDriveFolders(token);
-  return { folders: folders.map(toDriveFolderCard), connected };
+export async function getDepartments(token: string): Promise<DepartmentsResult> {
+  const { departments, connected } = await getDriveDepartments(token);
+  return { departments: departments.map(toDriveDepartment), connected };
 }
 
 export async function getDirectoryContents(

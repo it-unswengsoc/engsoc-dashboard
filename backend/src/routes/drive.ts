@@ -1,17 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { verifyAuthToken } from './auth';
 import { getUserGoogleRefreshToken } from '../functions/auth';
-import { listPortDirectories, listDriveEntries } from '../functions/drive';
+import { listDepartments, listDriveEntries } from '../functions/drive';
 
 const router = Router();
 
 /**
  * GET /drive/folders
  * Lists every Shared Drive the signed-in member's own Google account can
- * see. `connected: false` means this account has no stored Google refresh
- * token yet (a password-only account, or a Google account that hasn't
- * signed in since this feature shipped) — the frontend prompts them to sign
- * out and back in with Google in that case.
+ * see, grouped into departments (see listDepartments). `connected: false`
+ * means this account has no stored Google refresh token yet (a
+ * password-only account, or a Google account that hasn't signed in since
+ * this feature shipped) — the frontend prompts them to sign out and back in
+ * with Google in that case.
  */
 router.get('/folders', verifyAuthToken, async (req: Request, res: Response) => {
   try {
@@ -22,8 +23,8 @@ router.get('/folders', verifyAuthToken, async (req: Request, res: Response) => {
       return res.status(200).json({ status: 'success', data: [], connected: false });
     }
 
-    const folders = await listPortDirectories(refreshToken);
-    res.status(200).json({ status: 'success', data: folders, connected: true });
+    const departments = await listDepartments(refreshToken);
+    res.status(200).json({ status: 'success', data: departments, connected: true });
   } catch (error) {
     console.error('List drive folders error:', error);
     res.status(500).json({ status: 'error', message: 'Failed to load Drive folders' });

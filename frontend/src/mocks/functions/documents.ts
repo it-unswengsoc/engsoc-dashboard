@@ -1,8 +1,8 @@
-import type { DriveFolder, DriveEntry } from '@/types/documents';
-import { mockDriveFolders, mockDriveEntries } from '@/mocks/data/documents';
+import type { DriveDepartment, DriveEntry } from '@/types/documents';
+import { mockDepartments, mockDriveEntries } from '@/mocks/data/documents';
 
-export async function getDriveFolders(): Promise<DriveFolder[]> {
-  return mockDriveFolders;
+export async function getDriveDepartments(): Promise<DriveDepartment[]> {
+  return mockDepartments;
 }
 
 export async function getDriveEntries(driveId: string, folderId?: string): Promise<DriveEntry[]> {
