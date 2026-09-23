@@ -125,14 +125,17 @@ export default function DocumentsView() {
     }
   }
 
+  // Only reached via double-click in a column (the preview pane's own
+  // "Open file" is a real <a target="_blank"> now, not this) — a
+  // window.open() from inside a framework event handler is exactly the
+  // pattern browsers/extensions are most likely to silently swallow as a
+  // pop-up, so this at least surfaces something instead of doing nothing.
   function openFile(node: BrowserNode) {
-    if (node.webViewLink) window.open(node.webViewLink, '_blank', 'noopener');
-  }
-
-  function openSelected() {
-    const node = selected[selected.length - 1];
-    if (!node || node.navigable) return; // folders/drives already open themselves on click
-    openFile(node);
+    if (node.webViewLink) {
+      window.open(node.webViewLink, '_blank', 'noopener');
+    } else {
+      setOpenError(`Drive didn't provide a link to open "${node.name}".`);
+    }
   }
 
   function jumpToPath(pathIndex: number) {
@@ -282,12 +285,7 @@ export default function DocumentsView() {
               )}
             </div>
 
-            <DrivePreviewPane
-              node={previewNode}
-              path={previewPath}
-              locationLabel={previewLocation}
-              onOpen={openSelected}
-            />
+            <DrivePreviewPane node={previewNode} path={previewPath} locationLabel={previewLocation} />
           </>
         )}
       </div>
