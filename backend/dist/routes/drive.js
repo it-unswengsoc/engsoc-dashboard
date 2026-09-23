@@ -157,6 +157,28 @@ router.patch('/entries/:fileId', auth_1.verifyAuthToken, async (req, res) => {
     }
 });
 /**
+ * DELETE /drive/entries/:fileId
+ * Moves a file or folder to Drive's own Trash (see deleteDriveEntry) — a
+ * recoverable action, not a permanent delete. Google enforces
+ * capabilities.canDelete server-side same as every other write here.
+ */
+router.delete('/entries/:fileId', auth_1.verifyAuthToken, async (req, res) => {
+    try {
+        const user = req.user;
+        const { fileId } = req.params;
+        const refreshToken = await (0, auth_2.getUserGoogleRefreshToken)(user.userId);
+        if (!refreshToken) {
+            return res.status(409).json({ status: 'error', message: 'Google Drive is not connected for this account' });
+        }
+        await (0, drive_1.deleteDriveEntry)(refreshToken, fileId);
+        res.status(200).json({ status: 'success' });
+    }
+    catch (error) {
+        console.error('Delete drive entry error:', error);
+        res.status(500).json({ status: 'error', message: 'Failed to delete' });
+    }
+});
+/**
  * GET /drive/access-token
  * Mints a short-lived Google access token for the signed-in member, for the
  * frontend to upload a file's bytes directly to Google's own upload

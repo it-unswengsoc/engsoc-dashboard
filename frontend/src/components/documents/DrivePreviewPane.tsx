@@ -1,4 +1,4 @@
-import { Pencil } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import type { BrowserNode } from '@/types/documents';
 
 interface DrivePreviewPaneProps {
@@ -6,6 +6,7 @@ interface DrivePreviewPaneProps {
   path: string[]; // names of every selected node up to and including `node`
   locationLabel: string; // parent's name — the department for a drive, the previous column's node for an entry
   onRename: () => void;
+  onDelete: () => void;
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -33,12 +34,13 @@ const OPEN_BUTTON_STYLES =
    pop-up, with zero visible error. A genuine anchor-tag navigation isn't
    subject to that same heuristic.
 
-   The rename pencil only ever shows for a file/folder whose own real
-   capabilities.canRename came back true for the signed-in member — never
-   for a Shared Drive itself (renaming a whole drive is a different, more
-   sensitive Drive API call this app doesn't expose), and never just
-   because it looks like it should be allowed. */
-export default function DrivePreviewPane({ node, path, locationLabel, onRename }: DrivePreviewPaneProps) {
+   The rename pencil and delete icon only ever show for a file/folder whose
+   own real capabilities (canRename / canDelete) came back true for the
+   signed-in member — never for a Shared Drive itself (renaming or deleting
+   a whole drive is a different, more sensitive Drive API call this app
+   doesn't expose), and never just because it looks like it should be
+   allowed. */
+export default function DrivePreviewPane({ node, path, locationLabel, onRename, onDelete }: DrivePreviewPaneProps) {
   if (!node) {
     return (
       <div className="flex w-80 shrink-0 flex-col items-center justify-center gap-2 border-l border-gray-100 px-6 text-center">
@@ -49,6 +51,7 @@ export default function DrivePreviewPane({ node, path, locationLabel, onRename }
 
   const isFile = node.kind === 'entry' && node.type === 'file';
   const canRename = node.kind === 'entry' && node.capabilities.canRename;
+  const canDelete = node.kind === 'entry' && node.capabilities.canDelete;
 
   return (
     <div className="flex w-80 shrink-0 flex-col border-l border-gray-100 px-6 py-6">
@@ -69,15 +72,26 @@ export default function DrivePreviewPane({ node, path, locationLabel, onRename }
 
       <div className="mt-3 flex items-start justify-between gap-2">
         <h3 className="text-lg font-bold text-gray-900">{node.name}</h3>
-        {canRename && (
-          <button
-            onClick={onRename}
-            aria-label="Rename"
-            className="shrink-0 rounded-lg p-1 text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-600"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {canRename && (
+            <button
+              onClick={onRename}
+              aria-label="Rename"
+              className="rounded-lg p-1 text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {canDelete && (
+            <button
+              onClick={onDelete}
+              aria-label="Delete"
+              className="rounded-lg p-1 text-gray-300 transition-colors hover:bg-[#F4E1E3] hover:text-[#8B2E38]"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
       <p className="truncate font-mono text-xs text-gray-400">{path.join(' / ')}</p>
 

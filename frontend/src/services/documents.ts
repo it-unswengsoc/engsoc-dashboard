@@ -7,6 +7,7 @@ import {
   renameDriveEntry,
   getDriveAccessToken,
   uploadDriveFile,
+  deleteDriveEntry,
 } from '@/services/documents-api';
 import type {
   DriveFolder,
@@ -246,4 +247,8 @@ export async function uploadFile(
   const { accessToken } = await getDriveAccessToken(token);
   const entry = await uploadDriveFile(accessToken, driveId, parentId, file);
   return toDriveEntryRow(entry);
+}
+
+export async function remove(token: string, fileId: string): Promise<void> {
+  await deleteDriveEntry(token, fileId);
 }

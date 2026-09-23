@@ -6,6 +6,7 @@ export interface DriveCapabilities {
   canEdit: boolean;
   canAddChildren: boolean;
   canRename: boolean;
+  canDelete: boolean;
 }
 
 export interface DriveFolder {
