@@ -4,14 +4,33 @@ import { at, minutesAgo } from '@/mocks/data/date-helpers';
 /* Local dev has no real Google account behind it, so these stand in for
    what listDepartments/listDriveEntries would normally read off Drive's own
    `capabilities` for the signed-in member — IT mocked as fully editable,
-   everything else as view-only, so the "New"/rename gating has something
-   real to demonstrate without a backend. */
-const EDITABLE: DriveCapabilities = { canEdit: true, canAddChildren: true, canRename: true };
-const VIEW_ONLY: DriveCapabilities = { canEdit: false, canAddChildren: false, canRename: false };
+   everything else as view-only, so the "New"/rename/delete gating has
+   something real to demonstrate without a backend. */
+const EDITABLE: DriveCapabilities = { canEdit: true, canAddChildren: true, canRename: true, canDelete: true };
+const VIEW_ONLY: DriveCapabilities = { canEdit: false, canAddChildren: false, canRename: false, canDelete: false };
 
+/* Named to mirror the real DEPARTMENT_DEFS headings in
+   backend/src/functions/drive.ts (Cabinet, IT, Careers, Marketing,
+   Publications, Outreach, Programs, Socials, Sponsorships, HR, Resources) —
+   just one representative drive per department, enough to exercise the
+   sidebar and column browser locally. */
 export const mockDepartments: DriveDepartment[] = [
   {
-    name: 'Operations',
+    name: 'Cabinet',
+    colour: '#8B2E38',
+    drives: [
+      {
+        id: 'folder-cabinet',
+        name: 'Cabinet',
+        fileCount: 24,
+        colour: '#E5E7EB',
+        webViewLink: 'https://drive.google.com/drive/folders/folder-cabinet',
+        capabilities: VIEW_ONLY,
+      },
+    ],
+  },
+  {
+    name: 'IT',
     colour: '#3D6C94',
     drives: [
       {
@@ -22,6 +41,12 @@ export const mockDepartments: DriveDepartment[] = [
         webViewLink: 'https://drive.google.com/drive/folders/folder-it',
         capabilities: EDITABLE,
       },
+    ],
+  },
+  {
+    name: 'Marketing',
+    colour: '#C9862E',
+    drives: [
       {
         id: 'folder-marketing',
         name: 'Marketing',
@@ -33,20 +58,12 @@ export const mockDepartments: DriveDepartment[] = [
     ],
   },
   {
-    name: 'Leadership',
-    colour: '#8B2E38',
+    name: 'Sponsorships',
+    colour: '#C77FA0',
     drives: [
       {
-        id: 'folder-cabinet',
-        name: 'Cabinet',
-        fileCount: 24,
-        colour: '#E5E7EB',
-        webViewLink: 'https://drive.google.com/drive/folders/folder-cabinet',
-        capabilities: VIEW_ONLY,
-      },
-      {
         id: 'folder-spons',
-        name: 'Spons',
+        name: 'Sponsorships',
         fileCount: 24,
         colour: '#B1C9DC',
         webViewLink: 'https://drive.google.com/drive/folders/folder-spons',

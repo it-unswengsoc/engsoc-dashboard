@@ -9,6 +9,7 @@ import {
   createDriveFolder,
   createDriveFile,
   renameDriveEntry,
+  deleteDriveEntry,
 } from '../functions/drive';
 
 const router = Router();
@@ -178,6 +179,30 @@ router.patch('/entries/:fileId', verifyAuthToken, async (req: Request, res: Resp
   } catch (error) {
     console.error('Rename drive entry error:', error);
     res.status(500).json({ status: 'error', message: 'Failed to rename' });
+  }
+});
+
+/**
+ * DELETE /drive/entries/:fileId
+ * Moves a file or folder to Drive's own Trash (see deleteDriveEntry) — a
+ * recoverable action, not a permanent delete. Google enforces
+ * capabilities.canDelete server-side same as every other write here.
+ */
+router.delete('/entries/:fileId', verifyAuthToken, async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const { fileId } = req.params;
+
+    const refreshToken = await getUserGoogleRefreshToken(user.userId);
+    if (!refreshToken) {
+      return res.status(409).json({ status: 'error', message: 'Google Drive is not connected for this account' });
+    }
+
+    await deleteDriveEntry(refreshToken, fileId);
+    res.status(200).json({ status: 'success' });
+  } catch (error) {
+    console.error('Delete drive entry error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to delete' });
   }
 });
 

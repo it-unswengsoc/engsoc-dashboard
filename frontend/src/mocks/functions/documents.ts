@@ -14,7 +14,7 @@ const DRIVE_NAME_BY_ID: Record<string, string> = {
   'folder-it': 'IT',
   'folder-marketing': 'Marketing',
   'folder-cabinet': 'Cabinet',
-  'folder-spons': 'Spons',
+  'folder-spons': 'Sponsorships',
 };
 
 export async function searchDrive(query: string): Promise<DriveSearchResult[]> {
@@ -63,7 +63,7 @@ export async function createDriveFolder(
     modifiedAt: new Date().toISOString(),
     sizeBytes: null,
     webViewLink: null,
-    capabilities: { canEdit: true, canAddChildren: true, canRename: true },
+    capabilities: { canEdit: true, canAddChildren: true, canRename: true, canDelete: true },
   };
   const key = parentId ? `${driveId}/${parentId}` : driveId;
   mockDriveEntries[key] = [...(mockDriveEntries[key] ?? []), entry];
@@ -84,7 +84,7 @@ export async function createDriveFile(
     modifiedAt: new Date().toISOString(),
     sizeBytes: 0,
     webViewLink: `https://docs.google.com/document/d/${mockId('mock')}/edit`,
-    capabilities: { canEdit: true, canAddChildren: false, canRename: true },
+    capabilities: { canEdit: true, canAddChildren: false, canRename: true, canDelete: true },
   };
   const key = parentId ? `${driveId}/${parentId}` : driveId;
   mockDriveEntries[key] = [...(mockDriveEntries[key] ?? []), entry];
@@ -115,9 +115,26 @@ export async function uploadDriveFile(
     modifiedAt: new Date().toISOString(),
     sizeBytes: file.size,
     webViewLink: null,
-    capabilities: { canEdit: true, canAddChildren: false, canRename: true },
+    capabilities: { canEdit: true, canAddChildren: false, canRename: true, canDelete: true },
   };
   const key = parentId ? `${driveId}/${parentId}` : driveId;
   mockDriveEntries[key] = [...(mockDriveEntries[key] ?? []), entry];
   return entry;
+}
+
+/* Deletes are trash moves against a real backend (see functions/drive.ts's
+   deleteDriveEntry) — this mock just drops the entry outright, and clears
+   out any nested listing under it (a folder's own former contents) so a
+   deleted folder doesn't leave orphaned children reachable by id. */
+export async function deleteDriveEntry(fileId: string): Promise<void> {
+  let found = false;
+  for (const key of Object.keys(mockDriveEntries)) {
+    const before = mockDriveEntries[key].length;
+    mockDriveEntries[key] = mockDriveEntries[key].filter((e) => e.id !== fileId);
+    if (mockDriveEntries[key].length !== before) found = true;
+  }
+  for (const key of Object.keys(mockDriveEntries)) {
+    if (key.endsWith(`/${fileId}`)) delete mockDriveEntries[key];
+  }
+  if (!found) throw new Error('Not found in mock data');
 }

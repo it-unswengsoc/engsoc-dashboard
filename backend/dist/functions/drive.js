@@ -7,6 +7,7 @@ exports.createDriveFolder = createDriveFolder;
 exports.createDriveFile = createDriveFile;
 exports.renameDriveEntry = renameDriveEntry;
 exports.uploadDriveFile = uploadDriveFile;
+exports.deleteDriveEntry = deleteDriveEntry;
 const googleapis_1 = require("googleapis");
 const stream_1 = require("stream");
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -39,18 +40,26 @@ const DEFAULT_DRIVE_COLOUR = '#D9DEE5';
 /* Groups the flat list of Shared Drives into department buckets purely by
    name — EngSoc's Drive naming convention already clusters related drives
    under a shared prefix ("Careers", "Careers Directors", "Careers
-   External", ...). Evaluated in order, first match wins; the trailing entry
-   matches everything so a drive that fits no named department (Arc
-   Delegate, Key Resources, ...) still shows up somewhere instead of being
-   silently dropped. */
+   External", ...). Evaluated in order, first match wins.
+
+   Cabinet also absorbs Treasury and the Arc Delegate drives (they're run out
+   of Cabinet, not standalone departments of their own) alongside the old
+   Governance-style drives (Executive, Chairperson, EngSoc Directors).
+
+   The trailing entry matches everything so a drive that fits no named
+   department (Internal Photos, Key Resources, ...) still shows up under
+   Resources instead of being silently dropped. */
 const DEPARTMENT_DEFS = [
-    { name: 'Governance', colour: '#8B2E38', match: (n) => /^(Executive|Chairperson|EngSoc Directors)/.test(n) },
+    { name: 'Cabinet', colour: '#8B2E38', match: (n) => /^(Cabinet|Executive|Chairperson|EngSoc Directors|Treasury|Arc Del)/.test(n) },
     { name: 'IT', colour: '#3D6C94', match: (n) => n.startsWith('IT') },
     { name: 'Careers', colour: '#2A7D6F', match: (n) => n.startsWith('Careers') },
-    { name: 'Marketing & Publications', colour: '#C9862E', match: (n) => n.startsWith('Marketing') || n.startsWith('Publications') },
-    { name: 'Outreach & Programs', colour: '#6B4FA0', match: (n) => n.startsWith('Outreach') || n.startsWith('Programs') },
-    { name: 'Socials & Sponsorships', colour: '#B1698C', match: (n) => n.startsWith('Socials') || n.startsWith('Sponsorships') },
-    { name: 'HR & Treasury', colour: '#ED6672', match: (n) => n.startsWith('HR') || n.startsWith('Treasury') },
+    { name: 'Marketing', colour: '#C9862E', match: (n) => n.startsWith('Marketing') },
+    { name: 'Publications', colour: '#D9A441', match: (n) => n.startsWith('Publications') },
+    { name: 'Outreach', colour: '#6B4FA0', match: (n) => n.startsWith('Outreach') },
+    { name: 'Programs', colour: '#7C5FB5', match: (n) => n.startsWith('Programs') },
+    { name: 'Socials', colour: '#B1698C', match: (n) => n.startsWith('Socials') },
+    { name: 'Sponsorships', colour: '#C77FA0', match: (n) => n.startsWith('Sponsorships') },
+    { name: 'HR', colour: '#ED6672', match: (n) => n.startsWith('HR') },
     { name: 'Resources', colour: '#8A94A3', match: () => true },
 ];
 function toCapabilities(caps) {
@@ -58,6 +67,10 @@ function toCapabilities(caps) {
         canEdit: caps?.canEdit ?? false,
         canAddChildren: caps?.canAddChildren ?? false,
         canRename: caps?.canRename ?? false,
+        // Only a File's capabilities ever carry canDelete — a Shared Drive's own
+        // capabilities don't have a "delete this whole Drive" concept, so it's
+        // just absent (and defaults to false) for a drive-level summary.
+        canDelete: caps?.canDelete ?? false,
     };
 }
 /**
@@ -69,6 +82,9 @@ function toCapabilities(caps) {
 async function listDepartments(refreshToken) {
     const drive = getDriveClient(refreshToken);
     const drivesRes = await drive.drives.list({
+        // Shared Drives don't carry canDelete in their own capabilities (there's
+        // no per-member "delete this whole Drive" action) — only files/folders
+        // within one do, requested separately via ENTRY_FIELD_LIST below.
         fields: 'drives(id, name, capabilities(canEdit, canAddChildren, canRename))',
         pageSize: 100,
     });
@@ -109,7 +125,7 @@ async function listDepartments(refreshToken) {
 // The fields of a single File resource this app ever needs — shared between
 // a list response (wrapped in `files(...)`) and a single create/update/get
 // response (the bare field list) so the two can't drift apart.
-const ENTRY_FIELD_LIST = 'id, name, mimeType, modifiedTime, size, webViewLink, capabilities(canEdit, canAddChildren, canRename)';
+const ENTRY_FIELD_LIST = 'id, name, mimeType, modifiedTime, size, webViewLink, capabilities(canEdit, canAddChildren, canRename, canDelete)';
 const ENTRY_FIELDS = `files(${ENTRY_FIELD_LIST})`;
 function toDriveEntry(f) {
     return {
@@ -259,5 +275,20 @@ async function uploadDriveFile(refreshToken, driveId, parentId, name, mimeType, 
         fields: ENTRY_FIELD_LIST,
     });
     return toDriveEntry(res.data);
+}
+/**
+ * Moves a file or folder to Drive's own Trash — recoverable there for 30
+ * days by default, the same outcome as choosing "Remove" in Drive's own UI,
+ * rather than a permanent drive.files.delete(). Google enforces
+ * capabilities.canDelete server-side same as every other write here; the
+ * frontend only offers this when it already knows that's true.
+ */
+async function deleteDriveEntry(refreshToken, fileId) {
+    const drive = getDriveClient(refreshToken);
+    await drive.files.update({
+        fileId,
+        requestBody: { trashed: true },
+        supportsAllDrives: true,
+    });
 }
 //# sourceMappingURL=drive.js.map

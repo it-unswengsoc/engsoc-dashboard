@@ -12,12 +12,14 @@ import {
   createFile,
   rename,
   uploadFile,
+  remove,
 } from '@/services/documents';
 import DepartmentSidebar from './DepartmentSidebar';
 import DriveColumn from './DriveColumn';
 import DrivePreviewPane from './DrivePreviewPane';
 import NewDriveItemMenu from './NewDriveItemMenu';
 import NamePromptDialog from './NamePromptDialog';
+import ConfirmDeleteDialog from './ConfirmDeleteDialog';
 
 const FILTERS: { label: string; category: DriveFileCategory | 'ALL' }[] = [
   { label: 'All', category: 'ALL' },
@@ -34,7 +36,12 @@ const FILTERS: { label: string; category: DriveFileCategory | 'ALL' }[] = [
    DOM and the horizontally-scrolled strip without bound. */
 const MAX_VISIBLE_COLUMNS = 4;
 
-type CreateDialog = { kind: 'folder' } | { kind: 'file'; mimeType: string; label: string } | { kind: 'rename' } | null;
+type CreateDialog =
+  | { kind: 'folder' }
+  | { kind: 'file'; mimeType: string; label: string }
+  | { kind: 'rename' }
+  | { kind: 'delete' }
+  | null;
 
 /* A Finder-style column browser: pick a department in the sidebar, then
    drill through its Shared Drives and folders one column at a time.
@@ -232,6 +239,29 @@ export default function DocumentsView() {
     });
   }
 
+  // Moves the currently-selected file/folder to Drive's trash. Drops it (and
+  // any column that had been drilled into it) from `columns`, and pops
+  // `selected` back one level so the preview pane falls back to its parent —
+  // there's nothing left at this depth to preview.
+  async function handleDelete() {
+    if (!currentLocation || currentLocation.kind !== 'entry') return;
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    const colIdx = selected.length - 1;
+    const deletedId = currentLocation.id;
+    await remove(token, deletedId);
+
+    setColumns((prev) => {
+      const next = prev.slice(0, colIdx + 1);
+      next[colIdx] = next[colIdx].filter((n) => n.id !== deletedId);
+      return next;
+    });
+    setSelected((prev) => prev.slice(0, colIdx));
+  }
+
   async function handleUploadFiles(files: FileList) {
     if (!currentLocation) return;
     const token = sessionStorage.getItem('token');
@@ -386,6 +416,7 @@ export default function DocumentsView() {
               path={previewPath}
               locationLabel={previewLocation}
               onRename={() => setDialog({ kind: 'rename' })}
+              onDelete={() => setDialog({ kind: 'delete' })}
             />
           </>
         )}
@@ -413,6 +444,12 @@ export default function DocumentsView() {
         submitLabel="Save"
         initialValue={previewNode?.name}
         onSubmit={handleRename}
+        onClose={() => setDialog(null)}
+      />
+      <ConfirmDeleteDialog
+        open={dialog?.kind === 'delete'}
+        itemName={previewNode?.name ?? ''}
+        onConfirm={handleDelete}
         onClose={() => setDialog(null)}
       />
     </div>

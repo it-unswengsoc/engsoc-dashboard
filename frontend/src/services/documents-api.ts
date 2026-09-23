@@ -142,6 +142,24 @@ export async function renameDriveEntry(token: string, fileId: string, name: stri
   return data.data as DriveEntry;
 }
 
+/* Moves a file or folder to Drive's own Trash (recoverable there), not a
+   permanent delete — see backend/src/functions/drive.ts's deleteDriveEntry. */
+export async function deleteDriveEntry(token: string, fileId: string): Promise<void> {
+  if (USE_MOCK) {
+    const { deleteDriveEntry: mockDeleteDriveEntry } = await import('@/mocks/functions/documents');
+    return mockDeleteDriveEntry(fileId);
+  }
+
+  const res = await fetch(apiUrl(`/drive/entries/${encodeURIComponent(fileId)}`), {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || 'Failed to delete');
+  }
+}
+
 /* A short-lived Google access token for uploading a file's bytes straight
    to Google's own upload endpoint from the browser — see uploadDriveFile
    below for why this doesn't go through our own backend. */
@@ -185,7 +203,7 @@ export async function uploadDriveFile(
   ]);
 
   const res = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,modifiedTime,size,webViewLink,capabilities(canEdit,canAddChildren,canRename)',
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,modifiedTime,size,webViewLink,capabilities(canEdit,canAddChildren,canRename,canDelete)',
     {
       method: 'POST',
       headers: {
@@ -211,6 +229,7 @@ export async function uploadDriveFile(
       canEdit: data.capabilities?.canEdit ?? false,
       canAddChildren: data.capabilities?.canAddChildren ?? false,
       canRename: data.capabilities?.canRename ?? false,
+      canDelete: data.capabilities?.canDelete ?? false,
     },
   };
 }
