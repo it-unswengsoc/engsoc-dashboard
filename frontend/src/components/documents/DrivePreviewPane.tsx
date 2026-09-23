@@ -4,7 +4,6 @@ interface DrivePreviewPaneProps {
   node: BrowserNode | null;
   path: string[]; // names of every selected node up to and including `node`
   locationLabel: string; // parent's name — the department for a drive, the previous column's node for an entry
-  loading: boolean;
   onOpen: () => void;
 }
 
@@ -17,7 +16,12 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function DrivePreviewPane({ node, path, locationLabel, loading, onOpen }: DrivePreviewPaneProps) {
+/* A folder or drive has no "Open" button here — clicking it in its column
+   already opened its contents as the next column, so a second explicit
+   open action would be redundant. A file is the opposite: a single click
+   only selects + previews it, so this is the discoverable alternative to
+   double-clicking it to actually open it in Drive. */
+export default function DrivePreviewPane({ node, path, locationLabel, onOpen }: DrivePreviewPaneProps) {
   if (!node) {
     return (
       <div className="flex w-80 shrink-0 flex-col items-center justify-center gap-2 border-l border-gray-100 px-6 text-center">
@@ -64,13 +68,16 @@ export default function DrivePreviewPane({ node, path, locationLabel, loading, o
         )}
       </div>
 
-      <button
-        onClick={onOpen}
-        disabled={loading}
-        className="mt-4 rounded-xl bg-[#3D6C94] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#335a7d] hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {loading ? 'Opening…' : isFile ? 'Open file' : 'Open folder'}
-      </button>
+      {isFile ? (
+        <button
+          onClick={onOpen}
+          className="mt-4 rounded-xl bg-[#3D6C94] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#335a7d] hover:shadow-md active:scale-[0.98]"
+        >
+          Open file
+        </button>
+      ) : (
+        <p className="mt-4 font-mono text-xs text-gray-400">Its contents are open in the next column.</p>
+      )}
     </div>
   );
 }

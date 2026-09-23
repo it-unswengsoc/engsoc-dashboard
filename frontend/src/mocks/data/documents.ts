@@ -103,7 +103,20 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       webViewLink: null,
     },
   ],
+  /* Nested a few levels deeper than MAX_VISIBLE_COLUMNS on purpose — this
+     is what actually exercises the column-windowing fix in local dev,
+     since the real Drive data used for manual testing rarely nests this
+     deep in one place. */
   'folder-it/folder-it-archive-2025': [
+    {
+      id: 'folder-it-archive-2025-q1',
+      name: 'Q1',
+      type: 'folder',
+      mimeType: 'application/vnd.google-apps.folder',
+      modifiedAt: at(-250, '09:00'),
+      sizeBytes: null,
+      webViewLink: null,
+    },
     {
       id: 'file-old-2',
       name: '2025 handover notes',
@@ -112,6 +125,43 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: at(-260, '10:00'),
       sizeBytes: null,
       webViewLink: null,
+    },
+  ],
+  // Keyed "<driveId>/<folderId>" — the folder being expanded's *own* id,
+  // never the full chain of ancestors above it (that's what tripped this up
+  // originally: getDriveEntries only ever looks up by driveId + the direct
+  // parent, so a 3+-segment key here would just never match anything).
+  'folder-it/folder-it-archive-2025-q1': [
+    {
+      id: 'folder-it-archive-2025-q1-jan',
+      name: 'January',
+      type: 'folder',
+      mimeType: 'application/vnd.google-apps.folder',
+      modifiedAt: at(-249, '09:00'),
+      sizeBytes: null,
+      webViewLink: null,
+    },
+  ],
+  'folder-it/folder-it-archive-2025-q1-jan': [
+    {
+      id: 'folder-it-archive-2025-q1-jan-w1',
+      name: 'Week 1',
+      type: 'folder',
+      mimeType: 'application/vnd.google-apps.folder',
+      modifiedAt: at(-248, '09:00'),
+      sizeBytes: null,
+      webViewLink: null,
+    },
+  ],
+  'folder-it/folder-it-archive-2025-q1-jan-w1': [
+    {
+      id: 'file-deep-1',
+      name: 'standup notes.docx',
+      type: 'file',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      modifiedAt: at(-247, '09:00'),
+      sizeBytes: 12_800,
+      webViewLink: 'https://drive.google.com/file/d/file-deep-1',
     },
   ],
   'folder-marketing': [

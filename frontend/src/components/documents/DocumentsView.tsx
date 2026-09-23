@@ -16,12 +16,19 @@ const FILTERS: { label: string; category: DriveFileCategory | 'ALL' }[] = [
   { label: 'Videos', category: 'VIDEO' },
 ];
 
+/* Only the last MAX_VISIBLE_COLUMNS columns are ever mounted — full depth
+   is still tracked in `selected`/`columns` (the breadcrumb reflects all of
+   it, and clicking an earlier breadcrumb segment jumps straight back to
+   it), but a folder tree nested arbitrarily deep would otherwise grow the
+   DOM and the horizontally-scrolled strip without bound. */
+const MAX_VISIBLE_COLUMNS = 4;
+
 /* A Finder-style column browser: pick a department in the sidebar, then
    drill through its Shared Drives and folders one column at a time.
-   Clicking a row selects + previews it on the right; the preview pane's
-   "Open" button is what actually reveals the next column (or opens a file
-   in Drive) — a plain click never cascades a new column on its own, so
-   browsing and previewing stay two distinct, predictable actions. */
+   Clicking a drive/folder both selects it (updates the preview pane) and
+   immediately opens its contents as the next column. A file only selects +
+   previews on a single click — opening one (in Drive, via webViewLink)
+   takes a double-click, or the preview pane's "Open file" button. */
 export default function DocumentsView() {
   const router = useRouter();
   const [category, setCategory] = useState<DriveFileCategory | 'ALL'>('ALL');
@@ -34,13 +41,15 @@ export default function DocumentsView() {
   const [activeDepartment, setActiveDepartment] = useState<DriveDepartmentData | null>(null);
 
   // columns[0] is always the active department's drives; columns[i] for
-  // i > 0 is the contents of selected[i - 1].
+  // i > 0 is the contents of selected[i - 1]. Both track the *full* path,
+  // even the part scrolled out of MAX_VISIBLE_COLUMNS.
   const [columns, setColumns] = useState<BrowserNode[][]>([]);
   const [selected, setSelected] = useState<BrowserNode[]>([]);
-  const [opening, setOpening] = useState(false);
+  const [pendingColumnAt, setPendingColumnAt] = useState<number | null>(null);
   const [openError, setOpenError] = useState('');
 
   const columnsScrollRef = useRef<HTMLDivElement>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
@@ -71,52 +80,73 @@ export default function DocumentsView() {
     setOpenError('');
   }
 
-  function selectNode(colIdx: number, node: BrowserNode) {
-    setSelected((prev) => [...prev.slice(0, colIdx), node]);
-    // A fresh selection at an earlier column invalidates whatever was
-    // drilled into from the old one — drop any columns beyond it.
-    setColumns((prev) => prev.slice(0, colIdx + 1));
-    setOpenError('');
-  }
-
-  async function openSelected() {
-    const node = selected[selected.length - 1];
-    if (!node) return;
-
-    if (!node.navigable) {
-      if (node.webViewLink) window.open(node.webViewLink, '_blank', 'noopener');
-      return;
-    }
-
+  async function expandColumn(colIdx: number, node: BrowserNode) {
     const token = sessionStorage.getItem('token');
     if (!token) {
       router.push('/login');
       return;
     }
 
-    const colIdx = selected.length - 1;
-    setOpening(true);
+    const requestId = ++requestIdRef.current;
+    setPendingColumnAt(colIdx + 1);
     setOpenError('');
     try {
       const folderId = node.kind === 'entry' ? node.id : undefined;
       const { entries, connected } = await getDirectoryContents(token, node.driveId, folderId);
+      if (requestIdRef.current !== requestId) return; // superseded by a later click
       setGoogleConnected(connected);
       setColumns((prev) => [
         ...prev.slice(0, colIdx + 1),
         entries.map((entry) => entryToBrowserNode(node.driveId, node.accessLabel, entry)),
       ]);
     } catch (err) {
+      if (requestIdRef.current !== requestId) return;
       setOpenError(err instanceof Error ? err.message : 'Failed to open this folder');
     } finally {
-      setOpening(false);
+      if (requestIdRef.current === requestId) setPendingColumnAt(null);
     }
+  }
+
+  function selectNode(colIdx: number, node: BrowserNode) {
+    // Re-clicking the already-open node at this column: leave its (already
+    // fetched) next column alone instead of truncating and refetching it.
+    if (selected[colIdx]?.id === node.id && columns[colIdx + 1] !== undefined) {
+      setSelected((prev) => [...prev.slice(0, colIdx), node]);
+      return;
+    }
+
+    setSelected((prev) => [...prev.slice(0, colIdx), node]);
+    // A fresh selection at an earlier column invalidates whatever was
+    // drilled into from the old one — drop any columns beyond it.
+    setColumns((prev) => prev.slice(0, colIdx + 1));
+    setOpenError('');
+
+    if (node.navigable) {
+      expandColumn(colIdx, node);
+    }
+  }
+
+  function openFile(node: BrowserNode) {
+    if (node.webViewLink) window.open(node.webViewLink, '_blank', 'noopener');
+  }
+
+  function openSelected() {
+    const node = selected[selected.length - 1];
+    if (!node || node.navigable) return; // folders/drives already open themselves on click
+    openFile(node);
+  }
+
+  function jumpToPath(pathIndex: number) {
+    setSelected((prev) => prev.slice(0, pathIndex));
+    setColumns((prev) => prev.slice(0, pathIndex + 1));
+    setOpenError('');
   }
 
   // Scrolls a freshly-opened column into view — otherwise it'd render off
   // the right edge of the (horizontally scrollable) columns strip.
   useEffect(() => {
     columnsScrollRef.current?.scrollTo({ left: columnsScrollRef.current.scrollWidth, behavior: 'smooth' });
-  }, [columns.length]);
+  }, [columns.length, pendingColumnAt]);
 
   const matchesFilter = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -132,6 +162,10 @@ export default function DocumentsView() {
   const previewNode = selected[selected.length - 1] ?? null;
   const previewPath = ['EngSoc Drive', ...selected.map((n) => n.name)];
   const previewLocation = selected.length <= 1 ? (activeDepartment?.name ?? '') : selected[selected.length - 2].name;
+
+  const visibleStart = Math.max(0, columns.length - MAX_VISIBLE_COLUMNS);
+  const visibleColumns = columns.slice(visibleStart);
+  const showPendingColumn = pendingColumnAt !== null && pendingColumnAt >= columns.length;
 
   return (
     <div className="flex h-full flex-col">
@@ -175,12 +209,21 @@ export default function DocumentsView() {
       {/* BREADCRUMB + FILTER PILLS */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <nav className="flex flex-wrap items-center gap-1.5 font-mono text-xs font-bold uppercase tracking-wide text-[#8A94A3]">
-          {previewPath.map((name, i) => (
-            <span key={i} className="flex items-center gap-1.5">
-              {i > 0 && <span className="text-gray-300">/</span>}
-              <span className={i === previewPath.length - 1 ? 'text-gray-900' : ''}>{name}</span>
-            </span>
-          ))}
+          {previewPath.map((name, i) => {
+            const isCurrent = i === previewPath.length - 1;
+            return (
+              <span key={i} className="flex items-center gap-1.5">
+                {i > 0 && <span className="text-gray-300">/</span>}
+                <button
+                  onClick={() => jumpToPath(i)}
+                  disabled={isCurrent}
+                  className={isCurrent ? 'text-gray-900' : 'transition-colors hover:text-gray-600'}
+                >
+                  {name}
+                </button>
+              </span>
+            );
+          })}
         </nav>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -219,22 +262,33 @@ export default function DocumentsView() {
             </div>
 
             <div ref={columnsScrollRef} className="flex flex-1 overflow-x-auto">
-              {columns.map((nodes, colIdx) => (
-                <DriveColumn
-                  key={colIdx}
-                  title={colIdx === 0 ? (activeDepartment?.name ?? '') : (selected[colIdx - 1]?.name ?? '')}
-                  nodes={nodes.filter(matchesFilter)}
-                  selectedId={selected[colIdx]?.id ?? null}
-                  onSelect={(node) => selectNode(colIdx, node)}
-                />
-              ))}
+              {visibleColumns.map((nodes, i) => {
+                const colIdx = visibleStart + i;
+                return (
+                  <DriveColumn
+                    key={colIdx}
+                    title={colIdx === 0 ? (activeDepartment?.name ?? '') : (selected[colIdx - 1]?.name ?? '')}
+                    nodes={nodes.filter(matchesFilter)}
+                    selectedId={selected[colIdx]?.id ?? null}
+                    onSelect={(node) => selectNode(colIdx, node)}
+                    onOpenFile={openFile}
+                  />
+                );
+              })}
+              {showPendingColumn && (
+                <div className="flex h-full w-56 shrink-0 flex-col border-r border-gray-100">
+                  <h3 className="border-b border-gray-100 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
+                    &nbsp;
+                  </h3>
+                  <p className="px-3 py-6 text-center font-mono text-xs text-gray-400">Loading…</p>
+                </div>
+              )}
             </div>
 
             <DrivePreviewPane
               node={previewNode}
               path={previewPath}
               locationLabel={previewLocation}
-              loading={opening}
               onOpen={openSelected}
             />
           </>

@@ -6,6 +6,7 @@ interface DriveColumnProps {
   nodes: BrowserNode[];
   selectedId: string | null;
   onSelect: (node: BrowserNode) => void;
+  onOpenFile: (node: BrowserNode) => void;
 }
 
 const EXTENSION_COLOURS: Record<string, { bg: string; text: string }> = {
@@ -46,9 +47,11 @@ function NodeIcon({ node }: { node: BrowserNode }) {
 }
 
 /* One column in the Finder-style browser — a list of drives (the leftmost
-   column) or of a folder's contents (every column after). Selecting a node
-   drives which column appears to its right, via the parent's onSelect. */
-export default function DriveColumn({ title, nodes, selectedId, onSelect }: DriveColumnProps) {
+   column) or of a folder's contents (every column after). Clicking a
+   drive/folder both selects it and opens its contents as the next column
+   (via the parent's onSelect); clicking a file only selects + previews it —
+   opening one takes a double-click. */
+export default function DriveColumn({ title, nodes, selectedId, onSelect, onOpenFile }: DriveColumnProps) {
   return (
     <div className="flex h-full w-56 shrink-0 flex-col overflow-y-auto border-r border-gray-100">
       <h3 className="sticky top-0 truncate border-b border-gray-100 bg-white px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
@@ -65,6 +68,9 @@ export default function DriveColumn({ title, nodes, selectedId, onSelect }: Driv
               <button
                 key={node.id}
                 onClick={() => onSelect(node)}
+                onDoubleClick={() => {
+                  if (!node.navigable) onOpenFile(node);
+                }}
                 className={`flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
                   isSelected ? 'bg-[#B1C9DC]/25' : 'hover:bg-gray-50'
                 }`}
