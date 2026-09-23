@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GoogleDomainError = void 0;
 exports.getGoogleAuthUrl = getGoogleAuthUrl;
 exports.exchangeGoogleCode = exchangeGoogleCode;
+exports.getGoogleAccessToken = getGoogleAccessToken;
 const google_auth_library_1 = require("google-auth-library");
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
@@ -20,19 +21,23 @@ class GoogleDomainError extends Error {
     }
 }
 exports.GoogleDomainError = GoogleDomainError;
-/* Login (openid/email/profile) plus read-write Calendar and read-only Drive
-   access, all under the one consent screen. EngSoc's Drive is organised as
-   a set of Shared Drives (Arc Delegate, HR, IT, ...), not files/folders the
-   app itself creates — so drive.file (access limited to app-created files)
-   can't see any of it. drive.readonly covers listing and reading across
-   Shared Drives; swap it for the full drive scope only if upload/write ever
-   gets built. */
+/* Login (openid/email/profile) plus read-write Calendar and read-write
+   Drive access, all under the one consent screen. EngSoc's Drive is
+   organised as a set of Shared Drives (Arc Delegate, HR, IT, ...), not
+   files/folders the app itself creates — so drive.file (access limited to
+   app-created files) can't see any of it, and the plain "drive" scope is
+   needed for creating folders/files and uploading into it too, not just
+   drive.readonly.
+   NOTE: this scope was widened from drive.readonly to drive — anyone who
+   signed in before that change only has a read-only grant stored, and
+   needs to sign out and back in (forcing the consent screen again, per
+   prompt: 'consent' below) before create/upload will work for them. */
 const GOOGLE_SCOPES = [
     'openid',
     'https://www.googleapis.com/auth/userinfo.email',
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/calendar',
-    'https://www.googleapis.com/auth/drive.readonly',
+    'https://www.googleapis.com/auth/drive',
 ];
 function getOAuthClient() {
     return new google_auth_library_1.OAuth2Client(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
@@ -91,6 +96,26 @@ async function exchangeGoogleCode(code) {
         },
         accessToken: tokens.access_token ?? undefined,
         refreshToken: tokens.refresh_token ?? undefined,
+    };
+}
+/**
+ * Exchanges a member's stored refresh token for a fresh, short-lived access
+ * token. Used for the one Drive operation too heavy to route through our
+ * own backend — uploading a file's actual bytes — where the frontend
+ * instead calls Google's upload endpoint directly with this, so a large
+ * upload never has to pass through a serverless function's own request
+ * body size limit.
+ */
+async function getGoogleAccessToken(refreshToken) {
+    const client = getOAuthClient();
+    client.setCredentials({ refresh_token: refreshToken });
+    const { credentials } = await client.refreshAccessToken();
+    if (!credentials.access_token) {
+        throw new Error('Google did not return an access token');
+    }
+    return {
+        accessToken: credentials.access_token,
+        expiresAt: credentials.expiry_date ?? Date.now() + 55 * 60 * 1000,
     };
 }
 //# sourceMappingURL=google.js.map

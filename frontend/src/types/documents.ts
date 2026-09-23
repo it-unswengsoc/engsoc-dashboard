@@ -1,17 +1,20 @@
-/* Access labels and display colour aren't things Drive's API exposes on a
-   folder — they're club-curated metadata (who's allowed to edit what),
-   matched up against real folder listings by the backend. Any Shared Drive
-   the backend doesn't have curated metadata for still comes through, just
-   with a neutral default style. */
-export type DriveAccessLevel = 'editable' | 'view-only' | 'restricted';
+/* What the signed-in member can actually do with this drive/file/folder,
+   straight from Google Drive's own `capabilities` for their account — not a
+   guess or a hardcoded lookup table. canAddChildren is only meaningful on a
+   folder or a Shared Drive's own root (always false on a plain file). */
+export interface DriveCapabilities {
+  canEdit: boolean;
+  canAddChildren: boolean;
+  canRename: boolean;
+}
 
 export interface DriveFolder {
   id: string; // Google Drive file/folder IDs are opaque strings, not auto-increment numbers
   name: string;
   fileCount: number;
-  access: DriveAccessLevel;
-  colour: string; // hex swatch for the folder card
+  colour: string; // hex swatch for the folder card — cosmetic only, not derived from real Drive data
   webViewLink: string;
+  capabilities: DriveCapabilities;
 }
 
 /* A named cluster of related Shared Drives — "Careers", "Careers Directors"
@@ -35,6 +38,21 @@ export interface DriveEntry {
   modifiedAt: string; // ISO date string
   sizeBytes: number | null; // Drive omits size for native Docs/Sheets/Slides, and for folders
   webViewLink: string | null;
+  capabilities: DriveCapabilities;
+}
+
+/* One hit from the global header search — spans every Shared Drive (and My
+   Drive) the member can see, not just whatever's open in the column
+   browser, so it carries its own drive name for context instead of relying
+   on the browser's current location. */
+export interface DriveSearchResult {
+  id: string;
+  name: string;
+  type: 'folder' | 'file';
+  mimeType: string;
+  modifiedAt: string;
+  webViewLink: string | null;
+  driveName: string;
 }
 
 /* ---------- Display shapes (what the documents page renders) ---------- */
@@ -45,9 +63,10 @@ export interface DriveFolderCardData {
   id: string;
   name: string;
   fileCount: number;
-  accessLabel: string; // "Editable" / "View only" / "Restricted"
+  accessLabel: string; // "Editable" / "View only" — derived from real capabilities.canEdit
   colour: string;
   webViewLink: string;
+  capabilities: DriveCapabilities;
 }
 
 export interface DriveDepartmentData {
@@ -64,6 +83,17 @@ export interface DriveEntryRowData {
   extensionLabel: string; // e.g. "DOC", "PDF" — drives the icon badge; ignored for folders
   modifiedLabel: string; // "2 min ago"
   sizeLabel: string; // "4.2 MB", "—"
+  webViewLink: string | null;
+  capabilities: DriveCapabilities;
+}
+
+export interface DriveSearchResultData {
+  id: string;
+  name: string;
+  type: 'folder' | 'file';
+  extensionLabel: string;
+  driveName: string;
+  modifiedLabel: string;
   webViewLink: string | null;
 }
 
@@ -83,6 +113,7 @@ export type BrowserNode =
       accessLabel: string;
       fileCount: number;
       webViewLink: string | null;
+      capabilities: DriveCapabilities;
     }
   | {
       kind: 'entry';
@@ -96,5 +127,6 @@ export type BrowserNode =
       modifiedLabel: string;
       sizeLabel: string;
       webViewLink: string | null;
-      accessLabel: string; // inherited from the owning drive — Drive has no per-folder access level of its own
+      accessLabel: string;
+      capabilities: DriveCapabilities;
     };

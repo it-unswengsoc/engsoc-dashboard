@@ -1,9 +1,9 @@
-import type { DriveDepartment, DriveEntry } from '@/types/documents';
+import type { DriveDepartment, DriveEntry, DriveSearchResult } from '@/types/documents';
 import { apiUrl } from '@/services/api-config';
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
-export type { DriveDepartment, DriveEntry };
+export type { DriveDepartment, DriveEntry, DriveSearchResult };
 
 export interface DriveDepartmentsResult {
   departments: DriveDepartment[];
@@ -63,4 +63,154 @@ export async function getDriveEntries(
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load Drive contents');
   return { entries: data.data as DriveEntry[], connected: data.connected as boolean };
+}
+
+/* Full-text search across every Shared Drive (and My Drive) the member can
+   see — backs the global header search, not scoped to the column browser's
+   current location. */
+export async function searchDrive(token: string, query: string): Promise<DriveSearchResult[]> {
+  if (USE_MOCK) {
+    const { searchDrive: mockSearchDrive } = await import('@/mocks/functions/documents');
+    return mockSearchDrive(query);
+  }
+
+  const res = await fetch(apiUrl(`/drive/search?q=${encodeURIComponent(query)}`), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to search Drive');
+  return data.data as DriveSearchResult[];
+}
+
+export async function createDriveFolder(
+  token: string,
+  driveId: string,
+  parentId: string | undefined,
+  name: string
+): Promise<DriveEntry> {
+  if (USE_MOCK) {
+    const { createDriveFolder: mockCreateDriveFolder } = await import('@/mocks/functions/documents');
+    return mockCreateDriveFolder(driveId, parentId, name);
+  }
+
+  const res = await fetch(apiUrl('/drive/folders/create'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ driveId, parentId, name }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to create folder');
+  return data.data as DriveEntry;
+}
+
+export async function createDriveFile(
+  token: string,
+  driveId: string,
+  parentId: string | undefined,
+  name: string,
+  mimeType: string
+): Promise<DriveEntry> {
+  if (USE_MOCK) {
+    const { createDriveFile: mockCreateDriveFile } = await import('@/mocks/functions/documents');
+    return mockCreateDriveFile(driveId, parentId, name, mimeType);
+  }
+
+  const res = await fetch(apiUrl('/drive/files/create'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ driveId, parentId, name, mimeType }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to create file');
+  return data.data as DriveEntry;
+}
+
+export async function renameDriveEntry(token: string, fileId: string, name: string): Promise<DriveEntry> {
+  if (USE_MOCK) {
+    const { renameDriveEntry: mockRenameDriveEntry } = await import('@/mocks/functions/documents');
+    return mockRenameDriveEntry(fileId, name);
+  }
+
+  const res = await fetch(apiUrl(`/drive/entries/${encodeURIComponent(fileId)}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to rename');
+  return data.data as DriveEntry;
+}
+
+/* A short-lived Google access token for uploading a file's bytes straight
+   to Google's own upload endpoint from the browser — see uploadDriveFile
+   below for why this doesn't go through our own backend. */
+export async function getDriveAccessToken(token: string): Promise<{ accessToken: string; expiresAt: number }> {
+  if (USE_MOCK) {
+    return { accessToken: 'mock-access-token', expiresAt: Date.now() + 60 * 60 * 1000 };
+  }
+
+  const res = await fetch(apiUrl('/drive/access-token'), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to get an upload token');
+  return data.data as { accessToken: string; expiresAt: number };
+}
+
+/* Uploads directly to Google's own multipart upload endpoint using a
+   short-lived access token (see getDriveAccessToken) rather than routing
+   the file's bytes through our own backend — a serverless function's
+   request body limit would otherwise cap uploads far below what Drive
+   itself actually allows. */
+export async function uploadDriveFile(
+  accessToken: string,
+  driveId: string,
+  parentId: string | undefined,
+  file: File
+): Promise<DriveEntry> {
+  if (USE_MOCK) {
+    const { uploadDriveFile: mockUploadDriveFile } = await import('@/mocks/functions/documents');
+    return mockUploadDriveFile(driveId, parentId, file);
+  }
+
+  const metadata = { name: file.name, parents: [parentId || driveId] };
+  const boundary = `engsoc-upload-${Math.random().toString(36).slice(2)}`;
+  const body = new Blob([
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`,
+    `--${boundary}\r\nContent-Type: ${file.type || 'application/octet-stream'}\r\n\r\n`,
+    file,
+    `\r\n--${boundary}--`,
+  ]);
+
+  const res = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,mimeType,modifiedTime,size,webViewLink,capabilities(canEdit,canAddChildren,canRename)',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    }
+  );
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error?.message || 'Failed to upload file');
+
+  return {
+    id: data.id,
+    name: data.name,
+    type: data.mimeType === 'application/vnd.google-apps.folder' ? 'folder' : 'file',
+    mimeType: data.mimeType,
+    modifiedAt: data.modifiedTime,
+    sizeBytes: data.size ? Number(data.size) : null,
+    webViewLink: data.webViewLink ?? null,
+    capabilities: {
+      canEdit: data.capabilities?.canEdit ?? false,
+      canAddChildren: data.capabilities?.canAddChildren ?? false,
+      canRename: data.capabilities?.canRename ?? false,
+    },
+  };
 }
