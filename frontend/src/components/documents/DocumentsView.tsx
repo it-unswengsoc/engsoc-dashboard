@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { DriveDepartmentData, DriveFileCategory, BrowserNode } from '@/types/documents';
 import { getDepartments, getDirectoryContents, driveToBrowserNode, entryToBrowserNode } from '@/services/documents';
@@ -48,7 +48,6 @@ export default function DocumentsView() {
   const [pendingColumnAt, setPendingColumnAt] = useState<number | null>(null);
   const [openError, setOpenError] = useState('');
 
-  const columnsScrollRef = useRef<HTMLDivElement>(null);
   const requestIdRef = useRef(0);
 
   useEffect(() => {
@@ -141,12 +140,6 @@ export default function DocumentsView() {
     setColumns((prev) => prev.slice(0, pathIndex + 1));
     setOpenError('');
   }
-
-  // Scrolls a freshly-opened column into view — otherwise it'd render off
-  // the right edge of the (horizontally scrollable) columns strip.
-  useEffect(() => {
-    columnsScrollRef.current?.scrollTo({ left: columnsScrollRef.current.scrollWidth, behavior: 'smooth' });
-  }, [columns.length, pendingColumnAt]);
 
   const matchesFilter = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -244,7 +237,7 @@ export default function DocumentsView() {
       </div>
 
       {/* BROWSER */}
-      <div className="mt-4 flex flex-1 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="mt-4 flex min-w-0 flex-1 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         {departmentsLoading ? (
           <p className="p-6 font-mono text-xs text-gray-400">Loading…</p>
         ) : departmentsError ? (
@@ -253,7 +246,7 @@ export default function DocumentsView() {
           <p className="p-6 font-mono text-xs text-gray-400">No shared drives found.</p>
         ) : (
           <>
-            <div className="py-4 pl-4">
+            <div className="shrink-0 py-4 pl-4">
               <DepartmentSidebar
                 departments={departments}
                 activeDepartment={activeDepartment?.name ?? null}
@@ -261,7 +254,11 @@ export default function DocumentsView() {
               />
             </div>
 
-            <div ref={columnsScrollRef} className="flex flex-1 overflow-x-auto">
+            {/* No horizontal scrolling here on purpose — columns share
+                whatever width is actually available (down to a readable
+                minimum) instead of forcing the page wider. Capped at
+                MAX_VISIBLE_COLUMNS, so this only ever has to fit that many. */}
+            <div className="flex min-w-0 flex-1">
               {visibleColumns.map((nodes, i) => {
                 const colIdx = visibleStart + i;
                 return (
@@ -276,7 +273,7 @@ export default function DocumentsView() {
                 );
               })}
               {showPendingColumn && (
-                <div className="flex h-full w-56 shrink-0 flex-col border-r border-gray-100">
+                <div className="flex h-full min-w-[140px] flex-1 basis-0 flex-col border-r border-gray-100">
                   <h3 className="border-b border-gray-100 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
                     &nbsp;
                   </h3>

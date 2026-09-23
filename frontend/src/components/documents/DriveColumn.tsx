@@ -53,7 +53,7 @@ function NodeIcon({ node }: { node: BrowserNode }) {
    opening one takes a double-click. */
 export default function DriveColumn({ title, nodes, selectedId, onSelect, onOpenFile }: DriveColumnProps) {
   return (
-    <div className="flex h-full w-56 shrink-0 flex-col overflow-y-auto border-r border-gray-100">
+    <div className="flex h-full min-w-[140px] flex-1 basis-0 flex-col overflow-y-auto border-r border-gray-100">
       <h3 className="sticky top-0 truncate border-b border-gray-100 bg-white px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
         {title}
       </h3>
