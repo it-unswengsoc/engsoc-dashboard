@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.dbGetAllAnnouncements = dbGetAllAnnouncements;
 exports.dbGetAnnouncementById = dbGetAnnouncementById;
 exports.dbCreateAnnouncement = dbCreateAnnouncement;
+exports.dbUpdateAnnouncement = dbUpdateAnnouncement;
 exports.dbGetAnnouncementAuthorId = dbGetAnnouncementAuthorId;
 exports.dbDeleteAnnouncement = dbDeleteAnnouncement;
 exports.dbLikeAnnouncement = dbLikeAnnouncement;
@@ -75,6 +76,34 @@ async function dbCreateAnnouncement(input) {
     if (insertResult.rows.length === 0)
         return null;
     return dbGetAnnouncementById(insertResult.rows[0].id, input.authorId);
+}
+/**
+ * Updates an announcement's caption and/or image. Both are independently
+ * optional — undefined leaves that column untouched, whereas imageUrl: null
+ * explicitly clears an existing image (content has no such "clear" state;
+ * it's never nullable). currentUserId is who's asking, purely to compute
+ * isLikedByMe on the row handed back — not necessarily the post's author,
+ * since an admin can edit someone else's announcement.
+ * Returns null if the announcement doesn't exist or neither field was given.
+ */
+async function dbUpdateAnnouncement(announcementId, input, currentUserId) {
+    const sets = [];
+    const values = [];
+    if (input.content !== undefined) {
+        values.push(input.content);
+        sets.push(`content = $${values.length}`);
+    }
+    if (input.imageUrl !== undefined) {
+        values.push(input.imageUrl);
+        sets.push(`image_url = $${values.length}`);
+    }
+    if (sets.length === 0)
+        return null;
+    values.push(String(announcementId));
+    const result = await pool.query(`UPDATE announcements SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${values.length} RETURNING id`, values);
+    if (result.rows.length === 0)
+        return null;
+    return dbGetAnnouncementById(announcementId, currentUserId);
 }
 /**
  * Looks up who authored an announcement — used to check "author or admin"

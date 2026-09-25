@@ -5,10 +5,10 @@ const announcements_1 = require("../functions/announcements");
 const auth_1 = require("./auth");
 const admin_1 = require("../functions/admin");
 const router = (0, express_1.Router)();
-/* Only the author or an admin can delete their own announcement/comment —
-   anyone with a valid token could before this (POST already needed
+/* Only the author or an admin can edit/delete their own announcement/comment
+   — anyone with a valid token could delete before this (POST already needed
    director/executive/admin, but delete had no check at all). */
-async function canDelete(userId, authorId) {
+async function canModify(userId, authorId) {
     if (authorId === userId)
         return true;
     return (0, admin_1.isUserAdmin)(userId);
@@ -44,12 +44,6 @@ router.post('/', auth_1.verifyAuthToken, (0, auth_1.requireRole)(['director', 'e
     try {
         const user = req.user;
         const { content, imageUrl } = req.body;
-        if (!content) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Missing required field: content',
-            });
-        }
         const announcement = await (0, announcements_1.createAnnouncement)({
             authorId: user.userId,
             content,
@@ -68,10 +62,47 @@ router.post('/', auth_1.verifyAuthToken, (0, auth_1.requireRole)(['director', 'e
         });
     }
     catch (error) {
+        // createAnnouncement only throws for invalid input (caption missing,
+        // image too large or not an image) — a DB failure resolves to null
+        // instead, handled above. Same pattern as events.ts's createEvent.
         console.error('Create announcement error:', error);
-        res.status(500).json({
+        res.status(400).json({
             status: 'error',
-            message: 'Internal server error',
+            message: error instanceof Error ? error.message : 'Failed to create announcement',
+        });
+    }
+});
+/**
+ * PATCH /announcements/:announcementId
+ * Edits an announcement's caption and/or image. Author or admin only. Body:
+ * { content?, imageUrl? } — imageUrl: null clears an existing image.
+ */
+router.patch('/:announcementId', auth_1.verifyAuthToken, async (req, res) => {
+    try {
+        const announcementId = parseInt(req.params.announcementId);
+        const user = req.user;
+        const { content, imageUrl } = req.body;
+        if (isNaN(announcementId)) {
+            return res.status(400).json({ status: 'error', message: 'Invalid announcement ID' });
+        }
+        const authorId = await (0, announcements_1.getAnnouncementAuthorId)(announcementId);
+        if (authorId === null) {
+            return res.status(404).json({ status: 'error', message: 'Announcement not found' });
+        }
+        if (!(await canModify(user.userId, authorId))) {
+            return res.status(403).json({ status: 'error', message: 'Only the author or an admin can edit this' });
+        }
+        const announcement = await (0, announcements_1.updateAnnouncement)(announcementId, { content, imageUrl }, user.userId);
+        if (!announcement) {
+            return res.status(400).json({ status: 'error', message: 'Failed to update announcement' });
+        }
+        res.status(200).json({ status: 'success', message: 'Announcement updated', data: announcement });
+    }
+    catch (error) {
+        console.error('Update announcement error:', error);
+        res.status(400).json({
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Failed to update announcement',
         });
     }
 });
@@ -93,7 +124,7 @@ router.delete('/:announcementId', auth_1.verifyAuthToken, async (req, res) => {
         if (authorId === null) {
             return res.status(404).json({ status: 'error', message: 'Announcement not found' });
         }
-        if (!(await canDelete(user.userId, authorId))) {
+        if (!(await canModify(user.userId, authorId))) {
             return res.status(403).json({ status: 'error', message: 'Only the author or an admin can delete this' });
         }
         const deleted = await (0, announcements_1.deleteAnnouncement)(announcementId);
@@ -247,7 +278,7 @@ router.delete('/:announcementId/comments/:commentId', auth_1.verifyAuthToken, as
         if (authorId === null) {
             return res.status(404).json({ status: 'error', message: 'Comment not found' });
         }
-        if (!(await canDelete(user.userId, authorId))) {
+        if (!(await canModify(user.userId, authorId))) {
             return res.status(403).json({ status: 'error', message: 'Only the author or an admin can delete this' });
         }
         const deleted = await (0, announcements_1.deleteComment)(commentId);

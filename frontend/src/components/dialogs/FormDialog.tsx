@@ -41,7 +41,11 @@ export type FieldDef = Spanned &
         options: FieldOption[];
         required?: boolean;
       }
-    | { kind: 'file'; name: string; label: string; accept?: string; required?: boolean }
+    /* Value ends up a full data: URI (read client-side via FileReader), not
+       just the filename — real content, so it can actually be sent to and
+       rendered back from the backend. maxSizeMB rejects a picked file
+       up-front rather than letting a huge one fail on submit. */
+    | { kind: 'file'; name: string; label: string; accept?: string; required?: boolean; maxSizeMB?: number }
     /* Static copy, not an input — carries no value and never reaches the
        payload. Sits in the field list so it can appear and disappear with the
        request type like everything else. */
@@ -122,6 +126,7 @@ export default function FormDialog({
 }: FormDialogProps) {
   const [values, setValues] = useState<FieldValues>({});
   const [missing, setMissing] = useState<Record<string, boolean>>({});
+  const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
@@ -143,11 +148,40 @@ export default function FormDialog({
 
     setValues(prune);
     setMissing(prune);
+    setFileErrors(prune);
   }, [shownNames]);
 
   function setValue(name: string, value: string) {
     setValues((prev) => ({ ...prev, [name]: value }));
     setMissing((prev) => (prev[name] ? { ...prev, [name]: false } : prev));
+  }
+
+  /* Reads the picked file as a data: URI (base64) rather than just grabbing
+     its name — this is what lets the payload actually carry real content
+     through to the backend instead of a filename nobody can do anything
+     with. Rejects up-front (clearing the field) if it's over maxSizeMB,
+     rather than letting a huge payload fail later on submit. */
+  function handleFileChange(field: { name: string; maxSizeMB?: number }, file: File | undefined) {
+    if (!file) {
+      setValue(field.name, '');
+      setFileErrors((prev) => ({ ...prev, [field.name]: '' }));
+      return;
+    }
+    if (field.maxSizeMB && file.size > field.maxSizeMB * 1024 * 1024) {
+      setValue(field.name, '');
+      setFileErrors((prev) => ({ ...prev, [field.name]: `File is too large — max ${field.maxSizeMB}MB` }));
+      return;
+    }
+
+    setFileErrors((prev) => ({ ...prev, [field.name]: '' }));
+    const reader = new FileReader();
+    reader.onload = () => {
+      setValue(field.name, typeof reader.result === 'string' ? reader.result : '');
+    };
+    reader.onerror = () => {
+      setFileErrors((prev) => ({ ...prev, [field.name]: 'Failed to read file' }));
+    };
+    reader.readAsDataURL(file);
   }
 
   function toggleMulti(name: string, option: string) {
@@ -176,6 +210,13 @@ export default function FormDialog({
 
     if (empty.length > 0) {
       setMissing(Object.fromEntries(empty.map((field) => [field.name, true])));
+      return;
+    }
+
+    // A rejected (too-large/unreadable) file leaves its field empty with an
+    // error still showing — don't let a non-required field silently submit
+    // without it while that error is still on screen.
+    if (Object.values(fileErrors).some((message) => message)) {
       return;
     }
 
@@ -314,8 +355,8 @@ export default function FormDialog({
                   type="file"
                   accept={field.accept}
                   required={field.required}
-                  aria-invalid={invalid}
-                  onChange={(e) => setValue(field.name, e.target.files?.[0]?.name ?? '')}
+                  aria-invalid={invalid || Boolean(fileErrors[field.name])}
+                  onChange={(e) => handleFileChange(field, e.target.files?.[0])}
                   className={`${controlStyles} file:mr-3 file:rounded-md file:border-0 file:bg-[#B1C9DC] file:px-3 file:py-1 file:text-xs file:font-bold file:text-white`}
                 />
               ) : (
@@ -336,11 +377,15 @@ export default function FormDialog({
                 />
               )}
 
-              {invalid && (
+              {fileErrors[field.name] ? (
+                <span role="alert" className="text-xs font-bold text-[#ED6672]">
+                  {fileErrors[field.name]}
+                </span>
+              ) : invalid ? (
                 <span role="alert" className="text-xs font-bold text-[#ED6672]">
                   {field.label} is required
                 </span>
-              )}
+              ) : null}
             </Wrapper>
           );
         })}

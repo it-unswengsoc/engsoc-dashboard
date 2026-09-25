@@ -1,7 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MAX_IMAGE_DATA_URI_LENGTH = void 0;
 exports.getAllAnnouncements = getAllAnnouncements;
 exports.createAnnouncement = createAnnouncement;
+exports.updateAnnouncement = updateAnnouncement;
 exports.deleteAnnouncement = deleteAnnouncement;
 exports.getAnnouncementAuthorId = getAnnouncementAuthorId;
 exports.likeAnnouncement = likeAnnouncement;
@@ -14,6 +16,12 @@ const announcements_1 = require("../database/announcements");
 const users_1 = require("./users");
 const mentions_1 = require("./mentions");
 const notifications_1 = require("./notifications");
+// A data: URI inflates ~4/3 over the raw file, plus the JSON body it rides
+// in — capped well under Vercel's serverless request body limit (see
+// frontend/src/services/documents-api.ts's uploadDriveFile for why Drive
+// uploads route around this entirely instead; announcements have no such
+// route, so the cap lives here instead).
+exports.MAX_IMAGE_DATA_URI_LENGTH = 3000000;
 /**
  * Retrieves all announcements, newest first, with isLikedByMe computed for
  * the requesting user. Returns an empty array if none exist.
@@ -37,7 +45,21 @@ async function getAllAnnouncements(currentUserId) {
  *     specifically tagged, not just "something new happened")
  * Returns the newly created announcement, or null if creation failed.
  */
+function validateImageDataUri(imageUrl) {
+    if (!imageUrl.startsWith('data:image/')) {
+        throw new Error('Image must be an uploaded image file');
+    }
+    if (imageUrl.length > exports.MAX_IMAGE_DATA_URI_LENGTH) {
+        throw new Error('Image is too large — please use one under 2MB');
+    }
+}
 async function createAnnouncement(input) {
+    if (!input.content?.trim()) {
+        throw new Error('Caption is required');
+    }
+    if (input.imageUrl) {
+        validateImageDataUri(input.imageUrl);
+    }
     try {
         const announcement = await (0, announcements_1.dbCreateAnnouncement)(input);
         if (!announcement)
@@ -47,6 +69,28 @@ async function createAnnouncement(input) {
     }
     catch (error) {
         console.error('Create announcement error:', error);
+        return null;
+    }
+}
+/**
+ * Edits an existing announcement's caption and/or image — author or admin
+ * only (checked by the route). Doesn't re-run the new-announcement broadcast
+ * or re-notify mentions: an edit is treated as a correction to what's
+ * already out there, not a new thing happening, so it stays quiet.
+ * Returns the updated announcement, or null if it doesn't exist.
+ */
+async function updateAnnouncement(announcementId, input, editorId) {
+    if (input.content !== undefined && !input.content.trim()) {
+        throw new Error('Caption is required');
+    }
+    if (input.imageUrl) {
+        validateImageDataUri(input.imageUrl);
+    }
+    try {
+        return await (0, announcements_1.dbUpdateAnnouncement)(announcementId, input, editorId);
+    }
+    catch (error) {
+        console.error('Update announcement error:', error);
         return null;
     }
 }

@@ -46,6 +46,29 @@ export async function createAnnouncement(
   return data.data as AnnouncementItem;
 }
 
+/* Author or admin only — the backend enforces this (403s otherwise); the
+   frontend only offers Edit when it already knows that's true (see
+   AnnouncementRow). imageUrl: null explicitly clears an existing image. */
+export async function updateAnnouncement(
+  token: string,
+  announcementId: number,
+  input: { content?: string; imageUrl?: string | null }
+): Promise<AnnouncementItem> {
+  if (USE_MOCK) {
+    const { updateAnnouncement: mockUpdateAnnouncement } = await import('@/mocks/functions/announcements');
+    return mockUpdateAnnouncement(announcementId, input);
+  }
+
+  const res = await fetch(apiUrl(`/announcements/${announcementId}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to update announcement');
+  return data.data as AnnouncementItem;
+}
+
 export async function likeAnnouncement(token: string, announcementId: number): Promise<AnnouncementItem> {
   if (USE_MOCK) {
     const { likeAnnouncement: mockLike } = await import('@/mocks/functions/announcements');
