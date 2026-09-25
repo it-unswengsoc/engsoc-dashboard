@@ -2,6 +2,7 @@ import {
   dbGetAllAnnouncements,
   dbGetAnnouncementById,
   dbCreateAnnouncement,
+  dbUpdateAnnouncement,
   dbDeleteAnnouncement,
   dbLikeAnnouncement,
   dbUnlikeAnnouncement,
@@ -36,6 +37,18 @@ export interface CreateAnnouncementInput {
   imageUrl?: string;
 }
 
+export interface UpdateAnnouncementInput {
+  content?: string;
+  imageUrl?: string | null;
+}
+
+// A data: URI inflates ~4/3 over the raw file, plus the JSON body it rides
+// in — capped well under Vercel's serverless request body limit (see
+// frontend/src/services/documents-api.ts's uploadDriveFile for why Drive
+// uploads route around this entirely instead; announcements have no such
+// route, so the cap lives here instead).
+export const MAX_IMAGE_DATA_URI_LENGTH = 3_000_000;
+
 export interface AnnouncementComment {
   id: number;
   announcementId: number;
@@ -69,7 +82,23 @@ export async function getAllAnnouncements(currentUserId: number): Promise<Announ
  *     specifically tagged, not just "something new happened")
  * Returns the newly created announcement, or null if creation failed.
  */
+function validateImageDataUri(imageUrl: string): void {
+  if (!imageUrl.startsWith('data:image/')) {
+    throw new Error('Image must be an uploaded image file');
+  }
+  if (imageUrl.length > MAX_IMAGE_DATA_URI_LENGTH) {
+    throw new Error('Image is too large — please use one under 2MB');
+  }
+}
+
 export async function createAnnouncement(input: CreateAnnouncementInput): Promise<Announcement | null> {
+  if (!input.content?.trim()) {
+    throw new Error('Caption is required');
+  }
+  if (input.imageUrl) {
+    validateImageDataUri(input.imageUrl);
+  }
+
   try {
     const announcement = await dbCreateAnnouncement(input);
     if (!announcement) return null;
@@ -79,6 +108,33 @@ export async function createAnnouncement(input: CreateAnnouncementInput): Promis
     return announcement;
   } catch (error) {
     console.error('Create announcement error:', error);
+    return null;
+  }
+}
+
+/**
+ * Edits an existing announcement's caption and/or image — author or admin
+ * only (checked by the route). Doesn't re-run the new-announcement broadcast
+ * or re-notify mentions: an edit is treated as a correction to what's
+ * already out there, not a new thing happening, so it stays quiet.
+ * Returns the updated announcement, or null if it doesn't exist.
+ */
+export async function updateAnnouncement(
+  announcementId: number,
+  input: UpdateAnnouncementInput,
+  editorId: number
+): Promise<Announcement | null> {
+  if (input.content !== undefined && !input.content.trim()) {
+    throw new Error('Caption is required');
+  }
+  if (input.imageUrl) {
+    validateImageDataUri(input.imageUrl);
+  }
+
+  try {
+    return await dbUpdateAnnouncement(announcementId, input, editorId);
+  } catch (error) {
+    console.error('Update announcement error:', error);
     return null;
   }
 }

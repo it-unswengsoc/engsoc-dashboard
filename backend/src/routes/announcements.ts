@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import {
   getAllAnnouncements,
   createAnnouncement,
+  updateAnnouncement,
   deleteAnnouncement,
   likeAnnouncement,
   unlikeAnnouncement,
@@ -16,10 +17,10 @@ import { isUserAdmin } from '../functions/admin';
 
 const router = Router();
 
-/* Only the author or an admin can delete their own announcement/comment —
-   anyone with a valid token could before this (POST already needed
+/* Only the author or an admin can edit/delete their own announcement/comment
+   — anyone with a valid token could delete before this (POST already needed
    director/executive/admin, but delete had no check at all). */
-async function canDelete(userId: number, authorId: number | null): Promise<boolean> {
+async function canModify(userId: number, authorId: number | null): Promise<boolean> {
   if (authorId === userId) return true;
   return isUserAdmin(userId);
 }
@@ -57,13 +58,6 @@ router.post('/', verifyAuthToken, requireRole(['director', 'executive', 'admin']
     const user = (req as any).user;
     const { content, imageUrl } = req.body;
 
-    if (!content) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required field: content',
-      });
-    }
-
     const announcement = await createAnnouncement({
       authorId: user.userId,
       content,
@@ -83,10 +77,51 @@ router.post('/', verifyAuthToken, requireRole(['director', 'executive', 'admin']
       data: announcement,
     });
   } catch (error) {
+    // createAnnouncement only throws for invalid input (caption missing,
+    // image too large or not an image) — a DB failure resolves to null
+    // instead, handled above. Same pattern as events.ts's createEvent.
     console.error('Create announcement error:', error);
-    res.status(500).json({
+    res.status(400).json({
       status: 'error',
-      message: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Failed to create announcement',
+    });
+  }
+});
+
+/**
+ * PATCH /announcements/:announcementId
+ * Edits an announcement's caption and/or image. Author or admin only. Body:
+ * { content?, imageUrl? } — imageUrl: null clears an existing image.
+ */
+router.patch('/:announcementId', verifyAuthToken, async (req: Request, res: Response) => {
+  try {
+    const announcementId = parseInt(req.params.announcementId);
+    const user = (req as any).user;
+    const { content, imageUrl } = req.body as { content?: string; imageUrl?: string | null };
+
+    if (isNaN(announcementId)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid announcement ID' });
+    }
+
+    const authorId = await getAnnouncementAuthorId(announcementId);
+    if (authorId === null) {
+      return res.status(404).json({ status: 'error', message: 'Announcement not found' });
+    }
+    if (!(await canModify(user.userId, authorId))) {
+      return res.status(403).json({ status: 'error', message: 'Only the author or an admin can edit this' });
+    }
+
+    const announcement = await updateAnnouncement(announcementId, { content, imageUrl }, user.userId);
+    if (!announcement) {
+      return res.status(400).json({ status: 'error', message: 'Failed to update announcement' });
+    }
+
+    res.status(200).json({ status: 'success', message: 'Announcement updated', data: announcement });
+  } catch (error) {
+    console.error('Update announcement error:', error);
+    res.status(400).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Failed to update announcement',
     });
   }
 });
@@ -111,7 +146,7 @@ router.delete('/:announcementId', verifyAuthToken, async (req: Request, res: Res
     if (authorId === null) {
       return res.status(404).json({ status: 'error', message: 'Announcement not found' });
     }
-    if (!(await canDelete(user.userId, authorId))) {
+    if (!(await canModify(user.userId, authorId))) {
       return res.status(403).json({ status: 'error', message: 'Only the author or an admin can delete this' });
     }
 
@@ -282,7 +317,7 @@ router.delete('/:announcementId/comments/:commentId', verifyAuthToken, async (re
     if (authorId === null) {
       return res.status(404).json({ status: 'error', message: 'Comment not found' });
     }
-    if (!(await canDelete(user.userId, authorId))) {
+    if (!(await canModify(user.userId, authorId))) {
       return res.status(403).json({ status: 'error', message: 'Only the author or an admin can delete this' });
     }
 

@@ -181,12 +181,23 @@ CREATE TABLE notifications (
 -- the user's profile. like_count/comment_count are denormalized counters —
 -- the backend is responsible for incrementing/decrementing them when rows
 -- are added to/removed from announcement_likes / announcement_comments.
+--
+-- image_url is TEXT, not a short VARCHAR: there's no separate file-upload
+-- pipeline in this app, so the frontend reads the picked (and cropped)
+-- image as a base64 data URI (client-side, via FileReader + a <canvas>
+-- crop step) and sends that straight through as image_url —
+-- routes/announcements.ts caps it at a few MB so this table doesn't grow
+-- unbounded per row.
+--
+-- To pick this up on a database that already has the old announcements
+-- table without losing its data, migrate in place instead of resetting:
+--   ALTER TABLE announcements ALTER COLUMN image_url TYPE TEXT;
 -- ============================================================
 CREATE TABLE announcements (
   id SERIAL PRIMARY KEY,
   author_id INTEGER,
   content TEXT NOT NULL,
-  image_url VARCHAR(500),
+  image_url TEXT,
   like_count INTEGER DEFAULT 0,
   comment_count INTEGER DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

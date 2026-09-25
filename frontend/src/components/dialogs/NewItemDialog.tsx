@@ -31,6 +31,7 @@ import type { DirectoryUser } from '@/types/directory';
 import { PORT_OPTIONS } from '@/lib/ports';
 import { CALENDAR_EVENTS_CHANGED_EVENT } from '@/lib/calendar';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
+import AnnouncementComposer from '@/components/announcements/AnnouncementComposer';
 
 interface NewItemDialogProps {
   open: boolean;
@@ -262,16 +263,6 @@ const eventForm: FieldDef[] = [
   { kind: 'textarea', name: 'description', label: 'Description' },
 ];
 
-/* content/imageUrl match POST /announcements's body exactly — announcements
-   have no separate title column (see backend/src/functions/announcements.ts),
-   and imageUrl is a plain URL field rather than a file upload since there's
-   no upload pipeline anywhere in this app yet; paste a link to an
-   already-hosted image (e.g. a Drive share link) instead. */
-const announcementForm: FieldDef[] = [
-  { kind: 'textarea', name: 'content', label: 'Announcement', required: true },
-  { kind: 'text', name: 'imageUrl', label: 'Image URL (optional)', placeholder: 'https://...' },
-];
-
 /* Assignment is one-of, so the toggle picks the target and only that control
    follows — showing a port dropdown and a person box side by side read as
    "both". `assignee` is a real member picker fed by GET /users (the
@@ -325,11 +316,11 @@ function taskForm(values: FieldValues, directory: DirectoryUser[]): FieldDef[] {
 type FormView = Exclude<View, 'chooser' | 'request-list'>;
 
 /* task's fields depend on the fetched member directory (state, only known
-   inside the component), so only event/announcement — whose fields are
-   static — live in this table. task is assembled at render time below. */
-const staticForms: Record<'event' | 'announcement', { title: string; submitLabel: string; fields: FieldDef[] }> = {
+   inside the component), so only event — whose fields are static — lives in
+   this table. task is assembled at render time below; announcement doesn't
+   go through FormDialog at all anymore (see AnnouncementComposer). */
+const staticForms: Record<'event', { title: string; submitLabel: string; fields: FieldDef[] }> = {
   event: { title: 'New event', submitLabel: 'Create event', fields: eventForm },
-  announcement: { title: 'New announcement', submitLabel: 'Post', fields: announcementForm },
 };
 const TASK_FORM_META = { title: 'New task', submitLabel: 'Add task' };
 
@@ -394,7 +385,7 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
   }
 
-  async function handleCreateAnnouncement(payload: FieldPayload) {
+  async function handleCreateAnnouncement(input: { content: string; imageUrl?: string | null }) {
     const token = sessionStorage.getItem('token');
     if (!token) {
       router.push('/login');
@@ -402,8 +393,8 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     }
 
     await createAnnouncement(token, {
-      content: payload.content as string,
-      imageUrl: (payload.imageUrl as string | undefined) || undefined,
+      content: input.content,
+      imageUrl: input.imageUrl ?? undefined,
     });
 
     window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
@@ -429,10 +420,9 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   }
 
   /* Requests still have no backend route mounted, so its submit stays
-     disabled. */
-  const onSubmit: Partial<Record<FormView, (payload: FieldPayload) => Promise<void>>> = {
+     disabled. announcement isn't here — it doesn't go through FormDialog. */
+  const onSubmit: Partial<Record<Exclude<FormView, 'announcement'>, (payload: FieldPayload) => Promise<void>>> = {
     event: handleCreateEvent,
-    announcement: handleCreateAnnouncement,
     task: handleCreateTask,
   };
 
@@ -474,6 +464,15 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
         </div>
       </Dialog>
     );
+  }
+
+  // Its own bespoke composer (caption + image crop/position + a preview
+  // step) rather than a generic FormDialog — see AnnouncementComposer.
+  // Cancelling closes the whole "New" dialog rather than going back to the
+  // chooser: the composer's own back arrow is already spoken for by its
+  // preview<->compose step navigation.
+  if (view === 'announcement') {
+    return <AnnouncementComposer open={open} mode="create" onSubmit={handleCreateAnnouncement} onClose={onClose} />;
   }
 
   if (view !== 'chooser') {

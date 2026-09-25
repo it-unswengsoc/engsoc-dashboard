@@ -1,20 +1,24 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Heart, MessageCircle } from 'lucide-react';
+import { Heart, MessageCircle, Pencil } from 'lucide-react';
 import type { AnnouncementItem, AnnouncementComment } from '@/types/announcements';
 import {
   likeAnnouncement,
   unlikeAnnouncement,
   getComments,
   addComment,
+  updateAnnouncement,
 } from '@/services/announcements-api';
 import { getDirectory } from '@/services/users-api';
+import { getProfile } from '@/services/auth-api';
 import type { DirectoryUser } from '@/types/directory';
+import type { Profile } from '@/types/auth';
 import { roleLabel } from '@/lib/roles';
-import { matchMentionCandidates, type MentionCandidate } from '@/lib/mentions';
 import MentionText from '@/components/MentionText';
+import MentionTextarea from '@/components/MentionTextarea';
+import AnnouncementComposer from '@/components/announcements/AnnouncementComposer';
 
 function initialsOf(name: string | null): string {
   if (!name) return '?';
@@ -42,26 +46,6 @@ function CommentComposer({
 }) {
   const [value, setValue] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [candidates, setCandidates] = useState<MentionCandidate[]>([]);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  /* Only the trailing "@word" is matched (not a mention typed mid-sentence
-     then edited around) — a deliberate simplification, see lib/mentions.ts. */
-  function updateCandidates(next: string) {
-    const trailing = next.match(/@([A-Za-z]*)$/);
-    if (!trailing || !directory) {
-      setCandidates([]);
-      return;
-    }
-    setCandidates(matchMentionCandidates(trailing[1], directory));
-  }
-
-  function pick(candidate: MentionCandidate) {
-    const next = value.replace(/@([A-Za-z]*)$/, `@${candidate.insertText} `);
-    setValue(next);
-    setCandidates([]);
-    textareaRef.current?.focus();
-  }
 
   async function handleSubmit() {
     const trimmed = value.trim();
@@ -70,65 +54,44 @@ function CommentComposer({
     try {
       await onSubmit(trimmed);
       setValue('');
-      setCandidates([]);
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <div className="relative">
-      <div className="flex items-end gap-2">
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            updateCandidates(e.target.value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              handleSubmit();
-            }
-            if (e.key === 'Escape') setCandidates([]);
-          }}
-          placeholder="Write a comment... @Name or @Portfolio to tag someone"
-          className="min-w-0 flex-1 resize-none rounded-lg border border-transparent bg-gray-100 px-3 py-2 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]"
-        />
-        <button
-          onClick={handleSubmit}
-          disabled={!value.trim() || submitting}
-          className="shrink-0 rounded-lg bg-[#B1C9DC] px-3 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {submitting ? '...' : 'Post'}
-        </button>
-      </div>
-
-      {candidates.length > 0 && (
-        <ul className="absolute bottom-full left-0 z-10 mb-1 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-          {candidates.map((c) => (
-            <li key={c.key}>
-              <button
-                type="button"
-                onClick={() => pick(c)}
-                className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm text-gray-900 transition-colors hover:bg-[#B1C9DC]/20"
-              >
-                <span className="font-bold">{c.label}</span>
-                <span className="font-mono text-[10px] uppercase tracking-wide text-gray-400">{c.sublabel}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="flex items-end gap-2">
+      <MentionTextarea
+        value={value}
+        onChange={setValue}
+        directory={directory}
+        rows={1}
+        placeholder="Write a comment... @Name or @Portfolio to tag someone"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSubmit();
+          }
+        }}
+        className="min-w-0 flex-1 resize-none rounded-lg border border-transparent bg-gray-100 px-3 py-2 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]"
+      />
+      <button
+        onClick={handleSubmit}
+        disabled={!value.trim() || submitting}
+        className="shrink-0 rounded-lg bg-[#B1C9DC] px-3 py-2 text-xs font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {submitting ? '...' : 'Post'}
+      </button>
     </div>
   );
 }
 
 export default function AnnouncementRow(announcement: AnnouncementItem) {
   const router = useRouter();
-  const { id, authorName, authorRole, content, imageUrl, createdAt } = announcement;
+  const { id, authorId, authorName, authorRole, createdAt } = announcement;
+
+  const [content, setContent] = useState(announcement.content);
+  const [imageUrl, setImageUrl] = useState(announcement.imageUrl);
 
   const [likeCount, setLikeCount] = useState(announcement.likeCount);
   const [isLiked, setIsLiked] = useState(announcement.isLikedByMe);
@@ -139,6 +102,15 @@ export default function AnnouncementRow(announcement: AnnouncementItem) {
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentCount, setCommentCount] = useState(announcement.commentCount);
   const [directory, setDirectory] = useState<DirectoryUser[] | null>(null);
+
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('token');
+    if (!token) return;
+    getProfile(token).then(setProfile).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!commentsOpen) return;
@@ -194,6 +166,19 @@ export default function AnnouncementRow(announcement: AnnouncementItem) {
     setCommentCount((c) => c + 1);
   }
 
+  async function handleEditSubmit(input: { content: string; imageUrl?: string | null }) {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    const updated = await updateAnnouncement(token, id, input);
+    setContent(updated.content);
+    setImageUrl(updated.imageUrl);
+  }
+
+  const canEdit = profile !== null && (profile.id === authorId || profile.role === 'admin');
+
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       {/* Poster header */}
@@ -208,10 +193,23 @@ export default function AnnouncementRow(announcement: AnnouncementItem) {
           </p>
           <p className="font-mono text-[10px] text-gray-400">{timeAgo(createdAt)}</p>
         </div>
+        {canEdit && (
+          <button
+            onClick={() => setEditing(true)}
+            aria-label="Edit announcement"
+            className="shrink-0 rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Announcement image */}
-      {imageUrl && <img src={imageUrl} alt="" className="w-full object-cover" />}
+      {imageUrl && (
+        <div className="aspect-video w-full overflow-hidden">
+          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+        </div>
+      )}
 
       {/* Content */}
       <div className="px-5 py-4">
@@ -270,6 +268,14 @@ export default function AnnouncementRow(announcement: AnnouncementItem) {
           </div>
         </div>
       )}
+
+      <AnnouncementComposer
+        open={editing}
+        mode="edit"
+        initial={{ content, imageUrl }}
+        onSubmit={handleEditSubmit}
+        onClose={() => setEditing(false)}
+      />
     </div>
   );
 }

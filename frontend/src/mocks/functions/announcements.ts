@@ -38,6 +38,17 @@ export async function createAnnouncement(input: { content: string; imageUrl?: st
   return announcement;
 }
 
+export async function updateAnnouncement(
+  announcementId: number,
+  input: { content?: string; imageUrl?: string | null }
+): Promise<AnnouncementItem> {
+  const announcement = mockAnnouncements.find((a) => a.id === announcementId);
+  if (!announcement) throw new Error('Announcement not found');
+  if (input.content !== undefined) announcement.content = input.content;
+  if (input.imageUrl !== undefined) announcement.imageUrl = input.imageUrl;
+  return announcement;
+}
+
 export async function likeAnnouncement(announcementId: number): Promise<AnnouncementItem> {
   const announcement = mockAnnouncements.find((a) => a.id === announcementId);
   if (!announcement) throw new Error('Announcement not found');
