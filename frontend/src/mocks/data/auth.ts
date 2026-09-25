@@ -6,6 +6,7 @@ export const mockProfile: Profile = {
   firstName: 'Admin',
   lastName: 'User',
   role: 'admin',
+  port: null,
   createdAt: '2024-01-01T00:00:00.000Z',
 };
 
