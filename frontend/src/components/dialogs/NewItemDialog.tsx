@@ -23,8 +23,14 @@ import FormDialog, {
   type FieldValues,
 } from '@/components/dialogs/FormDialog';
 import { createEvent } from '@/services/events-api';
+import { createAnnouncement } from '@/services/announcements-api';
+import { createTask } from '@/services/tasks-api';
+import { getProfile } from '@/services/auth-api';
+import { getDirectory } from '@/services/users-api';
+import type { DirectoryUser } from '@/types/directory';
 import { PORT_OPTIONS } from '@/lib/ports';
 import { CALENDAR_EVENTS_CHANGED_EVENT } from '@/lib/calendar';
+import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
 
 interface NewItemDialogProps {
   open: boolean;
@@ -256,17 +262,22 @@ const eventForm: FieldDef[] = [
   { kind: 'textarea', name: 'description', label: 'Description' },
 ];
 
+/* content/imageUrl match POST /announcements's body exactly — announcements
+   have no separate title column (see backend/src/functions/announcements.ts),
+   and imageUrl is a plain URL field rather than a file upload since there's
+   no upload pipeline anywhere in this app yet; paste a link to an
+   already-hosted image (e.g. a Drive share link) instead. */
 const announcementForm: FieldDef[] = [
-  { kind: 'text', name: 'title', label: 'Title', required: true },
-  { kind: 'textarea', name: 'description', label: 'Description', required: true },
-  { kind: 'file', name: 'image', label: 'Picture', accept: 'image/*' },
+  { kind: 'textarea', name: 'content', label: 'Announcement', required: true },
+  { kind: 'text', name: 'imageUrl', label: 'Image URL (optional)', placeholder: 'https://...' },
 ];
 
 /* Assignment is one-of, so the toggle picks the target and only that control
    follows — showing a port dropdown and a person box side by side read as
-   "both". `assignee` is free text because naming a person needs a users
-   listing, and no such endpoint exists yet; swap it for a select once one does. */
-function taskForm(values: FieldValues): FieldDef[] {
+   "both". `assignee` is a real member picker fed by GET /users (the
+   directory) rather than free text, since the backend needs an actual user
+   id, not a typed name. */
+function taskForm(values: FieldValues, directory: DirectoryUser[]): FieldDef[] {
   const target: FieldDef[] =
     values.assignTo === 'port'
       ? [
@@ -282,10 +293,11 @@ function taskForm(values: FieldValues): FieldDef[] {
       : values.assignTo === 'person'
         ? [
             {
-              kind: 'text',
+              kind: 'select',
               name: 'assignee',
               label: 'Who',
-              placeholder: 'Name or email',
+              placeholder: 'Select a member...',
+              options: directory.map((u) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` })),
               required: true,
             },
           ]
@@ -298,6 +310,7 @@ function taskForm(values: FieldValues): FieldDef[] {
       kind: 'segmented',
       name: 'assignTo',
       label: 'Assign to',
+      required: true,
       options: [
         { value: 'me', label: 'Just me' },
         { value: 'port', label: 'A port' },
@@ -311,19 +324,27 @@ function taskForm(values: FieldValues): FieldDef[] {
 
 type FormView = Exclude<View, 'chooser' | 'request-list'>;
 
-const forms: Record<
-  FormView,
-  { title: string; submitLabel: string; fields: FieldDef[] | ((values: FieldValues) => FieldDef[]) }
-> = {
+/* task's fields depend on the fetched member directory (state, only known
+   inside the component), so only event/announcement — whose fields are
+   static — live in this table. task is assembled at render time below. */
+const staticForms: Record<'event' | 'announcement', { title: string; submitLabel: string; fields: FieldDef[] }> = {
   event: { title: 'New event', submitLabel: 'Create event', fields: eventForm },
   announcement: { title: 'New announcement', submitLabel: 'Post', fields: announcementForm },
-  task: { title: 'New task', submitLabel: 'Add task', fields: taskForm },
 };
+const TASK_FORM_META = { title: 'New task', submitLabel: 'Add task' };
 
 export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   const router = useRouter();
   const [view, setView] = useState<View>('chooser');
   const [requestType, setRequestType] = useState<string | null>(null);
+
+  // Only director/executive/admin can post an announcement (backend
+  // enforces this too — see requireRole on POST /announcements). Fetched
+  // fresh on every open rather than cached, same reasoning as everywhere
+  // else this app checks role: a change should take effect immediately.
+  const [role, setRole] = useState<string | null>(null);
+  const [directory, setDirectory] = useState<DirectoryUser[]>([]);
+  const canPostAnnouncement = role === 'director' || role === 'executive' || role === 'admin';
 
   /* Reset to the chooser on each *re*-open rather than in handleClose — Dialog
      now plays an exit animation before actually unmounting (see Dialog.tsx),
@@ -334,6 +355,12 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     if (open) {
       setView('chooser');
       setRequestType(null);
+
+      const token = sessionStorage.getItem('token');
+      if (token) {
+        getProfile(token).then((p) => setRole(p.role)).catch(() => {});
+        getDirectory(token).then(setDirectory).catch(() => {});
+      }
     }
   }, [open]);
 
@@ -364,12 +391,49 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
 
     router.refresh();
     window.dispatchEvent(new Event(CALENDAR_EVENTS_CHANGED_EVENT));
+    window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
   }
 
-  /* Only "New event" is wired up — tasks, announcements and requests have no
-     backend route mounted yet, so their submit stays disabled. */
+  async function handleCreateAnnouncement(payload: FieldPayload) {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    await createAnnouncement(token, {
+      content: payload.content as string,
+      imageUrl: (payload.imageUrl as string | undefined) || undefined,
+    });
+
+    window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
+  }
+
+  async function handleCreateTask(payload: FieldPayload) {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    await createTask(token, {
+      title: payload.name as string,
+      description: payload.description as string | undefined,
+      dueDate: payload.dueAt as string | undefined,
+      assignTo: payload.assignTo as 'me' | 'port' | 'person',
+      port: payload.port as string | undefined,
+      assigneeId: payload.assignee ? Number(payload.assignee) : undefined,
+    });
+
+    window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
+  }
+
+  /* Requests still have no backend route mounted, so its submit stays
+     disabled. */
   const onSubmit: Partial<Record<FormView, (payload: FieldPayload) => Promise<void>>> = {
     event: handleCreateEvent,
+    announcement: handleCreateAnnouncement,
+    task: handleCreateTask,
   };
 
   /* A chosen request type's own form. Which type it is lives in state rather
@@ -413,7 +477,10 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   }
 
   if (view !== 'chooser') {
-    const form = forms[view];
+    const form =
+      view === 'task'
+        ? { ...TASK_FORM_META, fields: (values: FieldValues) => taskForm(values, directory) }
+        : staticForms[view];
 
     return (
       <FormDialog
@@ -428,10 +495,14 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     );
   }
 
+  // "New announcement" only shows for director/executive/admin — everyone
+  // else never sees a composer the backend would just 403 anyway.
+  const visibleOptions = options.filter((o) => o.view !== 'announcement' || canPostAnnouncement);
+
   return (
     <Dialog open={open} title="What would you like to work on?" size="sm" onClose={onClose}>
       <div className="mt-6 grid grid-cols-2 gap-4">
-        {options.map(({ view: target, label, icon: Icon }) => (
+        {visibleOptions.map(({ view: target, label, icon: Icon }) => (
           <button
             key={label}
             onClick={() => setView(target)}

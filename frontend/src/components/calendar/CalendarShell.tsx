@@ -13,15 +13,19 @@ import {
   startOfWeek,
   MONTHS_LONG,
   toGoogleCalendarItems,
+  toTaskCalendarItems,
   CALENDAR_EVENTS_CHANGED_EVENT,
   type CalendarItem,
 } from '@/lib/calendar';
-import type { TaskRowData } from '@/types/dashboard';
+import { toOpenTaskRows } from '@/services/dashboard';
 import { getMyCalendarEvents } from '@/services/user-calendar-api';
+import { getTasks } from '@/services/tasks-api';
+import type { TaskItem } from '@/types/tasks';
+import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
+
+const DUE_TASKS_LIMIT = 5;
 
 interface CalendarShellProps {
-  taskItems: CalendarItem[];
-  dueTasks: TaskRowData[];
   children: React.ReactNode;
 }
 
@@ -50,7 +54,7 @@ function formatTitle(anchor: Date, view: CalendarView): string {
   return `${MONTHS_LONG[anchor.getMonth()]} ${anchor.getFullYear()}`;
 }
 
-export default function CalendarShell({ taskItems, dueTasks, children }: CalendarShellProps) {
+export default function CalendarShell({ children }: CalendarShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const view = viewFromPathname(pathname);
@@ -60,6 +64,7 @@ export default function CalendarShell({ taskItems, dueTasks, children }: Calenda
   const [eventItems, setEventItems] = useState<CalendarItem[]>([]);
   const [googleConnected, setGoogleConnected] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +96,30 @@ export default function CalendarShell({ taskItems, dueTasks, children }: Calenda
       window.removeEventListener(CALENDAR_EVENTS_CHANGED_EVENT, loadEvents);
     };
   }, [router]);
+
+  // Tasks carry per-user data, same reasoning as the dashboard page — fetched
+  // client-side with the signed-in member's own token, not passed down from
+  // a Server Component. Refetches on the same nudge the dashboard listens
+  // for, so creating/checking off a task anywhere stays in sync here too.
+  useEffect(() => {
+    function loadTasks() {
+      const token = sessionStorage.getItem('token');
+      if (!token) return;
+      getTasks(token).then(setTasks).catch(() => {});
+    }
+
+    loadTasks();
+    window.addEventListener(DASHBOARD_DATA_CHANGED_EVENT, loadTasks);
+    return () => window.removeEventListener(DASHBOARD_DATA_CHANGED_EVENT, loadTasks);
+  }, []);
+
+  function handleTaskToggled(id: number, completed: boolean) {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed } : t)));
+  }
+
+  const taskItems = useMemo(() => toTaskCalendarItems(tasks), [tasks]);
+  const dueTasks = useMemo(() => toOpenTaskRows(tasks, DUE_TASKS_LIMIT), [tasks]);
+  const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
 
   const items = useMemo(() => [...eventItems, ...taskItems], [eventItems, taskItems]);
 
@@ -133,7 +162,14 @@ export default function CalendarShell({ taskItems, dueTasks, children }: Calenda
               {dueTasks.length === 0 ? (
                 <p className="px-4 py-6 text-center font-mono text-xs text-gray-400">Nothing due — nice.</p>
               ) : (
-                dueTasks.map((task) => <TaskRow key={task.id} {...task} />)
+                dueTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    {...task}
+                    completed={taskById.get(task.id)?.completed ?? false}
+                    onToggled={handleTaskToggled}
+                  />
+                ))
               )}
             </div>
           </div>

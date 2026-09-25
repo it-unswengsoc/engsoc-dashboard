@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getNotificationsForUser = getNotificationsForUser;
 exports.getNotificationById = getNotificationById;
 exports.createNotification = createNotification;
+exports.createNotificationsBulk = createNotificationsBulk;
 exports.markNotificationRead = markNotificationRead;
 exports.markAllNotificationsRead = markAllNotificationsRead;
 exports.deleteNotification = deleteNotification;
@@ -14,31 +15,30 @@ const pool = new pg_1.Pool({
     ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
 });
 /**
- * Ethan
  * Retrieves all notifications for a given user, ordered by creation date descending.
  * Returns an array of notifications, or an empty array if none exist.
  */
 async function getNotificationsForUser(userId) {
-    // TODO: implement
     try {
-        const result = await (0, notifications_1.dbGetNotificationsForUser)(userId);
-        return result;
+        return await (0, notifications_1.dbGetNotificationsForUser)(userId);
     }
     catch (error) {
         throw error;
     }
 }
 /**
- * Stuart
  * Retrieves a single notification by its ID.
  * Returns the notification if found, or null if no notification exists with the given ID.
  */
 async function getNotificationById(notificationId) {
-    // TODO: implement
-    throw new Error('Not implemented');
+    try {
+        return await (0, notifications_1.dbGetNotificationById)(notificationId);
+    }
+    catch (error) {
+        throw error;
+    }
 }
 /**
- * Emma
  * Creates a new notification for a user.
  * Returns the newly created notification, or null if creation failed.
  */
@@ -53,7 +53,22 @@ async function createNotification(input) {
     }
 }
 /**
- * Ethan
+ * Creates the same kind of notification for many users at once — one
+ * announcement notifying every member, or one portfolio-assigned task
+ * notifying everyone in it. Best-effort: logs and returns an empty array
+ * rather than throwing, so a notification failure never blocks the
+ * announcement/task itself from having been created.
+ */
+async function createNotificationsBulk(inputs) {
+    try {
+        return await (0, notifications_1.dbCreateNotificationsBulk)(inputs);
+    }
+    catch (error) {
+        console.error('Create notifications bulk error:', error);
+        return [];
+    }
+}
+/**
  * Marks a single notification as read by its ID.
  * Returns the updated notification if found, or null if no notification exists with the given ID.
  */
@@ -67,16 +82,18 @@ async function markNotificationRead(notificationId) {
     }
 }
 /**
- * Stuart
  * Marks all unread notifications for a given user as read.
  * Returns the number of notifications that were updated.
  */
 async function markAllNotificationsRead(userId) {
-    // TODO: implement
-    throw new Error('Not implemented');
+    try {
+        return await (0, notifications_1.dbMarkAllNotificationsRead)(userId);
+    }
+    catch (error) {
+        throw error;
+    }
 }
 /**
- * Emma
  * Deletes a notification by its ID.
  * Returns true if the notification was deleted, or false if no notification was found with the given ID.
  */

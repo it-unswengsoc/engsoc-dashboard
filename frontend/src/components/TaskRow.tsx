@@ -1,16 +1,26 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { updateTaskStatus } from '@/services/tasks-api';
 
 interface TaskRowProps {
-  daysTillDue: number;     // e.g. "5"
+  id: number;
+  daysTillDue: number | null; // null if no due date was set
   name: string;      // e.g. "Edit cover photo"
-  dateString: string; // e.g. "Mon, 1 June"
-  time: string;      // e.g. "9:30PM"
+  dateString: string; // e.g. "Mon, 1 June"; "" if no due date
+  time: string;      // e.g. "9:30PM"; "" if no due date
+  completed: boolean;
+  /* Lets the dashboard page keep its own task list (and the OPEN TASKS stat
+     derived from it) in sync after a real PATCH — this row doesn't own the
+     source of truth, the page does. */
+  onToggled: (id: number, completed: boolean) => void;
 }
 
-/* This shat gonna style the days into a text string */
-function getBadge(days: number): { label: string; styles: string } {
+function getBadge(days: number | null): { label: string; styles: string } {
+  if (days === null) {
+    return { label: 'No due date', styles: 'bg-gray-100 text-gray-500' };
+  }
   if (days <= 0) {
     return { label: 'DUE', styles: 'bg-[#F1C4C9] text-[#8B2E38]' };
   }
@@ -27,9 +37,31 @@ function getBadge(days: number): { label: string; styles: string } {
   };
 }
 
-export default function TaskRow({ daysTillDue, name, dateString, time }: TaskRowProps) {
+export default function TaskRow({ id, daysTillDue, name, dateString, time, completed, onToggled }: TaskRowProps) {
+  const router = useRouter();
   const badge = getBadge(daysTillDue);
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState(completed);
+  const [saving, setSaving] = useState(false);
+
+  async function handleToggle(checked: boolean) {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    const previous = done;
+    setDone(checked); // optimistic
+    setSaving(true);
+    try {
+      await updateTaskStatus(token, id, checked ? 'completed' : 'pending');
+      onToggled(id, checked);
+    } catch {
+      setDone(previous); // roll back on failure
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="flex items-center gap-2.5 px-3 py-3.5">
@@ -38,8 +70,9 @@ export default function TaskRow({ daysTillDue, name, dateString, time }: TaskRow
         <input
           type="checkbox"
           checked={done}
-          onChange={(e) => setDone(e.target.checked)}
-          className="h-full w-full cursor-pointer appearance-none rounded-md border border-gray-300 bg-white transition-colors hover:border-2 hover:border-[#ED6672] checked:border-0 checked:bg-[#ED6672]"
+          disabled={saving}
+          onChange={(e) => handleToggle(e.target.checked)}
+          className="h-full w-full cursor-pointer appearance-none rounded-md border border-gray-300 bg-white transition-colors hover:border-2 hover:border-[#ED6672] checked:border-0 checked:bg-[#ED6672] disabled:cursor-wait"
         />
         {done && (
           <svg
@@ -69,9 +102,11 @@ export default function TaskRow({ daysTillDue, name, dateString, time }: TaskRow
           <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${badge.styles}`}>
             {badge.label}
           </span>
-          <span className="font-mono text-xs text-gray-400">
-            {dateString} {time}
-          </span>
+          {dateString && (
+            <span className="font-mono text-xs text-gray-400">
+              {dateString} {time}
+            </span>
+          )}
         </div>
       </div>
     </div>

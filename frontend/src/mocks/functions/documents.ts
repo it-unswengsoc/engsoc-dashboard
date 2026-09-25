@@ -1,13 +1,15 @@
 import type { DriveDepartment, DriveEntry, DriveSearchResult } from '@/types/documents';
 import { mockDepartments, mockDriveEntries } from '@/mocks/data/documents';
 
+/* Copies, not the live mock arrays — see
+   mocks/functions/announcements.ts's getAnnouncements for why. */
 export async function getDriveDepartments(): Promise<DriveDepartment[]> {
-  return mockDepartments;
+  return mockDepartments.slice();
 }
 
 export async function getDriveEntries(driveId: string, folderId?: string): Promise<DriveEntry[]> {
   const key = folderId ? `${driveId}/${folderId}` : driveId;
-  return mockDriveEntries[key] ?? [];
+  return (mockDriveEntries[key] ?? []).slice();
 }
 
 const DRIVE_NAME_BY_ID: Record<string, string> = {

@@ -3,9 +3,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.dbGetAllAnnouncements = dbGetAllAnnouncements;
 exports.dbGetAnnouncementById = dbGetAnnouncementById;
 exports.dbCreateAnnouncement = dbCreateAnnouncement;
+exports.dbGetAnnouncementAuthorId = dbGetAnnouncementAuthorId;
 exports.dbDeleteAnnouncement = dbDeleteAnnouncement;
 exports.dbLikeAnnouncement = dbLikeAnnouncement;
 exports.dbUnlikeAnnouncement = dbUnlikeAnnouncement;
+exports.dbGetCommentsForAnnouncement = dbGetCommentsForAnnouncement;
+exports.dbCreateComment = dbCreateComment;
+exports.dbDeleteComment = dbDeleteComment;
+exports.dbGetCommentAuthorId = dbGetCommentAuthorId;
 const pg_1 = require("pg");
 const pool = new pg_1.Pool({
     connectionString: process.env.DATABASE_URL,
@@ -72,6 +77,14 @@ async function dbCreateAnnouncement(input) {
     return dbGetAnnouncementById(insertResult.rows[0].id, input.authorId);
 }
 /**
+ * Looks up who authored an announcement — used to check "author or admin"
+ * before allowing a delete.
+ */
+async function dbGetAnnouncementAuthorId(announcementId) {
+    const result = await pool.query(`SELECT author_id FROM announcements WHERE id = $1`, [announcementId]);
+    return result.rows[0]?.author_id ?? null;
+}
+/**
  * Deletes the announcement with the given ID (its likes cascade with it).
  * Returns true if a row was deleted, false if no announcement with that ID
  * existed.
@@ -131,5 +144,88 @@ async function dbUnlikeAnnouncement(announcementId, userId) {
     finally {
         client.release();
     }
+}
+const COMMENT_SELECT = `
+  SELECT c.id, c.announcement_id, c.author_id, u.first_name, u.last_name, u.role,
+         c.content, c.created_at
+  FROM announcement_comments c
+  LEFT JOIN users u ON u.id = c.author_id
+`;
+function rowToComment(row) {
+    return {
+        id: row.id,
+        announcementId: row.announcement_id,
+        authorId: row.author_id,
+        authorName: row.first_name ? `${row.first_name} ${row.last_name}` : null,
+        authorRole: row.role,
+        content: row.content,
+        createdAt: row.created_at,
+    };
+}
+/**
+ * Fetches every comment on an announcement, oldest first (a flat list, not
+ * threaded).
+ */
+async function dbGetCommentsForAnnouncement(announcementId) {
+    const result = await pool.query(`${COMMENT_SELECT} WHERE c.announcement_id = $1 ORDER BY c.created_at ASC`, [announcementId]);
+    return result.rows.map(rowToComment);
+}
+/**
+ * Inserts a new comment and increments the parent announcement's
+ * denormalized comment_count in the same transaction. Returns null if the
+ * announcement doesn't exist (the insert's FK constraint fails).
+ */
+async function dbCreateComment(announcementId, authorId, content) {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const insertResult = await client.query(`INSERT INTO announcement_comments (announcement_id, author_id, content, created_at, updated_at)
+       VALUES ($1, $2, $3, NOW(), NOW())
+       RETURNING id`, [announcementId, authorId, content]);
+        await client.query(`UPDATE announcements SET comment_count = comment_count + 1 WHERE id = $1`, [announcementId]);
+        await client.query('COMMIT');
+        const commentId = insertResult.rows[0].id;
+        const fullResult = await pool.query(`${COMMENT_SELECT} WHERE c.id = $1`, [commentId]);
+        return fullResult.rows.length > 0 ? rowToComment(fullResult.rows[0]) : null;
+    }
+    catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    }
+    finally {
+        client.release();
+    }
+}
+/**
+ * Deletes a comment and decrements its parent announcement's comment_count
+ * (floored at 0) in the same transaction. Returns true if a comment was
+ * deleted, false if no comment with that ID existed.
+ */
+async function dbDeleteComment(commentId) {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const deleteResult = await client.query(`DELETE FROM announcement_comments WHERE id = $1 RETURNING announcement_id`, [commentId]);
+        if ((deleteResult.rowCount ?? 0) > 0) {
+            await client.query(`UPDATE announcements SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = $1`, [deleteResult.rows[0].announcement_id]);
+        }
+        await client.query('COMMIT');
+        return (deleteResult.rowCount ?? 0) > 0;
+    }
+    catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    }
+    finally {
+        client.release();
+    }
+}
+/**
+ * Looks up who authored a comment — used to check "author or admin" before
+ * allowing a delete.
+ */
+async function dbGetCommentAuthorId(commentId) {
+    const result = await pool.query(`SELECT author_id FROM announcement_comments WHERE id = $1`, [commentId]);
+    return result.rows[0]?.author_id ?? null;
 }
 //# sourceMappingURL=announcements.js.map

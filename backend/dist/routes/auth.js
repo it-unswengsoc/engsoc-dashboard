@@ -2,10 +2,12 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.verifyAuthToken = verifyAuthToken;
 exports.requireAdmin = requireAdmin;
+exports.requireRole = requireRole;
 const express_1 = require("express");
 const auth_1 = require("../functions/auth");
 const google_1 = require("../functions/google");
 const admin_1 = require("../functions/admin");
+const users_1 = require("../functions/users");
 const router = (0, express_1.Router)();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 // Middleware to verify JWT token
@@ -45,6 +47,25 @@ async function requireAdmin(req, res, next) {
         console.error('Admin check error:', error);
         res.status(500).json({ status: 'error', message: 'Internal server error' });
     }
+}
+// General version of requireAdmin for anything short of full admin — e.g.
+// "director, executive or admin only" on posting an announcement. Same
+// database-not-JWT reasoning.
+function requireRole(allowed) {
+    return async (req, res, next) => {
+        const user = req.user;
+        try {
+            const role = await (0, users_1.getUserRole)(user.userId);
+            if (!role || !allowed.includes(role)) {
+                return res.status(403).json({ status: 'error', message: 'Insufficient permissions' });
+            }
+            next();
+        }
+        catch (error) {
+            console.error('Role check error:', error);
+            res.status(500).json({ status: 'error', message: 'Internal server error' });
+        }
+    };
 }
 /**
  * POST /api/auth/register

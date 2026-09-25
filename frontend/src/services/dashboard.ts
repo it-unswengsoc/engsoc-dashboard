@@ -1,6 +1,3 @@
-import { getEvents } from '@/services/events-api';
-import { getTasks } from '@/services/tasks-api';
-import { getAnnouncements } from '@/services/announcements-api';
 import type { EventItem, EventType } from '@/types/events';
 import type { TaskItem } from '@/types/tasks';
 import type { AnnouncementItem } from '@/types/announcements';
@@ -60,6 +57,9 @@ export function toEventRow(event: EventItem): EventRowData {
 }
 
 export function toTaskRow(task: TaskItem): TaskRowData {
+  if (task.dueAt === null) {
+    return { id: task.id, daysTillDue: null, name: task.name, dateString: '', time: '' };
+  }
   const d = new Date(task.dueAt);
   return {
     id: task.id,
@@ -70,50 +70,56 @@ export function toTaskRow(task: TaskItem): TaskRowData {
   };
 }
 
-/* ---------- Dashboard-shaped getters ---------- */
+/* ---------- Dashboard-shaped getters ----------
+   Tasks and announcements now carry per-user data (whose task it is,
+   whether *I* liked this) — both need the signed-in member's own token,
+   which only exists in the browser (sessionStorage), so these can't run in
+   a Server Component the way events still can. The dashboard page fetches
+   all three itself, client-side, and calls the mappers below directly. */
 
 /* Soonest first, capped so the query doesn't grow unbounded — the panel scrolls past the cap */
-export async function getUpcomingEvents(limit = 3): Promise<EventRowData[]> {
-  const events = await getEvents();
+export function toUpcomingEventRows(events: EventItem[], limit = 3): EventRowData[] {
   const now = Date.now();
   return events
     .filter((e) => new Date(e.startsAt).getTime() >= now)
+    .slice()
     .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
     .slice(0, limit)
     .map(toEventRow);
 }
 
-/* Incomplete tasks, most urgent first */
-export async function getOpenTasks(limit = 3): Promise<TaskRowData[]> {
-  const tasks = await getTasks();
+/* Incomplete tasks, most urgent first — no due date sorts last. */
+export function toOpenTaskRows(tasks: TaskItem[], limit = 3): TaskRowData[] {
   return tasks
     .filter((t) => !t.completed)
-    .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+    .slice()
+    .sort((a, b) => {
+      const at = a.dueAt === null ? Infinity : new Date(a.dueAt).getTime();
+      const bt = b.dueAt === null ? Infinity : new Date(b.dueAt).getTime();
+      return at - bt;
+    })
     .slice(0, limit)
     .map(toTaskRow);
 }
 
 /* Newest first */
-export async function getRecentAnnouncements(): Promise<AnnouncementItem[]> {
-  const announcements = await getAnnouncements();
-  return announcements
-    .slice()
-    .sort((a, b) => new Date(b.postedAt).getTime() - new Date(a.postedAt).getTime());
+export function toRecentAnnouncements(announcements: AnnouncementItem[]): AnnouncementItem[] {
+  return announcements.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 }
 
-export async function getDashboardStats(): Promise<DashboardStats> {
-  const [tasks, events, announcements] = await Promise.all([
-    getTasks(),
-    getEvents(),
-    getAnnouncements(),
-  ]);
+/* "New" announcements = posted in the last 7 days — announcements
+   themselves have no per-user read state the way notifications do, so this
+   is a simple recency window rather than an unread count. */
+const NEW_ANNOUNCEMENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
+export function toDashboardStats(tasks: TaskItem[], events: EventItem[], announcements: AnnouncementItem[]): DashboardStats {
   const open = tasks.filter((t) => !t.completed).length;
-  const unread = announcements.filter((a) => !a.read).length;
+  const now = Date.now();
+  const recent = announcements.filter((a) => now - new Date(a.createdAt).getTime() < NEW_ANNOUNCEMENT_WINDOW_MS).length;
 
   return {
     openTasks: `${open}/${tasks.length}`,
-    upcomingEvents: String(events.length),
-    newAnnouncements: String(unread),
+    upcomingEvents: String(events.filter((e) => new Date(e.startsAt).getTime() >= now).length),
+    newAnnouncements: String(recent),
   };
 }
