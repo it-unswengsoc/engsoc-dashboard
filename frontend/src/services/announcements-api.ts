@@ -5,20 +5,20 @@ const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
 export type { AnnouncementItem, AnnouncementComment };
 
-/* Server-fetched (no token) for the dashboard's initial render — matches
-   events-api.ts's getEvents. isLikedByMe needs a signed-in user to mean
-   anything, but the backend already requires auth on GET /announcements for
-   exactly that reason; the frontend calls it from a Server Component here
-   the same way it calls GET /events, without a token. That's fine for
-   *reading* the club-wide feed — write actions below (like/comment) do
-   carry a token, client-side, same as everywhere else in this app. */
-export async function getAnnouncements(): Promise<AnnouncementItem[]> {
+/* Unlike GET /events, GET /announcements requires auth — isLikedByMe is
+   computed per requesting user, so the backend needs to know who's asking.
+   Called client-side with the signed-in member's own token (see
+   app/dashboard/page.tsx), not server-side without one. */
+export async function getAnnouncements(token: string): Promise<AnnouncementItem[]> {
   if (USE_MOCK) {
     const { getAnnouncements: mockGetAnnouncements } = await import('@/mocks/functions/announcements');
     return mockGetAnnouncements();
   }
 
-  const res = await fetch(apiUrl('/announcements'), { cache: 'no-store' });
+  const res = await fetch(apiUrl('/announcements'), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load announcements');
   return data.data as AnnouncementItem[];

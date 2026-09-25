@@ -50,7 +50,7 @@ export default function HomePage() {
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
 
   const load = useCallback(async (token: string) => {
-    const [e, t, a] = await Promise.all([getEvents(), getTasks(token), getAnnouncements()]);
+    const [e, t, a] = await Promise.all([getEvents(), getTasks(token), getAnnouncements(token)]);
     setEvents(e);
     setTasks(t);
     setAnnouncements(a);
