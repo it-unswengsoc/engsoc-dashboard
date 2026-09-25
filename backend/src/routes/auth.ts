@@ -9,6 +9,7 @@ import {
   generateToken,
 } from '../functions/auth';
 import { getGoogleAuthUrl, exchangeGoogleCode, GoogleDomainError } from '../functions/google';
+import { isUserAdmin } from '../functions/admin';
 
 const router = Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -36,6 +37,24 @@ export function verifyAuthToken(req: Request, res: Response, next: Function) {
 
   (req as any).user = decoded;
   next();
+}
+
+// Gates every /admin/* route. Must run after verifyAuthToken (needs
+// req.user). Checks the database rather than the JWT — role isn't in the
+// token, so a change takes effect on the member's very next request rather
+// than only after they log back in.
+export async function requireAdmin(req: Request, res: Response, next: Function) {
+  const user = (req as any).user;
+  try {
+    const admin = await isUserAdmin(user.userId);
+    if (!admin) {
+      return res.status(403).json({ status: 'error', message: 'Admin access required' });
+    }
+    next();
+  } catch (error) {
+    console.error('Admin check error:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error' });
+  }
 }
 
 /**

@@ -1,0 +1,68 @@
+import type { AdminUser } from '@/types/admin';
+
+/* Mirrors the shape of the real production users table this was built
+   against — one admin (the signed-in mock account, see mocks/data/auth.ts),
+   a mix of roles, and a couple of unassigned ports to demonstrate the
+   "manually assign" fallback path. */
+export const mockUsers: AdminUser[] = [
+  {
+    id: 1,
+    email: 'admin@engsoc.com',
+    firstName: 'Admin',
+    lastName: 'User',
+    role: 'admin',
+    port: null,
+    isActive: true,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    lastLogin: '2026-09-24T09:00:00.000Z',
+    hasGoogleAccount: false,
+  },
+  {
+    id: 2,
+    email: 'zachary.abran@unswengsoc.com',
+    firstName: 'Zachary',
+    lastName: 'Abran',
+    role: 'admin',
+    port: 'IT',
+    isActive: true,
+    createdAt: '2024-02-10T00:00:00.000Z',
+    lastLogin: '2026-09-24T08:30:00.000Z',
+    hasGoogleAccount: true,
+  },
+  {
+    id: 3,
+    email: 'winnie.moy@unswengsoc.com',
+    firstName: 'Winnie',
+    lastName: 'Moy',
+    role: 'admin',
+    port: 'cabinet',
+    isActive: true,
+    createdAt: '2024-02-10T00:00:00.000Z',
+    lastLogin: '2026-09-23T14:00:00.000Z',
+    hasGoogleAccount: true,
+  },
+  {
+    id: 4,
+    email: 'ethan.bian@unswengsoc.com',
+    firstName: 'Ethan',
+    lastName: 'Bian',
+    role: 'director',
+    port: 'marketing',
+    isActive: true,
+    createdAt: '2024-03-01T00:00:00.000Z',
+    lastLogin: '2026-09-20T11:00:00.000Z',
+    hasGoogleAccount: true,
+  },
+  {
+    id: 5,
+    email: 'general.it@unswengsoc.com',
+    firstName: 'EngSoc',
+    lastName: 'IT',
+    role: 'member',
+    port: null,
+    isActive: true,
+    createdAt: '2024-03-15T00:00:00.000Z',
+    lastLogin: null,
+    hasGoogleAccount: false,
+  },
+];
