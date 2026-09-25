@@ -1,8 +1,10 @@
 import type { AdminUser, UpdateUserInput } from '@/types/admin';
 import { mockUsers } from '@/mocks/data/admin';
 
+/* A copy, not the live mockUsers array — see
+   mocks/functions/announcements.ts's getAnnouncements for why. */
 export async function getUsers(): Promise<AdminUser[]> {
-  return mockUsers;
+  return mockUsers.slice();
 }
 
 /* Mutates mockUsers directly (module-level, in-memory) so the panel

@@ -16,7 +16,9 @@ export type CalendarItem =
 
 export function toTaskCalendarItems(tasks: TaskItem[]): CalendarItem[] {
   return tasks
-    .filter((t) => !t.completed)
+    // A task with no due date has no date to place it on — leave it off
+    // the grid (it still shows in the "Due tasks" list, just undated there).
+    .filter((t): t is TaskItem & { dueAt: string } => !t.completed && t.dueAt !== null)
     .map((t) => ({
       kind: 'task',
       id: `task-${t.id}`,

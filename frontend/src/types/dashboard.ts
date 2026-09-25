@@ -15,10 +15,10 @@ export interface EventRowData {
 
 export interface TaskRowData {
   id: number;
-  daysTillDue: number;
+  daysTillDue: number | null; // null if no due date was set
   name: string;
-  dateString: string; // "Mon, 1 June"
-  time: string;       // "9:30PM"
+  dateString: string; // "Mon, 1 June"; "" if no due date
+  time: string;       // "9:30PM"; "" if no due date
 }
 
 export interface DashboardStats {
