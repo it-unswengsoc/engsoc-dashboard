@@ -35,6 +35,8 @@ const drive_1 = __importDefault(require("./routes/drive"));
 const announcements_1 = __importDefault(require("./routes/announcements"));
 const calendar_1 = __importDefault(require("./routes/calendar"));
 const admin_1 = __importDefault(require("./routes/admin"));
+const users_1 = __importDefault(require("./routes/users"));
+const tasks_1 = __importDefault(require("./routes/tasks"));
 const app = (0, express_1.default)();
 // Frontend owns port 3000 by Next.js convention; this backend now runs as
 // its own standalone service (not routed through the frontend's domain
@@ -61,6 +63,8 @@ app.use('/drive', drive_1.default);
 app.use('/announcements', announcements_1.default);
 app.use('/calendar', calendar_1.default);
 app.use('/admin', admin_1.default);
+app.use('/users', users_1.default);
+app.use('/tasks', tasks_1.default);
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({

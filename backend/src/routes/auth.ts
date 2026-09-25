@@ -10,6 +10,8 @@ import {
 } from '../functions/auth';
 import { getGoogleAuthUrl, exchangeGoogleCode, GoogleDomainError } from '../functions/google';
 import { isUserAdmin } from '../functions/admin';
+import { getUserRole } from '../functions/users';
+import type { AuthorRole } from '../functions/announcements';
 
 const router = Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -55,6 +57,25 @@ export async function requireAdmin(req: Request, res: Response, next: Function) 
     console.error('Admin check error:', error);
     res.status(500).json({ status: 'error', message: 'Internal server error' });
   }
+}
+
+// General version of requireAdmin for anything short of full admin — e.g.
+// "director, executive or admin only" on posting an announcement. Same
+// database-not-JWT reasoning.
+export function requireRole(allowed: AuthorRole[]) {
+  return async (req: Request, res: Response, next: Function) => {
+    const user = (req as any).user;
+    try {
+      const role = await getUserRole(user.userId);
+      if (!role || !allowed.includes(role)) {
+        return res.status(403).json({ status: 'error', message: 'Insufficient permissions' });
+      }
+      next();
+    } catch (error) {
+      console.error('Role check error:', error);
+      res.status(500).json({ status: 'error', message: 'Internal server error' });
+    }
+  };
 }
 
 /**
