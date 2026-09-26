@@ -10,4 +10,6 @@ export interface EventItem {
   location: string | null;
   description: string | null;
   capacity: number | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
 }

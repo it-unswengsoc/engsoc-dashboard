@@ -70,6 +70,8 @@ CREATE TABLE events (
   -- Calendar (see backend/src/functions/calendar-sync.ts). Null means the
   -- mirror hasn't happened yet (sync failed, or predates this feature).
   google_calendar_event_id VARCHAR(255),
+  facebook_url VARCHAR(500),
+  instagram_url VARCHAR(500),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (organizer_id) REFERENCES users(id) ON DELETE SET NULL,
@@ -78,19 +80,23 @@ CREATE TABLE events (
 
 -- ============================================================
 -- EVENT ATTENDEES (a.k.a. RSVPs)
--- A row = this user clicked "Going". checked_in / checked_in_at track
--- whether they actually showed up on the day, separate from the RSVP.
+-- A row = this user has explicitly responded either way — status says
+-- which. No row at all means they haven't responded, distinct from having
+-- said they can't come. checked_in / checked_in_at track whether they
+-- actually showed up on the day, separate from the RSVP itself.
 -- ============================================================
 CREATE TABLE event_attendees (
   id SERIAL PRIMARY KEY,
   event_id INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'going',
   checked_in BOOLEAN DEFAULT false,
   registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   checked_in_at TIMESTAMP,
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  UNIQUE(event_id, user_id)
+  UNIQUE(event_id, user_id),
+  CHECK (status IN ('going', 'not_going'))
 );
 
 -- ============================================================
@@ -115,6 +121,25 @@ CREATE TABLE tasks (
   FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+);
+
+-- ============================================================
+-- TASK ATTACHMENTS
+-- The file's actual bytes live in Google Drive (uploaded straight from the
+-- browser — see frontend/src/services/documents-api.ts's uploadDriveFile),
+-- not here — this just records which Drive file is attached to which task.
+-- ============================================================
+CREATE TABLE task_attachments (
+  id SERIAL PRIMARY KEY,
+  task_id INTEGER NOT NULL,
+  drive_file_id VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  web_view_link VARCHAR(500),
+  mime_type VARCHAR(255),
+  added_by INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  FOREIGN KEY (added_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- ============================================================

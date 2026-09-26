@@ -29,6 +29,8 @@ export interface Event {
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
   capacity: number | null;
   googleCalendarEventId: string | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -43,6 +45,8 @@ export interface CreateEventInput {
   location?: string;
   organizerId: number;
   capacity?: number;
+  facebookUrl?: string;
+  instagramUrl?: string;
 }
 
 export interface UpdateEventInput {
@@ -55,6 +59,17 @@ export interface UpdateEventInput {
   location?: string;
   status?: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
   capacity?: number;
+  facebookUrl?: string;
+  instagramUrl?: string;
+}
+
+/* Both are optional reference links, not validated against the real
+   Facebook/Instagram domains — just capped in length like every other free
+   text field here, so a typo doesn't need to be a hard rejection. */
+function validateSocialUrl(url: string | undefined, label: string): void {
+  if (url !== undefined && url.length > 500) {
+    throw new Error(`${label} link must be 500 characters or fewer`);
+  }
 }
 
 /**
@@ -120,6 +135,8 @@ export async function createEvent(input: CreateEventInput): Promise<Event | null
       throw new Error('Capacity must be a positive integer');
     }
   }
+  validateSocialUrl(input.facebookUrl, 'Facebook');
+  validateSocialUrl(input.instagramUrl, 'Instagram');
   if (!input.startDate || isNaN(new Date(input.startDate).getTime())) {
     throw new Error('A valid start date is required');
   }
