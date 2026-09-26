@@ -27,7 +27,7 @@ const UNSUPPORTED_IMAGE_TYPES = ['image/heic', 'image/heif'];
 type ImageState =
   | { kind: 'none' }
   | { kind: 'unchanged'; url: string } // edit mode: the original stored image, untouched so far
-  | { kind: 'picked'; src: string }; // a newly-picked file, being cropped (src is a blob: object URL)
+  | { kind: 'picked'; file: File; previewSrc: string }; // a newly-picked file, being cropped (previewSrc is a blob: object URL, for display only — the File itself is what gets decoded)
 
 export interface AnnouncementComposerProps {
   open: boolean;
@@ -93,7 +93,7 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
   // it's removed, or the dialog closes) so they don't pile up.
   useEffect(() => {
     return () => {
-      if (imageState.kind === 'picked') URL.revokeObjectURL(imageState.src);
+      if (imageState.kind === 'picked') URL.revokeObjectURL(imageState.previewSrc);
     };
   }, [imageState]);
 
@@ -108,7 +108,7 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
       return;
     }
     setError('');
-    setImageState({ kind: 'picked', src: URL.createObjectURL(file) });
+    setImageState({ kind: 'picked', file, previewSrc: URL.createObjectURL(file) });
     setCrop({ x: 0, y: 0 });
     setZoom(1);
     setCroppedAreaPixels(null);
@@ -134,7 +134,7 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
         return;
       }
       try {
-        setPreviewImageUrl(await getCroppedImageDataUrl(imageState.src, croppedAreaPixels));
+        setPreviewImageUrl(await getCroppedImageDataUrl(imageState.file, croppedAreaPixels));
       } catch (err) {
         // Surface the real message where we have one (e.g. the SecurityError
         // case in lib/image-crop.ts) instead of a generic string that hides
@@ -226,7 +226,7 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
               <div className="flex flex-col gap-2">
                 <div className="relative h-56 w-full overflow-hidden rounded-xl bg-gray-900">
                   <Cropper
-                    image={imageState.kind === 'picked' ? imageState.src : imageState.url}
+                    image={imageState.kind === 'picked' ? imageState.previewSrc : imageState.url}
                     crop={crop}
                     zoom={zoom}
                     aspect={CROP_ASPECT}

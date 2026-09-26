@@ -21,23 +21,30 @@ function loadImage(src: string): Promise<HTMLImageElement> {
    the difference between working here and in react-easy-crop's own <img>
    (which only *displays* the photo, a cheaper operation than the full
    getImageData-capable decode a canvas draw needs). createImageBitmap
-   decodes directly off the Blob without that intermediate <img>, handles
-   much larger sources, and — critically — throws a real Error with an
-   actual message on failure instead of a bare Event, so a genuine decode
-   failure is now distinguishable from every other cause. Falls back to the
-   <img> path for the rare browser without createImageBitmap support. */
-async function loadDrawable(src: string): Promise<CanvasImageSource> {
+   decodes directly off a Blob without that intermediate <img>, handles much
+   larger sources, and — critically — throws a real Error with an actual
+   message on failure instead of a bare Event.
+   When the source is already a Blob/File (the common case: a just-picked
+   local file), it's passed straight through — no need to round-trip it
+   through a blob: URL + fetch() first, which is its own source of flaky
+   failures (fetch() against blob: URLs is unreliable on some browser
+   versions, and was itself the cause of a "Failed to fetch" regression
+   here). A string source (e.g. an existing image's data: URI) is fetched
+   into a Blob first, since data: URIs don't share that same fragility.
+   Falls back to the <img> path for the rare browser without
+   createImageBitmap support. */
+async function loadDrawable(source: Blob | string): Promise<CanvasImageSource> {
   let bitmapFailure: unknown;
   if (typeof createImageBitmap === 'function') {
     try {
-      const blob = await (await fetch(src)).blob();
+      const blob = source instanceof Blob ? source : await (await fetch(source)).blob();
       return await createImageBitmap(blob, { imageOrientation: 'from-image' });
     } catch (err) {
       bitmapFailure = err;
     }
   }
   try {
-    return await loadImage(src);
+    return await loadImage(source instanceof Blob ? URL.createObjectURL(source) : source);
   } catch {
     throw bitmapFailure instanceof Error
       ? bitmapFailure
@@ -51,7 +58,7 @@ async function loadDrawable(src: string): Promise<CanvasImageSource> {
    Downscales to maxDimension on the longest side and compresses via
    `quality` so a full-resolution phone photo doesn't blow past that cap. */
 export async function getCroppedImageDataUrl(
-  imageSrc: string,
+  imageSrc: Blob | string,
   croppedAreaPixels: Area,
   maxDimension = 1600,
   quality = 0.85
