@@ -17,13 +17,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
-import FormDialog, {
-  type FieldDef,
-  type FieldPayload,
-  type FieldValues,
-} from '@/components/dialogs/FormDialog';
+import FormDialog, { type FieldDef } from '@/components/dialogs/FormDialog';
 import { createAnnouncement } from '@/services/announcements-api';
-import { createTask } from '@/services/tasks-api';
 import { getProfile } from '@/services/auth-api';
 import { getDirectory } from '@/services/users-api';
 import type { DirectoryUser } from '@/types/directory';
@@ -31,6 +26,7 @@ import { PORT_OPTIONS } from '@/lib/ports';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
 import AnnouncementComposer from '@/components/announcements/AnnouncementComposer';
 import EventComposer from '@/components/calendar/EventComposer';
+import TaskComposer from '@/components/TaskComposer';
 
 interface NewItemDialogProps {
   open: boolean;
@@ -241,61 +237,6 @@ const requestTypes: {
   },
 ];
 
-
-/* Assignment is one-of, so the toggle picks the target and only that control
-   follows — showing a port dropdown and a person box side by side read as
-   "both". `assignee` is a real member picker fed by GET /users (the
-   directory) rather than free text, since the backend needs an actual user
-   id, not a typed name. */
-function taskForm(values: FieldValues, directory: DirectoryUser[]): FieldDef[] {
-  const target: FieldDef[] =
-    values.assignTo === 'port'
-      ? [
-          {
-            kind: 'select',
-            name: 'port',
-            label: 'Which port',
-            placeholder: 'Select a port...',
-            options: PORT_OPTIONS,
-            required: true,
-          },
-        ]
-      : values.assignTo === 'person'
-        ? [
-            {
-              kind: 'select',
-              name: 'assignee',
-              label: 'Who',
-              placeholder: 'Select a member...',
-              options: directory.map((u) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` })),
-              required: true,
-            },
-          ]
-        : [];
-
-  return [
-    { kind: 'text', name: 'name', label: 'Task name', required: true, span: 'half' },
-    { kind: 'datetime', name: 'dueAt', label: 'Due date and time', required: true, span: 'half' },
-    {
-      kind: 'segmented',
-      name: 'assignTo',
-      label: 'Assign to',
-      required: true,
-      options: [
-        { value: 'me', label: 'Just me' },
-        { value: 'port', label: 'A port' },
-        { value: 'person', label: 'A person' },
-      ],
-    },
-    ...target,
-    { kind: 'textarea', name: 'description', label: 'Description' },
-  ];
-}
-
-type FormView = Exclude<View, 'chooser' | 'request-list'>;
-
-const TASK_FORM_META = { title: 'New task', submitLabel: 'Add task' };
-
 export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   const router = useRouter();
   const [view, setView] = useState<View>('chooser');
@@ -341,32 +282,6 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
 
     window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
   }
-
-  async function handleCreateTask(payload: FieldPayload) {
-    const token = sessionStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    await createTask(token, {
-      title: payload.name as string,
-      description: payload.description as string | undefined,
-      dueDate: payload.dueAt as string | undefined,
-      assignTo: payload.assignTo as 'me' | 'port' | 'person',
-      port: payload.port as string | undefined,
-      assigneeId: payload.assignee ? Number(payload.assignee) : undefined,
-    });
-
-    window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
-  }
-
-  /* Requests still have no backend route mounted, so its submit stays
-     disabled. Neither announcement nor event are here — neither goes
-     through FormDialog (see AnnouncementComposer / EventComposer). */
-  const onSubmit: Partial<Record<Exclude<FormView, 'announcement' | 'event'>, (payload: FieldPayload) => Promise<void>>> = {
-    task: handleCreateTask,
-  };
 
   /* A chosen request type's own form. Which type it is lives in state rather
      than in the payload now that the selector is gone — whoever wires the
@@ -437,24 +352,15 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     );
   }
 
-  if (view !== 'chooser') {
-    const form =
-      view === 'task'
-        ? { ...TASK_FORM_META, fields: (values: FieldValues) => taskForm(values, directory) }
-        : undefined;
-    if (!form) return null;
+  // Bespoke for the same reason as the two above — attaching a file needs a
+  // real async Drive upload, which FormDialog's declarative fields don't
+  // support (see TaskComposer).
+  if (view === 'task') {
+    return <TaskComposer open={open} directory={directory} onClose={onClose} />;
+  }
 
-    return (
-      <FormDialog
-        open={open}
-        title={form.title}
-        submitLabel={form.submitLabel}
-        fields={form.fields}
-        onSubmit={onSubmit[view]}
-        onClose={onClose}
-        onBack={() => setView('chooser')}
-      />
-    );
+  if (view !== 'chooser') {
+    return null;
   }
 
   // "New announcement" only shows for director/executive/admin — everyone
