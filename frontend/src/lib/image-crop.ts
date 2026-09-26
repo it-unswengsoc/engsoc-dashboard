@@ -52,5 +52,18 @@ export async function getCroppedImageDataUrl(
     outputHeight
   );
 
-  return canvas.toDataURL('image/jpeg', quality);
+  try {
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch (err) {
+    // toDataURL is the one call in this pipeline that a browser extension or
+    // privacy setting can legitimately block (canvas fingerprinting
+    // protections throw here, e.g. some ad blockers / Brave-style guards) —
+    // surface that distinctly so it isn't mistaken for a real decode bug.
+    if (err instanceof DOMException && err.name === 'SecurityError') {
+      throw new Error(
+        'Your browser or an extension is blocking image export from this page (this is usually a privacy/ad-block feature) — try disabling extensions for this site, or use a different browser.'
+      );
+    }
+    throw err;
+  }
 }

@@ -135,8 +135,17 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
       }
       try {
         setPreviewImageUrl(await getCroppedImageDataUrl(imageState.src, croppedAreaPixels));
-      } catch {
-        setError('Failed to process that image — try a different file.');
+      } catch (err) {
+        // Surface the real message where we have one (e.g. the SecurityError
+        // case in lib/image-crop.ts) instead of a generic string that hides
+        // what actually went wrong — this was making real, distinct failures
+        // indistinguishable from each other in the field.
+        console.error('Image crop failed:', err);
+        setError(
+          err instanceof Error && err.message
+            ? err.message
+            : 'Failed to process that image — try a different file.'
+        );
         return;
       }
     } else if (imageState.kind === 'unchanged') {
