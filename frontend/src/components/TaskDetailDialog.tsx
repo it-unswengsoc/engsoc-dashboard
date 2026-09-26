@@ -12,8 +12,7 @@ import {
   type TaskItem,
   type TaskAttachment,
 } from '@/services/tasks-api';
-import { getDriveDepartments, getDriveAccessToken, uploadDriveFile } from '@/services/documents-api';
-import type { DriveDepartment } from '@/types/documents';
+import DriveFilePicker, { type PickedAttachment } from '@/components/DriveFilePicker';
 
 export interface TaskDetailDialogProps {
   open: boolean;
@@ -22,19 +21,10 @@ export interface TaskDetailDialogProps {
   onCompletionChanged?: (id: number, completed: boolean) => void;
 }
 
-/* Attaching a file uploads straight to a Shared Drive's root the member
-   picks (reusing the exact upload dance documents-api.ts already has —
-   getDriveAccessToken + uploadDriveFile), then records the result against
-   this task. There's no folder browser here (unlike the Documents page) —
-   picking a department/drive is enough for a task attachment; anyone who
-   wants it organized further can move it in Drive itself afterwards. */
 export default function TaskDetailDialog({ open, taskId, onClose, onCompletionChanged }: TaskDetailDialogProps) {
   const [task, setTask] = useState<TaskItem | null>(null);
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
-  const [departments, setDepartments] = useState<DriveDepartment[]>([]);
-  const [driveId, setDriveId] = useState('');
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -45,13 +35,10 @@ export default function TaskDetailDialog({ open, taskId, onClose, onCompletionCh
     const token = sessionStorage.getItem('token');
     if (!token) return;
 
-    Promise.all([getTask(token, taskId), getTaskAttachments(token, taskId), getDriveDepartments(token)])
-      .then(([taskData, attachmentsData, { departments: depts }]) => {
+    Promise.all([getTask(token, taskId), getTaskAttachments(token, taskId)])
+      .then(([taskData, attachmentsData]) => {
         setTask(taskData);
         setAttachments(attachmentsData);
-        setDepartments(depts);
-        const firstDrive = depts.flatMap((d) => d.drives)[0];
-        if (firstDrive) setDriveId(firstDrive.id);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load task'))
       .finally(() => setLoading(false));
@@ -72,27 +59,17 @@ export default function TaskDetailDialog({ open, taskId, onClose, onCompletionCh
     }
   }
 
-  async function handleFilePicked(file: File | undefined) {
-    if (!file || !task || !driveId) return;
+  async function handleAttach(picked: PickedAttachment) {
+    if (!task) return;
     const token = sessionStorage.getItem('token');
     if (!token) return;
 
-    setUploading(true);
     setError('');
     try {
-      const { accessToken } = await getDriveAccessToken(token);
-      const uploaded = await uploadDriveFile(accessToken, driveId, undefined, file);
-      const attachment = await addTaskAttachment(token, task.id, {
-        driveFileId: uploaded.id,
-        name: uploaded.name,
-        webViewLink: uploaded.webViewLink,
-        mimeType: uploaded.mimeType,
-      });
+      const attachment = await addTaskAttachment(token, task.id, picked);
       setAttachments((prev) => [...prev, attachment]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to attach file');
-    } finally {
-      setUploading(false);
     }
   }
 
@@ -110,8 +87,6 @@ export default function TaskDetailDialog({ open, taskId, onClose, onCompletionCh
       setError(err instanceof Error ? err.message : 'Failed to remove attachment');
     }
   }
-
-  const drives = departments.flatMap((d) => d.drives.map((drive) => ({ ...drive, department: d.name })));
 
   return (
     <Dialog open={open} title="Task" size="md" onClose={onClose}>
@@ -185,34 +160,7 @@ export default function TaskDetailDialog({ open, taskId, onClose, onCompletionCh
                 </div>
               ))}
 
-              {drives.length > 0 ? (
-                <div className="mt-1 flex items-center gap-2">
-                  <select
-                    value={driveId}
-                    onChange={(e) => setDriveId(e.target.value)}
-                    className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700"
-                  >
-                    {drives.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.department} / {d.name}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="cursor-pointer rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-[#3D6C94] transition-colors hover:bg-gray-50">
-                    {uploading ? 'Uploading…' : 'Attach a file'}
-                    <input
-                      type="file"
-                      className="hidden"
-                      disabled={uploading}
-                      onChange={(e) => handleFilePicked(e.target.files?.[0])}
-                    />
-                  </label>
-                </div>
-              ) : (
-                <p className="font-mono text-xs text-gray-400">
-                  Connect Google Drive (sign out and back in with Google) to attach files.
-                </p>
-              )}
+              <DriveFilePicker onAttach={handleAttach} />
             </div>
           </>
         )}
