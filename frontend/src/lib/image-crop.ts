@@ -46,9 +46,15 @@ async function loadDrawable(source: Blob | string): Promise<CanvasImageSource> {
   try {
     return await loadImage(source instanceof Blob ? URL.createObjectURL(source) : source);
   } catch {
-    throw bitmapFailure instanceof Error
-      ? bitmapFailure
-      : new Error('This photo could not be decoded by your browser — try a different file, or a smaller/re-saved copy of it.');
+    // Both decode paths failed — the file itself isn't a format this browser
+    // can decode as an image at all (a RAW camera format, a HEIC that slipped
+    // past the extension/MIME check, or a genuinely corrupt file). Lead with
+    // the actionable fix rather than the bare browser message, which reads
+    // as a bug report rather than something the user can act on.
+    const reason = bitmapFailure instanceof Error ? ` (${bitmapFailure.message})` : '';
+    throw new Error(
+      `This file isn't a photo format your browser can open${reason} — try re-saving it as a JPEG or PNG and uploading that instead.`
+    );
   }
 }
 

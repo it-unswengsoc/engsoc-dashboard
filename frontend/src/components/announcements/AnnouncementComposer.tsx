@@ -23,6 +23,20 @@ const MAX_IMAGE_MB = 15;
 // iPhones save photos in this format by default, so this is the single most
 // likely reason "picking a photo" silently does nothing.
 const UNSUPPORTED_IMAGE_TYPES = ['image/heic', 'image/heif'];
+// file.type is populated from the OS/browser's own MIME detection, which is
+// unreliable for HEIC specifically — some Android gallery/file pickers hand
+// back an empty string or a generic type for a HEIC file instead of
+// 'image/heic', letting it slip past the check above straight into a
+// browser decode failure ("The source image could not be decoded") instead
+// of this clear message. The extension is a cheap, reliable backstop.
+const UNSUPPORTED_IMAGE_EXTENSIONS = ['.heic', '.heif'];
+
+function hasUnsupportedImageFormat(file: File): boolean {
+  return (
+    UNSUPPORTED_IMAGE_TYPES.includes(file.type) ||
+    UNSUPPORTED_IMAGE_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))
+  );
+}
 
 type ImageState =
   | { kind: 'none' }
@@ -99,7 +113,7 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
 
   function handlePickFile(file: File | undefined) {
     if (!file) return;
-    if (UNSUPPORTED_IMAGE_TYPES.includes(file.type)) {
+    if (hasUnsupportedImageFormat(file)) {
       setError("HEIC/HEIF photos aren't supported by browsers yet — try saving it as a JPEG or PNG first.");
       return;
     }
