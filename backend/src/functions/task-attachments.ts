@@ -5,7 +5,7 @@ import {
   dbDeleteTaskAttachment,
   type TaskAttachment,
 } from '../database/task-attachments';
-import { dbGetTaskById } from '../database/tasks';
+import { dbGetTaskById, dbIsTaskAssignee } from '../database/tasks';
 import { isUserAdmin } from './admin';
 import { ForbiddenTaskError } from './tasks';
 
@@ -14,7 +14,7 @@ export type { TaskAttachment };
 async function canAccessTask(taskId: number, userId: number): Promise<boolean> {
   const task = await dbGetTaskById(taskId);
   if (!task) return false;
-  if (task.assignedTo === userId) return true;
+  if (await dbIsTaskAssignee(taskId, userId)) return true;
   return isUserAdmin(userId);
 }
 

@@ -111,7 +111,6 @@ CREATE TABLE tasks (
   title VARCHAR(255) NOT NULL,
   description TEXT,
   assigned_by INTEGER,
-  assigned_to INTEGER NOT NULL,
   event_id INTEGER,
   status task_status DEFAULT 'pending',
   due_date TIMESTAMP,
@@ -119,8 +118,33 @@ CREATE TABLE tasks (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   completed_at TIMESTAMP,
   FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
-  FOREIGN KEY (assigned_to) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+);
+
+-- ============================================================
+-- TASK ASSIGNEES
+-- A task is one shared card with any number of assignees — one person,
+-- several, or everyone in a port (snapshotted at creation, so someone who
+-- joins the port later isn't added). Any assignee can move it, and it's in
+-- each of their "My tasks". A port's board is every task with at least one
+-- assignee currently in that port (see backend/src/database/tasks.ts).
+--
+-- To pick this up on a database that still has tasks.assigned_to, migrate
+-- in place instead of resetting:
+--   CREATE TABLE task_assignees (...as below...);
+--   CREATE INDEX idx_task_assignees_user_id ON task_assignees(user_id);
+--   INSERT INTO task_assignees (task_id, user_id) SELECT id, assigned_to FROM tasks;
+--   DROP INDEX idx_tasks_assigned_to;
+--   ALTER TABLE tasks DROP COLUMN assigned_to;
+-- Tasks that were fanned out to a port under the old one-row-per-member
+-- model stay as separate cards — there's nothing recorded to regroup them by.
+-- ============================================================
+CREATE TABLE task_assignees (
+  task_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  PRIMARY KEY (task_id, user_id),
+  FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -291,7 +315,7 @@ CREATE INDEX idx_events_type ON events(event_type);
 CREATE INDEX idx_event_attendees_user_id ON event_attendees(user_id);
 CREATE INDEX idx_event_attendees_event_id ON event_attendees(event_id);
 
-CREATE INDEX idx_tasks_assigned_to ON tasks(assigned_to);
+CREATE INDEX idx_task_assignees_user_id ON task_assignees(user_id);
 CREATE INDEX idx_tasks_assigned_by ON tasks(assigned_by);
 CREATE INDEX idx_tasks_status ON tasks(status);
 CREATE INDEX idx_tasks_event_id ON tasks(event_id);

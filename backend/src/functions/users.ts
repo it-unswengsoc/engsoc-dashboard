@@ -52,3 +52,9 @@ export async function getUserRole(userId: number): Promise<AuthorRole | null> {
   const result: QueryResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
   return result.rows[0]?.role ?? null;
 }
+
+/** The user's current port, or null if they haven't been given one yet. */
+export async function getUserPort(userId: number): Promise<string | null> {
+  const result: QueryResult = await pool.query('SELECT port FROM users WHERE id = $1', [userId]);
+  return result.rows[0]?.port ?? null;
+}
