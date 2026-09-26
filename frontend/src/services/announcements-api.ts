@@ -69,6 +69,25 @@ export async function updateAnnouncement(
   return data.data as AnnouncementItem;
 }
 
+/* Author or admin only — the backend enforces this (403s otherwise); the
+   frontend only offers Delete when it already knows that's true (see
+   AnnouncementRow). */
+export async function deleteAnnouncement(token: string, announcementId: number): Promise<void> {
+  if (USE_MOCK) {
+    const { deleteAnnouncement: mockDeleteAnnouncement } = await import('@/mocks/functions/announcements');
+    return mockDeleteAnnouncement(announcementId);
+  }
+
+  const res = await fetch(apiUrl(`/announcements/${announcementId}`), {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || 'Failed to delete announcement');
+  }
+}
+
 export async function likeAnnouncement(token: string, announcementId: number): Promise<AnnouncementItem> {
   if (USE_MOCK) {
     const { likeAnnouncement: mockLike } = await import('@/mocks/functions/announcements');

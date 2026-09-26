@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Heart, MessageCircle, Pencil } from 'lucide-react';
+import { Heart, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import type { AnnouncementItem, AnnouncementComment } from '@/types/announcements';
 import {
   likeAnnouncement,
@@ -10,6 +10,7 @@ import {
   getComments,
   addComment,
   updateAnnouncement,
+  deleteAnnouncement,
 } from '@/services/announcements-api';
 import { getDirectory } from '@/services/users-api';
 import { getProfile } from '@/services/auth-api';
@@ -19,6 +20,7 @@ import { roleLabel } from '@/lib/roles';
 import MentionText from '@/components/MentionText';
 import MentionTextarea from '@/components/MentionTextarea';
 import AnnouncementComposer from '@/components/announcements/AnnouncementComposer';
+import Dialog from '@/components/dialogs/Dialog';
 
 function initialsOf(name: string | null): string {
   if (!name) return '?';
@@ -35,6 +37,118 @@ function timeAgo(iso: string): string {
   const days = Math.round(hours / 24);
   if (days < 7) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
   return new Date(iso).toLocaleDateString();
+}
+
+function PostMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative shrink-0">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-label="Post options"
+        className="rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-600"
+      >
+        <MoreVertical className="h-4 w-4" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-20 mt-1 w-36 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
+          <button
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-bold text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            <Pencil className="h-3.5 w-3.5 text-[#3D6C94]" />
+            Edit
+          </button>
+          <button
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm font-bold text-[#8B2E38] transition-colors hover:bg-[#F1C4C9]/30"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConfirmDeleteDialog({
+  open,
+  onConfirm,
+  onClose,
+}: {
+  open: boolean;
+  onConfirm: () => Promise<void>;
+  onClose: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleConfirm() {
+    if (submitting) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} title="Delete announcement" size="sm" onClose={onClose}>
+      <div className="mt-5 flex flex-col gap-4">
+        <p className="text-sm text-gray-600">
+          This can&apos;t be undone — the post, its likes and its comments will all be gone for everyone.
+        </p>
+
+        {error && (
+          <p role="alert" className="text-xs font-bold text-[#ED6672]">
+            {error}
+          </p>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-gray-200 py-2.5 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={submitting}
+            className="flex-1 rounded-xl bg-[#8B2E38] py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#792636] hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
 }
 
 function CommentComposer({
@@ -65,7 +179,7 @@ function CommentComposer({
         value={value}
         onChange={setValue}
         directory={directory}
-        rows={1}
+        rows={3}
         placeholder="Write a comment... @Name or @Portfolio to tag someone"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
@@ -86,7 +200,11 @@ function CommentComposer({
   );
 }
 
-export default function AnnouncementRow(announcement: AnnouncementItem) {
+interface AnnouncementRowProps extends AnnouncementItem {
+  onDeleted?: (id: number) => void;
+}
+
+export default function AnnouncementRow({ onDeleted, ...announcement }: AnnouncementRowProps) {
   const router = useRouter();
   const { id, authorId, authorName, authorRole, createdAt } = announcement;
 
@@ -105,6 +223,7 @@ export default function AnnouncementRow(announcement: AnnouncementItem) {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
@@ -177,6 +296,16 @@ export default function AnnouncementRow(announcement: AnnouncementItem) {
     setImageUrl(updated.imageUrl);
   }
 
+  async function handleDelete() {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    await deleteAnnouncement(token, id);
+    onDeleted?.(id);
+  }
+
   const canEdit = profile !== null && (profile.id === authorId || profile.role === 'admin');
 
   return (
@@ -193,15 +322,7 @@ export default function AnnouncementRow(announcement: AnnouncementItem) {
           </p>
           <p className="font-mono text-[10px] text-gray-400">{timeAgo(createdAt)}</p>
         </div>
-        {canEdit && (
-          <button
-            onClick={() => setEditing(true)}
-            aria-label="Edit announcement"
-            className="shrink-0 rounded-lg p-1.5 text-gray-300 transition-colors hover:bg-gray-100 hover:text-gray-600"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-        )}
+        {canEdit && <PostMenu onEdit={() => setEditing(true)} onDelete={() => setDeleting(true)} />}
       </div>
 
       {/* Announcement image */}
@@ -276,6 +397,8 @@ export default function AnnouncementRow(announcement: AnnouncementItem) {
         onSubmit={handleEditSubmit}
         onClose={() => setEditing(false)}
       />
+
+      <ConfirmDeleteDialog open={deleting} onConfirm={handleDelete} onClose={() => setDeleting(false)} />
     </div>
   );
 }

@@ -49,6 +49,13 @@ export async function updateAnnouncement(
   return announcement;
 }
 
+export async function deleteAnnouncement(announcementId: number): Promise<void> {
+  const index = mockAnnouncements.findIndex((a) => a.id === announcementId);
+  if (index === -1) throw new Error('Announcement not found');
+  mockAnnouncements.splice(index, 1);
+  delete mockComments[announcementId];
+}
+
 export async function likeAnnouncement(announcementId: number): Promise<AnnouncementItem> {
   const announcement = mockAnnouncements.find((a) => a.id === announcementId);
   if (!announcement) throw new Error('Announcement not found');

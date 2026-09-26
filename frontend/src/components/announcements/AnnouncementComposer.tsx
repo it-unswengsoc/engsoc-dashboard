@@ -14,7 +14,15 @@ import { roleLabel } from '@/lib/roles';
 import { getCroppedImageDataUrl } from '@/lib/image-crop';
 
 const CROP_ASPECT = 16 / 9;
-const MAX_IMAGE_MB = 2;
+// The *picked* file, before cropping — the final upload is a separately
+// downscaled/compressed JPEG (see lib/image-crop.ts), so this only needs to
+// be generous enough for an un-edited phone photo, not the actual upload cap.
+const MAX_IMAGE_MB = 15;
+// Browsers (outside recent Safari) can't decode HEIC/HEIF at all — an <img>
+// or <canvas> given one just renders nothing, with no error to catch. Most
+// iPhones save photos in this format by default, so this is the single most
+// likely reason "picking a photo" silently does nothing.
+const UNSUPPORTED_IMAGE_TYPES = ['image/heic', 'image/heif'];
 
 type ImageState =
   | { kind: 'none' }
@@ -91,6 +99,10 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
 
   function handlePickFile(file: File | undefined) {
     if (!file) return;
+    if (UNSUPPORTED_IMAGE_TYPES.includes(file.type)) {
+      setError("HEIC/HEIF photos aren't supported by browsers yet — try saving it as a JPEG or PNG first.");
+      return;
+    }
     if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
       setError(`Image is too large — max ${MAX_IMAGE_MB}MB`);
       return;
