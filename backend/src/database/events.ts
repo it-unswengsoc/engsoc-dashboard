@@ -179,3 +179,22 @@ export async function dbSetGoogleCalendarEventId(
     eventId,
   ]);
 }
+
+/**
+ * Resolves a batch of shared-calendar Google event IDs back to their
+ * Postgres event IDs in one query — used when listing a member's own Google
+ * Calendar events so a shared/official event they see there can link back
+ * to its real Postgres row (and route edits through the official /events
+ * flow instead of a plain personal-calendar write).
+ */
+export async function dbGetEventIdsByGoogleCalendarEventIds(
+  googleCalendarEventIds: string[]
+): Promise<Map<string, number>> {
+  if (googleCalendarEventIds.length === 0) return new Map();
+
+  const result: QueryResult = await pool.query(
+    `SELECT id, google_calendar_event_id FROM events WHERE google_calendar_event_id = ANY($1)`,
+    [googleCalendarEventIds]
+  );
+  return new Map(result.rows.map((row) => [row.google_calendar_event_id as string, row.id as number]));
+}

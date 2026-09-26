@@ -1,4 +1,5 @@
 import { google, calendar_v3 } from 'googleapis';
+import { dbGetEventIdsByGoogleCalendarEventIds } from '../database/events';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
@@ -20,7 +21,28 @@ export interface UserCalendarEvent {
   // lets the dashboard tell "official" events apart from personal ones.
   isSharedEngSocEvent: boolean;
   htmlLink: string | null;
+  // True when the member owns (or can write to) the calendar this event
+  // lives on, AND it isn't the shared EngSoc calendar — shared events are
+  // only ever editable through the official Postgres-backed /events flow,
+  // to keep Postgres as the source of truth for anything official.
+  canEdit: boolean;
+  // For a shared EngSoc event, the Postgres events.id it was mirrored from
+  // (resolved via events.google_calendar_event_id) — lets the frontend route
+  // an edit on a shared item to PUT /events/:id instead of a personal write.
+  // Null for personal events, or if the lookup didn't find a match.
+  officialEventId: number | null;
 }
+
+export interface CreateUserCalendarEventInput {
+  title: string;
+  description?: string | null;
+  location?: string | null;
+  startsAt: string; // ISO datetime, or a date-only string ("2026-10-01") when allDay
+  endsAt: string; // same shape as startsAt
+  allDay: boolean;
+}
+
+export type UpdateUserCalendarEventInput = Partial<CreateUserCalendarEventInput>;
 
 function getServiceCalendarClient(): calendar_v3.Calendar {
   const auth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
@@ -60,6 +82,7 @@ function toUserCalendarEvent(
   cal: calendar_v3.Schema$CalendarListEntry,
   sharedCalendarId: string | null
 ): UserCalendarEvent {
+  const isSharedEngSocEvent = !!sharedCalendarId && cal.id === sharedCalendarId;
   return {
     id: event.id!,
     title: event.summary || '(untitled event)',
@@ -69,8 +92,10 @@ function toUserCalendarEvent(
     endsAt: event.end?.dateTime || event.end?.date || null,
     allDay: !!event.start?.date,
     calendarName: cal.summaryOverride || cal.summary || 'Calendar',
-    isSharedEngSocEvent: !!sharedCalendarId && cal.id === sharedCalendarId,
+    isSharedEngSocEvent,
     htmlLink: event.htmlLink ?? null,
+    canEdit: !isSharedEngSocEvent && (cal.accessRole === 'owner' || cal.accessRole === 'writer'),
+    officialEventId: null, // filled in by getUserCalendarEvents once every shared event's id is known
   };
 }
 
@@ -124,5 +149,69 @@ export async function getUserCalendarEvents(
     })
   );
 
-  return perCalendar.flat().sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  const events = perCalendar.flat();
+
+  const sharedEventIds = events.filter((e) => e.isSharedEngSocEvent).map((e) => e.id);
+  const officialIdByGoogleId = await dbGetEventIdsByGoogleCalendarEventIds(sharedEventIds);
+  for (const event of events) {
+    if (event.isSharedEngSocEvent) {
+      event.officialEventId = officialIdByGoogleId.get(event.id) ?? null;
+    }
+  }
+
+  return events.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+}
+
+function toGoogleEventBody(input: CreateUserCalendarEventInput | UpdateUserCalendarEventInput): calendar_v3.Schema$Event {
+  const body: calendar_v3.Schema$Event = {};
+  if (input.title !== undefined) body.summary = input.title;
+  if (input.description !== undefined) body.description = input.description ?? undefined;
+  if (input.location !== undefined) body.location = input.location ?? undefined;
+  if (input.startsAt !== undefined) {
+    body.start = input.allDay ? { date: input.startsAt } : { dateTime: input.startsAt };
+  }
+  if (input.endsAt !== undefined) {
+    body.end = input.allDay ? { date: input.endsAt } : { dateTime: input.endsAt };
+  }
+  return body;
+}
+
+/**
+ * Creates a new event directly on the signed-in member's own primary Google
+ * Calendar, using their own stored refresh token — the scope requested at
+ * login (`https://www.googleapis.com/auth/calendar`) already covers this, no
+ * new consent needed. This is for personal events only; official EngSoc
+ * events stay Postgres-backed (see functions/events.ts + calendar-sync.ts).
+ */
+export async function createUserCalendarEvent(
+  refreshToken: string,
+  input: CreateUserCalendarEventInput
+): Promise<UserCalendarEvent> {
+  const calendar = getUserCalendarClient(refreshToken);
+  const res = await calendar.events.insert({
+    calendarId: 'primary',
+    requestBody: toGoogleEventBody(input),
+  });
+  return toUserCalendarEvent(res.data, { id: 'primary', summary: 'primary', accessRole: 'owner' }, null);
+}
+
+export async function updateUserCalendarEvent(
+  refreshToken: string,
+  googleEventId: string,
+  input: UpdateUserCalendarEventInput
+): Promise<UserCalendarEvent> {
+  const calendar = getUserCalendarClient(refreshToken);
+  // .patch (not .update) — .update replaces the whole event resource, which
+  // would blank out any field this partial input doesn't include.
+  const res = await calendar.events.patch({
+    calendarId: 'primary',
+    eventId: googleEventId,
+    requestBody: toGoogleEventBody(input),
+  });
+  return toUserCalendarEvent(res.data, { id: 'primary', summary: 'primary', accessRole: 'owner' }, null);
+}
+
+export async function deleteUserCalendarEvent(refreshToken: string, googleEventId: string): Promise<void> {
+  const calendar = getUserCalendarClient(refreshToken);
+  await calendar.events.delete({ calendarId: 'primary', eventId: googleEventId });
 }

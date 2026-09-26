@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import TaskRow from '@/components/TaskRow';
-import { CalendarContext } from './CalendarContext';
+import { CalendarContext, type ComposerPrefill } from './CalendarContext';
 import CalendarToolbar, { type CalendarView } from './CalendarToolbar';
 import CalendarItemDetail from './CalendarItemDetail';
+import EventComposer from './EventComposer';
+import { getProfile } from '@/services/auth-api';
 import {
   addDays,
   addMonths,
@@ -65,6 +67,19 @@ export default function CalendarShell({ children }: CalendarShellProps) {
   const [googleConnected, setGoogleConnected] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [composerPrefill, setComposerPrefill] = useState<ComposerPrefill | null>(null);
+  const [canCreateSharedEvent, setCanCreateSharedEvent] = useState(false);
+
+  // Director/executive/admin only — the backend enforces this too (403s
+  // otherwise on POST /events); fetched fresh on mount rather than cached,
+  // same reasoning as everywhere else this app checks role.
+  useEffect(() => {
+    const token = sessionStorage.getItem('token');
+    if (!token) return;
+    getProfile(token)
+      .then((p) => setCanCreateSharedEvent(p.role === 'director' || p.role === 'executive' || p.role === 'admin'))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,7 +141,23 @@ export default function CalendarShell({ children }: CalendarShellProps) {
   const title = useMemo(() => formatTitle(anchor, view), [anchor, view]);
 
   return (
-    <CalendarContext.Provider value={{ items, anchor, setAnchor, selected, setSelected }}>
+    <CalendarContext.Provider
+      value={{
+        items,
+        anchor,
+        setAnchor,
+        selected,
+        setSelected,
+        canCreateSharedEvent,
+        openComposer: setComposerPrefill,
+      }}
+    >
+      <EventComposer
+        open={composerPrefill !== null}
+        prefill={composerPrefill}
+        canCreateSharedEvent={canCreateSharedEvent}
+        onClose={() => setComposerPrefill(null)}
+      />
       <div className="flex h-full justify-center gap-8">
         {/* MAIN CALENDAR */}
         <div className="flex h-full max-w-4xl flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">

@@ -6,7 +6,7 @@ import { useCalendarContext } from '@/components/calendar/CalendarContext';
 
 export default function CalendarMonthPage() {
   const router = useRouter();
-  const { items, anchor, setAnchor, setSelected } = useCalendarContext();
+  const { items, anchor, setAnchor, setSelected, openComposer } = useCalendarContext();
 
   return (
     <MonthView
@@ -17,6 +17,7 @@ export default function CalendarMonthPage() {
         setAnchor(day);
         router.push('/dashboard/calendar/day');
       }}
+      onCreateRange={(start, end) => openComposer({ mode: 'create', start, end, allDay: true })}
     />
   );
 }
