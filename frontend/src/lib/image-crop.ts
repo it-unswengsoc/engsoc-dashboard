@@ -5,9 +5,7 @@ import type { Area } from 'react-easy-crop';
    never a genuine cross-origin http(s) URL. Setting crossOrigin on an <img>
    requests CORS validation from the browser, which blob:/data: sources
    don't actually need and which some browser versions handle
-   inconsistently for blob: URLs specifically — it was causing this to fail
-   ("Failed to process that image") for photos that the Cropper component
-   itself (which sets no such attribute) displayed just fine. */
+   inconsistently for blob: URLs specifically. */
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -15,6 +13,36 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.onerror = reject;
     img.src = src;
   });
+}
+
+/* Decoding a full-resolution phone photo (many modern cameras shoot
+   40-100+ megapixels) straight into an <img> tag hits real, silent decode
+   limits on some browsers/devices — especially Android Chrome, where it's
+   the difference between working here and in react-easy-crop's own <img>
+   (which only *displays* the photo, a cheaper operation than the full
+   getImageData-capable decode a canvas draw needs). createImageBitmap
+   decodes directly off the Blob without that intermediate <img>, handles
+   much larger sources, and — critically — throws a real Error with an
+   actual message on failure instead of a bare Event, so a genuine decode
+   failure is now distinguishable from every other cause. Falls back to the
+   <img> path for the rare browser without createImageBitmap support. */
+async function loadDrawable(src: string): Promise<CanvasImageSource> {
+  let bitmapFailure: unknown;
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const blob = await (await fetch(src)).blob();
+      return await createImageBitmap(blob, { imageOrientation: 'from-image' });
+    } catch (err) {
+      bitmapFailure = err;
+    }
+  }
+  try {
+    return await loadImage(src);
+  } catch {
+    throw bitmapFailure instanceof Error
+      ? bitmapFailure
+      : new Error('This photo could not be decoded by your browser — try a different file, or a smaller/re-saved copy of it.');
+  }
 }
 
 /* Draws the cropped region onto a canvas and exports it as a JPEG data URI —
@@ -28,7 +56,7 @@ export async function getCroppedImageDataUrl(
   maxDimension = 1600,
   quality = 0.85
 ): Promise<string> {
-  const image = await loadImage(imageSrc);
+  const image = await loadDrawable(imageSrc);
 
   const scale = Math.min(1, maxDimension / Math.max(croppedAreaPixels.width, croppedAreaPixels.height));
   const outputWidth = Math.round(croppedAreaPixels.width * scale);
@@ -51,6 +79,8 @@ export async function getCroppedImageDataUrl(
     outputWidth,
     outputHeight
   );
+
+  if ('close' in image) image.close();
 
   try {
     return canvas.toDataURL('image/jpeg', quality);
