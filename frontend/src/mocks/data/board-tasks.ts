@@ -1,0 +1,108 @@
+import type { BoardTask } from '@/types/tasks';
+import { at } from '@/mocks/data/date-helpers';
+import { mockCurrentUser, mockMembers } from '@/mocks/data/members';
+
+const [riley, sam, alex, jordan, priya, dana] = mockMembers;
+
+/* The Publications port's board. Spread across all four task_status values,
+   with several on the current user so the "My tasks" filter has something to
+   narrow to, and due dates spanning overdue / this week / later. */
+export const mockBoardTasks: BoardTask[] = [
+  {
+    id: 1,
+    title: 'Shoot Careers Night',
+    description: 'Candids through the night plus group shots with sponsors before doors.',
+    status: 'pending',
+    assignedTo: riley,
+    assignedBy: sam,
+    port: 'publication',
+    dueAt: at(3, '18:00'),
+    requestTitle: 'Careers Night 2026',
+  },
+  {
+    id: 2,
+    title: 'Storyboard the sponsor reel',
+    description: 'Rough cut order before pulling last year’s footage.',
+    status: 'pending',
+    assignedTo: alex,
+    assignedBy: sam,
+    port: 'publication',
+    dueAt: at(6, '17:00'),
+    requestTitle: 'Sponsor reel for O-Week',
+  },
+  {
+    id: 3,
+    title: 'Book the studio for the handbook cover',
+    status: 'pending',
+    assignedTo: priya,
+    port: 'publication',
+    dueAt: at(12, '12:00'),
+  },
+  {
+    id: 4,
+    title: 'Edit trivia night photos',
+    description: 'Colour grade and cull to roughly 40 keepers.',
+    status: 'in_progress',
+    assignedTo: riley,
+    assignedBy: sam,
+    port: 'publication',
+    dueAt: at(-1, '19:00'),
+    requestTitle: 'Trivia night photos',
+  },
+  {
+    id: 5,
+    title: 'Cut the BBQ recap video',
+    status: 'in_progress',
+    assignedTo: jordan,
+    assignedBy: sam,
+    port: 'publication',
+    dueAt: at(2, '12:00'),
+    requestTitle: 'BESS x EngSoc BBQ',
+  },
+  {
+    id: 6,
+    title: 'Write alt text for the handbook spreads',
+    status: 'in_progress',
+    assignedTo: riley,
+    port: 'publication',
+    dueAt: at(9, '09:00'),
+  },
+  {
+    id: 7,
+    title: 'Export welcome week teaser',
+    description: 'Fifteen seconds, square and vertical crops.',
+    status: 'completed',
+    assignedTo: dana,
+    assignedBy: sam,
+    port: 'publication',
+    dueAt: at(-4, '09:00'),
+    requestTitle: 'Welcome week teaser',
+  },
+  {
+    id: 8,
+    title: 'Publish director applications recap',
+    status: 'completed',
+    assignedTo: alex,
+    port: 'publication',
+    dueAt: at(-8, '17:00'),
+    requestTitle: 'Director applications recap',
+  },
+  {
+    id: 9,
+    title: 'Archive last term’s raw footage',
+    status: 'completed',
+    assignedTo: riley,
+    port: 'publication',
+    dueAt: at(-14, '16:00'),
+  },
+  {
+    id: 10,
+    title: 'Reshoot the handbook cover',
+    description: 'Dropped when the request was rejected — studio was double booked.',
+    status: 'cancelled',
+    assignedTo: priya,
+    assignedBy: mockCurrentUser,
+    port: 'publication',
+    requestTitle: 'Handbook cover shoot',
+  },
+];
