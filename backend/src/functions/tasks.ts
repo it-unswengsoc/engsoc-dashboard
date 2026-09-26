@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { dbGetTasksForUser, dbGetTaskById, dbCreateTask, dbUpdateTaskStatus } from '../database/tasks';
 import { listDirectoryUsers } from './users';
 import { createNotificationsBulk } from './notifications';
+import { isUserAdmin } from './admin';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -134,6 +135,22 @@ export async function updateTaskStatus(taskId: number, userId: number, status: T
     throw new ForbiddenTaskError('You can only update your own tasks');
   }
   return dbUpdateTaskStatus(taskId, status);
+}
+
+/**
+ * Fetches a single task — assignee or admin only (there's no "tasks I've
+ * assigned to others" view yet, so the assigner can't reach this today;
+ * same restriction as updateTaskStatus, just also allowing admin). Throws
+ * ForbiddenTaskError if the requester isn't allowed to see it (caught by the
+ * route as a 403); returns null if the task doesn't exist at all.
+ */
+export async function getTaskById(taskId: number, userId: number): Promise<Task | null> {
+  const task = await dbGetTaskById(taskId);
+  if (!task) return null;
+  if (task.assignedTo !== userId && !(await isUserAdmin(userId))) {
+    throw new ForbiddenTaskError('You can only view your own tasks');
+  }
+  return task;
 }
 
 export default pool;

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateTaskStatus } from '@/services/tasks-api';
+import TaskDetailDialog from '@/components/TaskDetailDialog';
 
 interface TaskRowProps {
   id: number;
@@ -42,6 +43,7 @@ export default function TaskRow({ id, daysTillDue, name, dateString, time, compl
   const badge = getBadge(daysTillDue);
   const [done, setDone] = useState(completed);
   const [saving, setSaving] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   async function handleToggle(checked: boolean) {
     const token = sessionStorage.getItem('token');
@@ -91,13 +93,14 @@ export default function TaskRow({ id, daysTillDue, name, dateString, time, compl
 
       {/* Task details */}
       <div className="flex flex-col gap-0.5">
-        <p
-          className={`text-sm font-bold transition-colors ${
+        <button
+          onClick={() => setDetailOpen(true)}
+          className={`text-left text-sm font-bold transition-colors hover:underline ${
             done ? 'text-gray-400 line-through' : 'text-gray-900'
           }`}
         >
           {name}
-        </p>
+        </button>
         <div className="flex items-center gap-1.5">
           <span className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${badge.styles}`}>
             {badge.label}
@@ -109,6 +112,16 @@ export default function TaskRow({ id, daysTillDue, name, dateString, time, compl
           )}
         </div>
       </div>
+
+      <TaskDetailDialog
+        open={detailOpen}
+        taskId={id}
+        onClose={() => setDetailOpen(false)}
+        onCompletionChanged={(taskId, completed) => {
+          setDone(completed);
+          onToggled(taskId, completed);
+        }}
+      />
     </div>
   );
 }

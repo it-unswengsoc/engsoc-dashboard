@@ -12,6 +12,8 @@ export const mockEvents: EventItem[] = [
     location: null,
     description: null,
     capacity: null,
+    facebookUrl: null,
+    instagramUrl: null,
   },
   {
     id: 2,
@@ -23,6 +25,8 @@ export const mockEvents: EventItem[] = [
     location: null,
     description: null,
     capacity: null,
+    facebookUrl: null,
+    instagramUrl: null,
   },
   {
     id: 5,
@@ -34,6 +38,8 @@ export const mockEvents: EventItem[] = [
     location: null,
     description: null,
     capacity: null,
+    facebookUrl: null,
+    instagramUrl: null,
   },
   {
     id: 3,
@@ -45,6 +51,8 @@ export const mockEvents: EventItem[] = [
     location: null,
     description: null,
     capacity: null,
+    facebookUrl: null,
+    instagramUrl: null,
   },
   {
     id: 4,
@@ -56,6 +64,8 @@ export const mockEvents: EventItem[] = [
     location: null,
     description: null,
     capacity: null,
+    facebookUrl: null,
+    instagramUrl: null,
   },
   {
     id: 6,
@@ -67,5 +77,7 @@ export const mockEvents: EventItem[] = [
     location: null,
     description: null,
     capacity: null,
+    facebookUrl: null,
+    instagramUrl: null,
   },
 ];

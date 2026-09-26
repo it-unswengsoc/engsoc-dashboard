@@ -28,6 +28,7 @@ export async function createTask(input: CreateTaskInput): Promise<TaskItem[]> {
   const created: TaskItem[] = targets.map((id, i) => ({
     id: id + i,
     name: input.title,
+    description: input.description ?? null,
     dueAt: input.dueDate ?? null,
     completed: false,
   }));
@@ -40,5 +41,11 @@ export async function updateTaskStatus(taskId: number, status: 'pending' | 'comp
   const task = mockTasks.find((t) => t.id === taskId);
   if (!task) throw new Error('Task not found');
   task.completed = status === 'completed';
+  return task;
+}
+
+export async function getTask(taskId: number): Promise<TaskItem> {
+  const task = mockTasks.find((t) => t.id === taskId);
+  if (!task) throw new Error('Task not found');
   return task;
 }

@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import { itemColor, formatFullDate, formatTime, type CalendarItem } from '@/lib/calendar';
 import { useCalendarContext } from './CalendarContext';
+import EventDetailModal from './EventDetailModal';
+
+type EventItem = Extract<CalendarItem, { kind: 'event' }>;
 
 interface CalendarItemDetailProps {
   item: CalendarItem | null;
@@ -7,6 +11,7 @@ interface CalendarItemDetailProps {
 
 export default function CalendarItemDetail({ item }: CalendarItemDetailProps) {
   const { openComposer } = useCalendarContext();
+  const [detailOpen, setDetailOpen] = useState(false);
 
   if (!item) {
     return (
@@ -52,18 +57,27 @@ export default function CalendarItemDetail({ item }: CalendarItemDetailProps) {
 
         {item.kind === 'event' && (
           <div className="mt-4 flex gap-2">
-            <button className="flex-1 rounded-lg bg-[#ED6672] px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-[#d95a66]">
-              RSVP
-            </button>
             <button
-              onClick={() => openComposer({ mode: 'edit', item })}
-              className="flex-1 rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-gray-600 transition-colors hover:bg-gray-50"
+              onClick={() => setDetailOpen(true)}
+              className="flex-1 rounded-lg bg-[#B1C9DC] px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-[#9db8cd]"
             >
               Details
             </button>
           </div>
         )}
       </div>
+
+      {item.kind === 'event' && (
+        <EventDetailModal
+          open={detailOpen}
+          item={item}
+          onClose={() => setDetailOpen(false)}
+          onEdit={(eventItem: EventItem) => {
+            setDetailOpen(false);
+            openComposer({ mode: 'edit', item: eventItem });
+          }}
+        />
+      )}
     </div>
   );
 }

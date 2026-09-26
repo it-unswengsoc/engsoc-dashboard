@@ -8,6 +8,7 @@ import {
 } from '../functions/events';
 import { verifyAuthToken, requireRole } from './auth';
 import { isUserAdmin } from '../functions/admin';
+import { setRsvp, getRsvpSummary } from '../functions/rsvp';
 
 const router = Router();
 
@@ -84,7 +85,8 @@ router.get('/:eventId', async (req: Request, res: Response) => {
 router.post('/', verifyAuthToken, requireRole(['director', 'executive', 'admin']), async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const { title, description, imageUrl, eventType, startDate, endDate, location, capacity } = req.body;
+    const { title, description, imageUrl, eventType, startDate, endDate, location, capacity, facebookUrl, instagramUrl } =
+      req.body;
 
     if (!title || !startDate) {
       return res.status(400).json({
@@ -103,6 +105,8 @@ router.post('/', verifyAuthToken, requireRole(['director', 'executive', 'admin']
       location,
       organizerId: user.userId,
       capacity,
+      facebookUrl,
+      instagramUrl,
     });
 
     if (!event) {
@@ -152,7 +156,8 @@ router.put('/:eventId', verifyAuthToken, async (req: Request, res: Response) => 
       return res.status(403).json({ status: 'error', message: 'Only the organizer or an admin can edit this event' });
     }
 
-    const { title, description, imageUrl, eventType, startDate, endDate, location, status, capacity } = req.body;
+    const { title, description, imageUrl, eventType, startDate, endDate, location, status, capacity, facebookUrl, instagramUrl } =
+      req.body;
 
     const event = await updateEvent(eventId, {
       title,
@@ -164,6 +169,8 @@ router.put('/:eventId', verifyAuthToken, async (req: Request, res: Response) => 
       location,
       status,
       capacity,
+      facebookUrl,
+      instagramUrl,
     });
 
     if (!event) {
@@ -229,6 +236,51 @@ router.delete('/:eventId', verifyAuthToken, async (req: Request, res: Response) 
     res.status(500).json({
       status: 'error',
       message: 'Internal server error',
+    });
+  }
+});
+
+/**
+ * GET /events/:eventId/rsvp
+ * Who's going / not going, plus the signed-in member's own status.
+ */
+router.get('/:eventId/rsvp', verifyAuthToken, async (req: Request, res: Response) => {
+  try {
+    const eventId = parseInt(req.params.eventId);
+    const user = (req as any).user;
+    if (isNaN(eventId)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid event ID' });
+    }
+
+    const summary = await getRsvpSummary(eventId, user.userId);
+    res.status(200).json({ status: 'success', data: summary });
+  } catch (error) {
+    console.error('Get RSVP summary error:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error' });
+  }
+});
+
+/**
+ * PUT /events/:eventId/rsvp
+ * Records the signed-in member's own RSVP — any member can RSVP to any
+ * event (there's no invite list; see the comment on the events table).
+ */
+router.put('/:eventId/rsvp', verifyAuthToken, async (req: Request, res: Response) => {
+  try {
+    const eventId = parseInt(req.params.eventId);
+    const user = (req as any).user;
+    if (isNaN(eventId)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid event ID' });
+    }
+
+    await setRsvp(eventId, user.userId, req.body.status);
+    const summary = await getRsvpSummary(eventId, user.userId);
+    res.status(200).json({ status: 'success', data: summary });
+  } catch (error) {
+    console.error('Set RSVP error:', error);
+    res.status(400).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Failed to update RSVP',
     });
   }
 });

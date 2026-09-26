@@ -8,7 +8,8 @@ const pool = new Pool({
 });
 
 const EVENT_COLUMNS = `id, title, description, image_url, event_type, start_date, end_date,
-       location, organizer_id, status, capacity, google_calendar_event_id, created_at, updated_at`;
+       location, organizer_id, status, capacity, google_calendar_event_id, facebook_url,
+       instagram_url, created_at, updated_at`;
 
 /**
  * Maps a raw database row to the Event interface,
@@ -28,6 +29,8 @@ function rowToEvent(row: any): Event {
     status: row.status,
     capacity: row.capacity,
     googleCalendarEventId: row.google_calendar_event_id,
+    facebookUrl: row.facebook_url,
+    instagramUrl: row.instagram_url,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -64,8 +67,8 @@ export async function dbGetEventById(eventId: number): Promise<Event | null> {
 export async function dbCreateEvent(input: CreateEventInput): Promise<Event | null> {
   const result: QueryResult = await pool.query(
     `INSERT INTO events
-       (title, description, image_url, event_type, start_date, end_date, location, organizer_id, capacity, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+       (title, description, image_url, event_type, start_date, end_date, location, organizer_id, capacity, facebook_url, instagram_url, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
      RETURNING ${EVENT_COLUMNS}`,
     [
       input.title,
@@ -77,6 +80,8 @@ export async function dbCreateEvent(input: CreateEventInput): Promise<Event | nu
       input.location ?? null,
       input.organizerId,
       input.capacity ?? null,
+      input.facebookUrl ?? null,
+      input.instagramUrl ?? null,
     ]
   );
   if (result.rows.length === 0) return null;
@@ -131,6 +136,14 @@ export async function dbUpdateEvent(
   if (input.capacity !== undefined) {
     setClauses.push(`capacity = $${paramIndex++}`);
     values.push(input.capacity);
+  }
+  if (input.facebookUrl !== undefined) {
+    setClauses.push(`facebook_url = $${paramIndex++}`);
+    values.push(input.facebookUrl);
+  }
+  if (input.instagramUrl !== undefined) {
+    setClauses.push(`instagram_url = $${paramIndex++}`);
+    values.push(input.instagramUrl);
   }
 
   if (setClauses.length === 0) {

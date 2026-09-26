@@ -56,6 +56,8 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
   const [description, setDescription] = useState('');
   const [eventType, setEventType] = useState<'INTERNAL' | 'EXTERNAL'>('INTERNAL');
   const [capacity, setCapacity] = useState('');
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
   const [target, setTarget] = useState<'personal' | 'shared'>('personal');
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -84,6 +86,8 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
       setDescription('');
       setEventType('INTERNAL');
       setCapacity('');
+      setFacebookUrl('');
+      setInstagramUrl('');
       setTarget('personal');
       setCanEdit(true);
       return;
@@ -113,6 +117,8 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
           setLocation(official.location ?? '');
           setDescription(official.description ?? '');
           setCapacity(official.capacity !== null ? String(official.capacity) : '');
+          setFacebookUrl(official.facebookUrl ?? '');
+          setInstagramUrl(official.instagramUrl ?? '');
 
           const token = sessionStorage.getItem('token');
           if (!token) return;
@@ -131,6 +137,8 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
       setLocation(item.location ?? '');
       setDescription(item.description ?? '');
       setCapacity('');
+      setFacebookUrl('');
+      setInstagramUrl('');
       setCanEdit(item.canEdit);
     }
   }, [open, prefill]);
@@ -172,6 +180,8 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
           location: location.trim() || undefined,
           description: description.trim() || undefined,
           capacity: capacity.trim() ? Number(capacity) : undefined,
+          facebookUrl: facebookUrl.trim() || undefined,
+          instagramUrl: instagramUrl.trim() || undefined,
         };
         if (mode === 'edit' && editItem?.officialEventId) {
           await updateEvent(token, editItem.officialEventId, shared);
@@ -363,6 +373,28 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
                 min={1}
                 value={capacity}
                 onChange={(e) => setCapacity(e.target.value)}
+                className={inputStyles}
+                disabled={!canEdit}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className={labelStyles}>Facebook link</span>
+              <input
+                type="text"
+                value={facebookUrl}
+                onChange={(e) => setFacebookUrl(e.target.value)}
+                placeholder="https://facebook.com/events/..."
+                className={inputStyles}
+                disabled={!canEdit}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5">
+              <span className={labelStyles}>Instagram link</span>
+              <input
+                type="text"
+                value={instagramUrl}
+                onChange={(e) => setInstagramUrl(e.target.value)}
+                placeholder="https://instagram.com/p/..."
                 className={inputStyles}
                 disabled={!canEdit}
               />

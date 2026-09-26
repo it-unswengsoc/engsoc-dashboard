@@ -10,6 +10,7 @@ export type { TaskItem };
 interface RawTask {
   id: number;
   title: string;
+  description: string | null;
   dueDate: string | null;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
 }
@@ -18,6 +19,7 @@ function toTaskItem(raw: RawTask): TaskItem {
   return {
     id: raw.id,
     name: raw.title,
+    description: raw.description,
     dueAt: raw.dueDate,
     completed: raw.status === 'completed',
   };
@@ -38,6 +40,23 @@ export async function getTasks(token: string): Promise<TaskItem[]> {
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load tasks');
   return (data.data as RawTask[]).map(toTaskItem);
+}
+
+/* Backs the task detail dialog — assignee or admin only (backend 403s
+   otherwise). */
+export async function getTask(token: string, taskId: number): Promise<TaskItem> {
+  if (USE_MOCK) {
+    const { getTask: mockGetTask } = await import('@/mocks/functions/tasks');
+    return mockGetTask(taskId);
+  }
+
+  const res = await fetch(apiUrl(`/tasks/${taskId}`), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to load task');
+  return toTaskItem(data.data as RawTask);
 }
 
 export interface CreateTaskInput {
@@ -88,4 +107,76 @@ export async function updateTaskStatus(
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to update task');
   return toTaskItem(data.data as RawTask);
+}
+
+/* The file's bytes are never sent here — see documents-api.ts's
+   uploadDriveFile, which the task detail dialog calls first to actually
+   upload to Drive, then records the result with this. */
+export interface TaskAttachment {
+  id: number;
+  driveFileId: string;
+  name: string;
+  webViewLink: string | null;
+  mimeType: string | null;
+  createdAt: string;
+}
+
+interface RawTaskAttachment {
+  id: number;
+  driveFileId: string;
+  name: string;
+  webViewLink: string | null;
+  mimeType: string | null;
+  createdAt: string;
+}
+
+export async function getTaskAttachments(token: string, taskId: number): Promise<TaskAttachment[]> {
+  if (USE_MOCK) {
+    const { getTaskAttachments: mockGetTaskAttachments } = await import('@/mocks/functions/task-attachments');
+    return mockGetTaskAttachments(taskId);
+  }
+
+  const res = await fetch(apiUrl(`/tasks/${taskId}/attachments`), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to load attachments');
+  return data.data as RawTaskAttachment[];
+}
+
+export async function addTaskAttachment(
+  token: string,
+  taskId: number,
+  input: { driveFileId: string; name: string; webViewLink: string | null; mimeType: string | null }
+): Promise<TaskAttachment> {
+  if (USE_MOCK) {
+    const { addTaskAttachment: mockAddTaskAttachment } = await import('@/mocks/functions/task-attachments');
+    return mockAddTaskAttachment(taskId, input);
+  }
+
+  const res = await fetch(apiUrl(`/tasks/${taskId}/attachments`), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to add attachment');
+  return data.data as RawTaskAttachment;
+}
+
+export async function deleteTaskAttachment(token: string, taskId: number, attachmentId: number): Promise<void> {
+  if (USE_MOCK) {
+    const { deleteTaskAttachment: mockDeleteTaskAttachment } = await import('@/mocks/functions/task-attachments');
+    return mockDeleteTaskAttachment(attachmentId);
+  }
+
+  const res = await fetch(apiUrl(`/tasks/${taskId}/attachments/${attachmentId}`), {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || 'Failed to remove attachment');
+  }
 }

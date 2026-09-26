@@ -20,6 +20,8 @@ interface RawEvent {
   location: string | null;
   description: string | null;
   capacity: number | null;
+  facebookUrl: string | null;
+  instagramUrl: string | null;
 }
 
 function toEventItem(raw: RawEvent): EventItem {
@@ -33,6 +35,8 @@ function toEventItem(raw: RawEvent): EventItem {
     location: raw.location,
     description: raw.description,
     capacity: raw.capacity,
+    facebookUrl: raw.facebookUrl,
+    instagramUrl: raw.instagramUrl,
   };
 }
 
@@ -75,6 +79,8 @@ export interface CreateEventInput {
   location?: string;
   capacity?: number;
   description?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
 }
 
 export type UpdateEventInput = Partial<CreateEventInput>;
@@ -142,4 +148,51 @@ export async function deleteEvent(token: string, eventId: number): Promise<void>
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || 'Failed to delete event');
   }
+}
+
+export type RsvpStatus = 'going' | 'not_going';
+
+export interface RsvpEntry {
+  userId: number;
+  name: string;
+  status: RsvpStatus;
+}
+
+export interface RsvpSummary {
+  going: RsvpEntry[];
+  notGoing: RsvpEntry[];
+  myStatus: RsvpStatus | null;
+}
+
+/* Any member can RSVP to any event — there's no invite list (see the
+   comment on the events table). */
+export async function getRsvpSummary(token: string, eventId: number): Promise<RsvpSummary> {
+  if (USE_MOCK) {
+    const { getRsvpSummary: mockGetRsvpSummary } = await import('@/mocks/functions/events');
+    return mockGetRsvpSummary(eventId);
+  }
+
+  const res = await fetch(apiUrl(`/events/${eventId}/rsvp`), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to load RSVPs');
+  return data.data as RsvpSummary;
+}
+
+export async function setRsvp(token: string, eventId: number, status: RsvpStatus): Promise<RsvpSummary> {
+  if (USE_MOCK) {
+    const { setRsvp: mockSetRsvp } = await import('@/mocks/functions/events');
+    return mockSetRsvp(eventId, status);
+  }
+
+  const res = await fetch(apiUrl(`/events/${eventId}/rsvp`), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to update RSVP');
+  return data.data as RsvpSummary;
 }
