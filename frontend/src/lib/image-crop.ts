@@ -1,11 +1,18 @@
 import type { Area } from 'react-easy-crop';
 
+/* Every image this ever loads is either a blob: URL from a just-picked
+   local file or a data: URI from an already-stored announcement image —
+   never a genuine cross-origin http(s) URL. Setting crossOrigin on an <img>
+   requests CORS validation from the browser, which blob:/data: sources
+   don't actually need and which some browser versions handle
+   inconsistently for blob: URLs specifically — it was causing this to fail
+   ("Failed to process that image") for photos that the Cropper component
+   itself (which sets no such attribute) displayed just fine. */
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = reject;
-    img.crossOrigin = 'anonymous';
     img.src = src;
   });
 }
