@@ -1,7 +1,8 @@
-import type { TaskItem } from '@/types/tasks';
+import type { BoardTask, TaskItem } from '@/types/tasks';
 import type { CreateTaskInput } from '@/services/tasks-api';
 import { mockTasks } from '@/mocks/data/tasks';
 import { mockDirectory } from '@/mocks/data/users';
+import { mockBoardTasks } from '@/mocks/data/board-tasks';
 
 /* A copy, not the live mockTasks array — see mocks/functions/announcements.ts's
    getAnnouncements for why: callers hold this in React state and compare by
@@ -48,4 +49,10 @@ export async function getTask(taskId: number): Promise<TaskItem> {
   const task = mockTasks.find((t) => t.id === taskId);
   if (!task) throw new Error('Task not found');
   return task;
+}
+
+/* Filters on the port the real query will — see services/tasks-api.ts's
+   getBoardTasks. */
+export async function getBoardTasks(port: string): Promise<BoardTask[]> {
+  return mockBoardTasks.filter((task) => task.port === port);
 }

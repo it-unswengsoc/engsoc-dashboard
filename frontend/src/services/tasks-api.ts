@@ -1,9 +1,9 @@
-import type { TaskItem } from '@/types/tasks';
+import type { BoardTask, TaskItem } from '@/types/tasks';
 import { apiUrl } from '@/services/api-config';
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
-export type { TaskItem };
+export type { BoardTask, TaskItem };
 
 /* Shape the backend actually returns (backend/src/functions/tasks.ts's Task
    interface) — mapped to TaskItem below, same pattern as events-api.ts. */
@@ -179,4 +179,24 @@ export async function deleteTaskAttachment(token: string, taskId: number, attach
     const data = await res.json().catch(() => ({}));
     throw new Error(data.message || 'Failed to remove attachment');
   }
+}
+
+/* The board's fuller rows, for one port. Always mock for now: GET /tasks/mine
+   is scoped to the caller, and there's no port-wide query yet — the tasks
+   table has no port column, and a port-assigned task fans out into one row
+   per member (see backend/src/functions/tasks.ts), so a board over those
+   rows would show the same task once per assignee.
+
+   Going real means, in a later PR:
+     - backend: GET /tasks?port=… (plus a port column, or grouping the
+       fanned-out rows back into one card)
+     - here: a `token` param, the USE_MOCK branch like getTasks, and a
+       toBoardTask(raw) mapper beside toTaskItem — RawTask already carries
+       status and assignee/assigner ids and names
+     - the tasks page: a client component, since the token lives in
+       sessionStorage
+   The `port` param is already the seam, so callers won't change shape. */
+export async function getBoardTasks(port: string): Promise<BoardTask[]> {
+  const { getBoardTasks: mockGetBoardTasks } = await import('@/mocks/functions/tasks');
+  return mockGetBoardTasks(port);
 }

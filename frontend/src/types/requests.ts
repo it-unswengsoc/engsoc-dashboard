@@ -25,13 +25,9 @@ export interface RequestAnswer {
   value: string;
 }
 
-/* A person who can be assigned work. Stands in for a users listing — there's
-   no endpoint returning one yet. */
-export interface Member {
-  id: number;
-  name: string;
-  port: string;
-}
+import type { Member } from '@/types/members';
+
+export type { Member };
 
 export interface RequestDetail extends RequestItem {
   typeLabel: string; // "Event photo request"

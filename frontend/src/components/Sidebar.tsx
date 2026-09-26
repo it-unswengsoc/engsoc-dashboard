@@ -9,6 +9,7 @@ import {
   Calendar,
   FileText,
   Inbox,
+  KanbanSquare,
   ShieldCheck,
   LogOut,
   type LucideIcon,
@@ -20,6 +21,7 @@ const dashboardLinks: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Calendar", href: "/dashboard/calendar", icon: Calendar },
   { label: "Documents", href: "/dashboard/documents", icon: FileText },
   { label: "Requests", href: "/dashboard/requests", icon: Inbox },
+  { label: "Tasks", href: "/dashboard/tasks", icon: KanbanSquare },
 ];
 
 const adminLink = { label: "Admin", href: "/dashboard/admin", icon: ShieldCheck };
