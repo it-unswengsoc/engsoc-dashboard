@@ -83,6 +83,10 @@ export default function HomePage() {
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed } : t)));
   }
 
+  function handleAnnouncementDeleted(id: number) {
+    setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+  }
+
   if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
   if (error) return <p className="text-sm text-[#8B2E38]">{error}</p>;
 
@@ -126,7 +130,7 @@ export default function HomePage() {
           ) : (
             <StaggerReveal className="flex flex-col gap-4" replayKey={recentAnnouncements.length}>
               {recentAnnouncements.map((announcement) => (
-                <AnnouncementRow key={announcement.id} {...announcement} />
+                <AnnouncementRow key={announcement.id} {...announcement} onDeleted={handleAnnouncementDeleted} />
               ))}
             </StaggerReveal>
           )}
