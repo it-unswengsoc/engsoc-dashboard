@@ -4,7 +4,14 @@ import TimeGridView from '@/components/calendar/TimeGridView';
 import { useCalendarContext } from '@/components/calendar/CalendarContext';
 
 export default function CalendarDayPage() {
-  const { items, anchor, setSelected } = useCalendarContext();
+  const { items, anchor, setSelected, openComposer } = useCalendarContext();
 
-  return <TimeGridView days={[anchor]} items={items} onSelectItem={setSelected} />;
+  return (
+    <TimeGridView
+      days={[anchor]}
+      items={items}
+      onSelectItem={setSelected}
+      onCreateRange={(start, end) => openComposer({ mode: 'create', start, end, allDay: false })}
+    />
+  );
 }

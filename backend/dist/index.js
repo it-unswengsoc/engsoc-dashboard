@@ -34,6 +34,9 @@ const notifications_1 = __importDefault(require("./routes/notifications"));
 const drive_1 = __importDefault(require("./routes/drive"));
 const announcements_1 = __importDefault(require("./routes/announcements"));
 const calendar_1 = __importDefault(require("./routes/calendar"));
+const admin_1 = __importDefault(require("./routes/admin"));
+const users_1 = __importDefault(require("./routes/users"));
+const tasks_1 = __importDefault(require("./routes/tasks"));
 const app = (0, express_1.default)();
 // Frontend owns port 3000 by Next.js convention; this backend now runs as
 // its own standalone service (not routed through the frontend's domain
@@ -46,8 +49,14 @@ app.use((0, cors_1.default)({
     credentials: true,
 }));
 app.use((0, morgan_1.default)('dev'));
-app.use(express_1.default.json());
-app.use(express_1.default.urlencoded({ extended: true }));
+// Default body-parser limit is 100kb — comfortably enough for everything
+// except announcement images (functions/announcements.ts's
+// MAX_IMAGE_DATA_URI_LENGTH allows up to ~3MB of base64 there), which were
+// silently 413-ing here before that validation ever ran. Raised well past
+// that cap so the more precise, JSON-error-returning check in
+// createAnnouncement/updateAnnouncement is what actually enforces the limit.
+app.use(express_1.default.json({ limit: '10mb' }));
+app.use(express_1.default.urlencoded({ extended: true, limit: '10mb' }));
 // Routes — no /api prefix: this backend has its own domain now
 // (previously /api/backend/* routed here through the frontend's domain via
 // Vercel's "Services" feature, which never correctly packaged this
@@ -59,6 +68,9 @@ app.use('/notifications', notifications_1.default);
 app.use('/drive', drive_1.default);
 app.use('/announcements', announcements_1.default);
 app.use('/calendar', calendar_1.default);
+app.use('/admin', admin_1.default);
+app.use('/users', users_1.default);
+app.use('/tasks', tasks_1.default);
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.status(200).json({

@@ -65,7 +65,9 @@ export default function TasksBoard({ tasks, currentUser, port }: TasksBoardProps
       dueBadge(task.dueAt)?.label === 'Overdue',
   ).length;
 
-  /* Dropping only moves the card locally — there's no PATCH /tasks/:id. */
+  /* Dropping only moves the card locally for now. PATCH /tasks/:id exists but
+     only takes pending/completed until the backend accepts all four statuses.
+     Only the assignee can move a card, matching the backend's guard. */
   function moveTo(status: TaskStatus) {
     if (dragging === null) return;
     setBoard((prev) =>
@@ -167,13 +169,15 @@ export default function TasksBoard({ tasks, currentUser, port }: TasksBoardProps
                     return (
                       <article
                         key={task.id}
-                        draggable
+                        draggable={isMine}
                         onDragStart={() => setDragging(task.id)}
                         onDragEnd={() => {
                           setDragging(null);
                           setDragOver(null);
                         }}
-                        className={`cursor-grab rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-[#B1C9DC] hover:shadow-md active:cursor-grabbing ${
+                        className={`rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-[#B1C9DC] hover:shadow-md ${
+                          isMine ? 'cursor-grab active:cursor-grabbing' : ''
+                        } ${
                           dragging === task.id ? 'opacity-40' : ''
                         }`}
                       >

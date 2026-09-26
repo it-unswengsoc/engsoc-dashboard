@@ -247,11 +247,12 @@ export async function getUserProfile(userId: number): Promise<{
   firstName: string;
   lastName: string;
   role: string;
+  port: string | null;
   createdAt: string;
 } | null> {
   try {
     const result: QueryResult = await pool.query(
-      'SELECT id, email, first_name, last_name, role, created_at FROM users WHERE id = $1',
+      'SELECT id, email, first_name, last_name, role, port, created_at FROM users WHERE id = $1',
       [userId]
     );
 
@@ -266,6 +267,7 @@ export async function getUserProfile(userId: number): Promise<{
       firstName: user.first_name,
       lastName: user.last_name,
       role: user.role,
+      port: user.port,
       createdAt: user.created_at,
     };
   } catch (error) {

@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import TaskRow from '@/components/TaskRow';
-import { CalendarContext } from './CalendarContext';
+import { CalendarContext, type ComposerPrefill } from './CalendarContext';
 import CalendarToolbar, { type CalendarView } from './CalendarToolbar';
 import CalendarItemDetail from './CalendarItemDetail';
+import EventComposer from './EventComposer';
+import { getProfile } from '@/services/auth-api';
 import {
   addDays,
   addMonths,
@@ -13,15 +15,19 @@ import {
   startOfWeek,
   MONTHS_LONG,
   toGoogleCalendarItems,
+  toTaskCalendarItems,
   CALENDAR_EVENTS_CHANGED_EVENT,
   type CalendarItem,
 } from '@/lib/calendar';
-import type { TaskRowData } from '@/types/dashboard';
+import { toOpenTaskRows } from '@/services/dashboard';
 import { getMyCalendarEvents } from '@/services/user-calendar-api';
+import { getTasks } from '@/services/tasks-api';
+import type { TaskItem } from '@/types/tasks';
+import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
+
+const DUE_TASKS_LIMIT = 5;
 
 interface CalendarShellProps {
-  taskItems: CalendarItem[];
-  dueTasks: TaskRowData[];
   children: React.ReactNode;
 }
 
@@ -50,7 +56,7 @@ function formatTitle(anchor: Date, view: CalendarView): string {
   return `${MONTHS_LONG[anchor.getMonth()]} ${anchor.getFullYear()}`;
 }
 
-export default function CalendarShell({ taskItems, dueTasks, children }: CalendarShellProps) {
+export default function CalendarShell({ children }: CalendarShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const view = viewFromPathname(pathname);
@@ -60,6 +66,20 @@ export default function CalendarShell({ taskItems, dueTasks, children }: Calenda
   const [eventItems, setEventItems] = useState<CalendarItem[]>([]);
   const [googleConnected, setGoogleConnected] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [composerPrefill, setComposerPrefill] = useState<ComposerPrefill | null>(null);
+  const [canCreateSharedEvent, setCanCreateSharedEvent] = useState(false);
+
+  // Director/executive/admin only — the backend enforces this too (403s
+  // otherwise on POST /events); fetched fresh on mount rather than cached,
+  // same reasoning as everywhere else this app checks role.
+  useEffect(() => {
+    const token = sessionStorage.getItem('token');
+    if (!token) return;
+    getProfile(token)
+      .then((p) => setCanCreateSharedEvent(p.role === 'director' || p.role === 'executive' || p.role === 'admin'))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,12 +112,52 @@ export default function CalendarShell({ taskItems, dueTasks, children }: Calenda
     };
   }, [router]);
 
+  // Tasks carry per-user data, same reasoning as the dashboard page — fetched
+  // client-side with the signed-in member's own token, not passed down from
+  // a Server Component. Refetches on the same nudge the dashboard listens
+  // for, so creating/checking off a task anywhere stays in sync here too.
+  useEffect(() => {
+    function loadTasks() {
+      const token = sessionStorage.getItem('token');
+      if (!token) return;
+      getTasks(token).then(setTasks).catch(() => {});
+    }
+
+    loadTasks();
+    window.addEventListener(DASHBOARD_DATA_CHANGED_EVENT, loadTasks);
+    return () => window.removeEventListener(DASHBOARD_DATA_CHANGED_EVENT, loadTasks);
+  }, []);
+
+  function handleTaskToggled(id: number, completed: boolean) {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed } : t)));
+  }
+
+  const taskItems = useMemo(() => toTaskCalendarItems(tasks), [tasks]);
+  const dueTasks = useMemo(() => toOpenTaskRows(tasks, DUE_TASKS_LIMIT), [tasks]);
+  const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
+
   const items = useMemo(() => [...eventItems, ...taskItems], [eventItems, taskItems]);
 
   const title = useMemo(() => formatTitle(anchor, view), [anchor, view]);
 
   return (
-    <CalendarContext.Provider value={{ items, anchor, setAnchor, selected, setSelected }}>
+    <CalendarContext.Provider
+      value={{
+        items,
+        anchor,
+        setAnchor,
+        selected,
+        setSelected,
+        canCreateSharedEvent,
+        openComposer: setComposerPrefill,
+      }}
+    >
+      <EventComposer
+        open={composerPrefill !== null}
+        prefill={composerPrefill}
+        canCreateSharedEvent={canCreateSharedEvent}
+        onClose={() => setComposerPrefill(null)}
+      />
       <div className="flex h-full justify-center gap-8">
         {/* MAIN CALENDAR */}
         <div className="flex h-full max-w-4xl flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -133,7 +193,14 @@ export default function CalendarShell({ taskItems, dueTasks, children }: Calenda
               {dueTasks.length === 0 ? (
                 <p className="px-4 py-6 text-center font-mono text-xs text-gray-400">Nothing due — nice.</p>
               ) : (
-                dueTasks.map((task) => <TaskRow key={task.id} {...task} />)
+                dueTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    {...task}
+                    completed={taskById.get(task.id)?.completed ?? false}
+                    onToggled={handleTaskToggled}
+                  />
+                ))
               )}
             </div>
           </div>

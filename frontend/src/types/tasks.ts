@@ -5,7 +5,8 @@ import type { Member } from '@/types/members';
 export interface TaskItem {
   id: number;
   name: string;
-  dueAt: string; // ISO date string
+  description: string | null;
+  dueAt: string | null; // ISO date string; null if no due date was set
   completed: boolean;
 }
 

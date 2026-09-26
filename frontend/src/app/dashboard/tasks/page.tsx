@@ -7,7 +7,7 @@ import TasksBoard from '@/components/tasks/TasksBoard';
 const VIEWER_PORT = 'publication';
 
 export default async function TasksPage() {
-  const [tasks, currentUser] = await Promise.all([getBoardTasks(), getCurrentUser()]);
+  const [tasks, currentUser] = await Promise.all([getBoardTasks(VIEWER_PORT), getCurrentUser()]);
 
   return <TasksBoard tasks={tasks} currentUser={currentUser} port={VIEWER_PORT} />;
 }

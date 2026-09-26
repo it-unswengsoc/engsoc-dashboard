@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -10,9 +10,11 @@ import {
   FileText,
   Inbox,
   KanbanSquare,
+  ShieldCheck,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
+import { getProfile } from "@/services/auth-api";
 
 const dashboardLinks: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Home", href: "/dashboard", icon: Home },
@@ -22,10 +24,26 @@ const dashboardLinks: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Tasks", href: "/dashboard/tasks", icon: KanbanSquare },
 ];
 
+const adminLink = { label: "Admin", href: "/dashboard/admin", icon: ShieldCheck };
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Shown only for an admin — checked against the real role on every load
+  // rather than cached, so a role change (granted or revoked in the admin
+  // panel) is reflected the next time this member loads the dashboard.
+  useEffect(() => {
+    const token = sessionStorage.getItem("token");
+    if (!token) return;
+    getProfile(token)
+      .then((profile) => setIsAdmin(profile.role === "admin"))
+      .catch(() => setIsAdmin(false));
+  }, []);
+
+  const links = isAdmin ? [...dashboardLinks, adminLink] : dashboardLinks;
 
   function handleLogout() {
     sessionStorage.removeItem("token");
@@ -52,7 +70,7 @@ export default function Sidebar() {
 
       <nav className="flex flex-col flex-1 mt-2">
         <NavGroup
-          links={dashboardLinks}
+          links={links}
           pathname={pathname}
           collapsed={collapsed}
         />

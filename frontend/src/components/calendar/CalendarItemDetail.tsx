@@ -1,10 +1,18 @@
+import { useState } from 'react';
 import { itemColor, formatFullDate, formatTime, type CalendarItem } from '@/lib/calendar';
+import { useCalendarContext } from './CalendarContext';
+import EventDetailModal from './EventDetailModal';
+
+type EventItem = Extract<CalendarItem, { kind: 'event' }>;
 
 interface CalendarItemDetailProps {
   item: CalendarItem | null;
 }
 
 export default function CalendarItemDetail({ item }: CalendarItemDetailProps) {
+  const { openComposer } = useCalendarContext();
+  const [detailOpen, setDetailOpen] = useState(false);
+
   if (!item) {
     return (
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
@@ -33,23 +41,43 @@ export default function CalendarItemDetail({ item }: CalendarItemDetailProps) {
             <CalendarIcon />
             {formatFullDate(item.start)}
           </div>
-          <div className="flex items-center gap-2">
-            <ClockIcon />
-            {formatTime(item.start)}
-          </div>
+          {item.kind === 'event' && !item.allDay && (
+            <div className="flex items-center gap-2">
+              <ClockIcon />
+              {formatTime(item.start)}
+            </div>
+          )}
+          {item.kind === 'event' && item.location && (
+            <div className="flex items-center gap-2">
+              <LocationIcon />
+              {item.location}
+            </div>
+          )}
         </div>
 
         {item.kind === 'event' && (
           <div className="mt-4 flex gap-2">
-            <button className="flex-1 rounded-lg bg-[#ED6672] px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-[#d95a66]">
-              RSVP
-            </button>
-            <button className="flex-1 rounded-lg border border-gray-200 px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-gray-600 transition-colors hover:bg-gray-50">
+            <button
+              onClick={() => setDetailOpen(true)}
+              className="flex-1 rounded-lg bg-[#B1C9DC] px-3 py-2 font-mono text-xs font-bold uppercase tracking-wide text-white transition-colors hover:bg-[#9db8cd]"
+            >
               Details
             </button>
           </div>
         )}
       </div>
+
+      {item.kind === 'event' && (
+        <EventDetailModal
+          open={detailOpen}
+          item={item}
+          onClose={() => setDetailOpen(false)}
+          onEdit={(eventItem: EventItem) => {
+            setDetailOpen(false);
+            openComposer({ mode: 'edit', item: eventItem });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -68,6 +96,15 @@ function ClockIcon() {
     <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="9" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 3" />
+    </svg>
+  );
+}
+
+function LocationIcon() {
+  return (
+    <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 21s-7-6.1-7-11a7 7 0 1 1 14 0c0 4.9-7 11-7 11z" />
+      <circle cx="12" cy="10" r="2.5" />
     </svg>
   );
 }

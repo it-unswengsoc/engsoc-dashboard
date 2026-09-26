@@ -1,11 +1,76 @@
-import type { DriveFolder, DriveEntry } from '@/types/documents';
+import type { DriveDepartment, DriveEntry, DriveCapabilities } from '@/types/documents';
 import { at, minutesAgo } from '@/mocks/data/date-helpers';
 
-export const mockDriveFolders: DriveFolder[] = [
-  { id: 'folder-it', name: 'IT', fileCount: 24, access: 'editable', colour: '#F1C4C9' },
-  { id: 'folder-marketing', name: 'Marketing', fileCount: 24, access: 'view-only', colour: '#F4EFD3' },
-  { id: 'folder-cabinet', name: 'Cabinet', fileCount: 24, access: 'restricted', colour: '#E5E7EB' },
-  { id: 'folder-spons', name: 'Spons', fileCount: 24, access: 'view-only', colour: '#B1C9DC' },
+/* Local dev has no real Google account behind it, so these stand in for
+   what listDepartments/listDriveEntries would normally read off Drive's own
+   `capabilities` for the signed-in member — IT mocked as fully editable,
+   everything else as view-only, so the "New"/rename/delete gating has
+   something real to demonstrate without a backend. */
+const EDITABLE: DriveCapabilities = { canEdit: true, canAddChildren: true, canRename: true, canDelete: true };
+const VIEW_ONLY: DriveCapabilities = { canEdit: false, canAddChildren: false, canRename: false, canDelete: false };
+
+/* Named to mirror the real DEPARTMENT_DEFS headings in
+   backend/src/functions/drive.ts (Cabinet, IT, Careers, Marketing,
+   Publications, Outreach, Programs, Socials, Sponsorships, HR, Resources) —
+   just one representative drive per department, enough to exercise the
+   sidebar and column browser locally. */
+export const mockDepartments: DriveDepartment[] = [
+  {
+    name: 'Cabinet',
+    colour: '#8B2E38',
+    drives: [
+      {
+        id: 'folder-cabinet',
+        name: 'Cabinet',
+        fileCount: 24,
+        colour: '#E5E7EB',
+        webViewLink: 'https://drive.google.com/drive/folders/folder-cabinet',
+        capabilities: VIEW_ONLY,
+      },
+    ],
+  },
+  {
+    name: 'IT',
+    colour: '#3D6C94',
+    drives: [
+      {
+        id: 'folder-it',
+        name: 'IT',
+        fileCount: 24,
+        colour: '#F1C4C9',
+        webViewLink: 'https://drive.google.com/drive/folders/folder-it',
+        capabilities: EDITABLE,
+      },
+    ],
+  },
+  {
+    name: 'Marketing',
+    colour: '#C9862E',
+    drives: [
+      {
+        id: 'folder-marketing',
+        name: 'Marketing',
+        fileCount: 24,
+        colour: '#F4EFD3',
+        webViewLink: 'https://drive.google.com/drive/folders/folder-marketing',
+        capabilities: VIEW_ONLY,
+      },
+    ],
+  },
+  {
+    name: 'Sponsorships',
+    colour: '#C77FA0',
+    drives: [
+      {
+        id: 'folder-spons',
+        name: 'Sponsorships',
+        fileCount: 24,
+        colour: '#B1C9DC',
+        webViewLink: 'https://drive.google.com/drive/folders/folder-spons',
+        capabilities: VIEW_ONLY,
+      },
+    ],
+  },
 ];
 
 /* Keyed by "<driveId>" for a drive's root, or "<driveId>/<folderId>" for a
@@ -23,6 +88,7 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: at(-30, '09:00'),
       sizeBytes: null,
       webViewLink: null,
+      capabilities: EDITABLE,
     },
     {
       id: 'file-1',
@@ -32,6 +98,7 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: minutesAgo(2),
       sizeBytes: 184_320,
       webViewLink: null,
+      capabilities: EDITABLE,
     },
     {
       id: 'file-3',
@@ -41,6 +108,7 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: at(-1, '14:00'),
       sizeBytes: null,
       webViewLink: null,
+      capabilities: EDITABLE,
     },
   ],
   'folder-it/folder-it-archive': [
@@ -52,6 +120,7 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: at(-200, '09:00'),
       sizeBytes: null,
       webViewLink: null,
+      capabilities: EDITABLE,
     },
     {
       id: 'file-old-1',
@@ -61,9 +130,24 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: at(-90, '10:00'),
       sizeBytes: null,
       webViewLink: null,
+      capabilities: EDITABLE,
     },
   ],
+  /* Nested a few levels deeper than MAX_VISIBLE_COLUMNS on purpose — this
+     is what actually exercises the column-windowing fix in local dev,
+     since the real Drive data used for manual testing rarely nests this
+     deep in one place. */
   'folder-it/folder-it-archive-2025': [
+    {
+      id: 'folder-it-archive-2025-q1',
+      name: 'Q1',
+      type: 'folder',
+      mimeType: 'application/vnd.google-apps.folder',
+      modifiedAt: at(-250, '09:00'),
+      sizeBytes: null,
+      webViewLink: null,
+      capabilities: EDITABLE,
+    },
     {
       id: 'file-old-2',
       name: '2025 handover notes',
@@ -72,6 +156,47 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: at(-260, '10:00'),
       sizeBytes: null,
       webViewLink: null,
+      capabilities: EDITABLE,
+    },
+  ],
+  // Keyed "<driveId>/<folderId>" — the folder being expanded's *own* id,
+  // never the full chain of ancestors above it (that's what tripped this up
+  // originally: getDriveEntries only ever looks up by driveId + the direct
+  // parent, so a 3+-segment key here would just never match anything).
+  'folder-it/folder-it-archive-2025-q1': [
+    {
+      id: 'folder-it-archive-2025-q1-jan',
+      name: 'January',
+      type: 'folder',
+      mimeType: 'application/vnd.google-apps.folder',
+      modifiedAt: at(-249, '09:00'),
+      sizeBytes: null,
+      webViewLink: null,
+      capabilities: EDITABLE,
+    },
+  ],
+  'folder-it/folder-it-archive-2025-q1-jan': [
+    {
+      id: 'folder-it-archive-2025-q1-jan-w1',
+      name: 'Week 1',
+      type: 'folder',
+      mimeType: 'application/vnd.google-apps.folder',
+      modifiedAt: at(-248, '09:00'),
+      sizeBytes: null,
+      webViewLink: null,
+      capabilities: EDITABLE,
+    },
+  ],
+  'folder-it/folder-it-archive-2025-q1-jan-w1': [
+    {
+      id: 'file-deep-1',
+      name: 'standup notes.docx',
+      type: 'file',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      modifiedAt: at(-247, '09:00'),
+      sizeBytes: 12_800,
+      webViewLink: 'https://drive.google.com/file/d/file-deep-1',
+      capabilities: EDITABLE,
     },
   ],
   'folder-marketing': [
@@ -83,6 +208,7 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: minutesAgo(45),
       sizeBytes: 5_242_880,
       webViewLink: null,
+      capabilities: VIEW_ONLY,
     },
     {
       id: 'file-4',
@@ -92,6 +218,7 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: at(-2, '09:30'),
       sizeBytes: 2_411_724,
       webViewLink: null,
+      capabilities: VIEW_ONLY,
     },
     {
       id: 'file-6',
@@ -101,6 +228,7 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: at(-6, '11:00'),
       sizeBytes: 184_549_376,
       webViewLink: null,
+      capabilities: VIEW_ONLY,
     },
   ],
   'folder-cabinet': [
@@ -112,6 +240,7 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: at(-4, '16:20'),
       sizeBytes: 98_304,
       webViewLink: null,
+      capabilities: VIEW_ONLY,
     },
   ],
   'folder-spons': [
@@ -123,6 +252,7 @@ export const mockDriveEntries: Record<string, DriveEntry[]> = {
       modifiedAt: at(-8, '10:00'),
       sizeBytes: null,
       webViewLink: null,
+      capabilities: VIEW_ONLY,
     },
   ],
 };

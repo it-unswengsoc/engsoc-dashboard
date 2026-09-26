@@ -17,14 +17,16 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
-import FormDialog, {
-  type FieldDef,
-  type FieldPayload,
-  type FieldValues,
-} from '@/components/dialogs/FormDialog';
-import { createEvent } from '@/services/events-api';
+import FormDialog, { type FieldDef } from '@/components/dialogs/FormDialog';
+import { createAnnouncement } from '@/services/announcements-api';
+import { getProfile } from '@/services/auth-api';
+import { getDirectory } from '@/services/users-api';
+import type { DirectoryUser } from '@/types/directory';
 import { PORT_OPTIONS } from '@/lib/ports';
-import { CALENDAR_EVENTS_CHANGED_EVENT } from '@/lib/calendar';
+import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
+import AnnouncementComposer from '@/components/announcements/AnnouncementComposer';
+import EventComposer from '@/components/calendar/EventComposer';
+import TaskComposer from '@/components/TaskComposer';
 
 interface NewItemDialogProps {
   open: boolean;
@@ -235,95 +237,18 @@ const requestTypes: {
   },
 ];
 
-/* Field names match POST /events's body except eventDate (-> startDate) and
-   type (INTERNAL/EXTERNAL -> internal/external) — mapped in
-   handleCreateEvent below. */
-const eventForm: FieldDef[] = [
-  { kind: 'text', name: 'title', label: 'Event title', required: true },
-  { kind: 'datetime', name: 'eventDate', label: 'Date and time', required: true, span: 'half' },
-  {
-    kind: 'segmented',
-    name: 'type',
-    label: 'Type',
-    span: 'half',
-    options: [
-      { value: 'INTERNAL', label: 'Internal' },
-      { value: 'EXTERNAL', label: 'External' },
-    ],
-  },
-  { kind: 'text', name: 'location', label: 'Location', span: 'half' },
-  { kind: 'number', name: 'capacity', label: 'Capacity', span: 'half' },
-  { kind: 'textarea', name: 'description', label: 'Description' },
-];
-
-const announcementForm: FieldDef[] = [
-  { kind: 'text', name: 'title', label: 'Title', required: true },
-  { kind: 'textarea', name: 'description', label: 'Description', required: true },
-  { kind: 'file', name: 'image', label: 'Picture', accept: 'image/*' },
-];
-
-/* Assignment is one-of, so the toggle picks the target and only that control
-   follows — showing a port dropdown and a person box side by side read as
-   "both". `assignee` is free text because naming a person needs a users
-   listing, and no such endpoint exists yet; swap it for a select once one does. */
-function taskForm(values: FieldValues): FieldDef[] {
-  const target: FieldDef[] =
-    values.assignTo === 'port'
-      ? [
-          {
-            kind: 'select',
-            name: 'port',
-            label: 'Which port',
-            placeholder: 'Select a port...',
-            options: PORT_OPTIONS,
-            required: true,
-          },
-        ]
-      : values.assignTo === 'person'
-        ? [
-            {
-              kind: 'text',
-              name: 'assignee',
-              label: 'Who',
-              placeholder: 'Name or email',
-              required: true,
-            },
-          ]
-        : [];
-
-  return [
-    { kind: 'text', name: 'name', label: 'Task name', required: true, span: 'half' },
-    { kind: 'datetime', name: 'dueAt', label: 'Due date and time', required: true, span: 'half' },
-    {
-      kind: 'segmented',
-      name: 'assignTo',
-      label: 'Assign to',
-      options: [
-        { value: 'me', label: 'Just me' },
-        { value: 'port', label: 'A port' },
-        { value: 'person', label: 'A person' },
-      ],
-    },
-    ...target,
-    { kind: 'textarea', name: 'description', label: 'Description' },
-  ];
-}
-
-type FormView = Exclude<View, 'chooser' | 'request-list'>;
-
-const forms: Record<
-  FormView,
-  { title: string; submitLabel: string; fields: FieldDef[] | ((values: FieldValues) => FieldDef[]) }
-> = {
-  event: { title: 'New event', submitLabel: 'Create event', fields: eventForm },
-  announcement: { title: 'New announcement', submitLabel: 'Post', fields: announcementForm },
-  task: { title: 'New task', submitLabel: 'Add task', fields: taskForm },
-};
-
 export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   const router = useRouter();
   const [view, setView] = useState<View>('chooser');
   const [requestType, setRequestType] = useState<string | null>(null);
+
+  // Only director/executive/admin can post an announcement (backend
+  // enforces this too — see requireRole on POST /announcements). Fetched
+  // fresh on every open rather than cached, same reasoning as everywhere
+  // else this app checks role: a change should take effect immediately.
+  const [role, setRole] = useState<string | null>(null);
+  const [directory, setDirectory] = useState<DirectoryUser[]>([]);
+  const canPostAnnouncement = role === 'director' || role === 'executive' || role === 'admin';
 
   /* Reset to the chooser on each *re*-open rather than in handleClose — Dialog
      now plays an exit animation before actually unmounting (see Dialog.tsx),
@@ -334,43 +259,29 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     if (open) {
       setView('chooser');
       setRequestType(null);
+
+      const token = sessionStorage.getItem('token');
+      if (token) {
+        getProfile(token).then((p) => setRole(p.role)).catch(() => {});
+        getDirectory(token).then(setDirectory).catch(() => {});
+      }
     }
   }, [open]);
 
-  /* Backend maps 1:1 onto eventForm's fields except eventDate -> startDate
-     and INTERNAL/EXTERNAL -> internal/external — matching the casing
-     EventType already uses on the calendar. The backend mirrors the created
-     event to the shared EngSoc Google Calendar itself. router.refresh() picks
-     up the dashboard's own Postgres-backed "upcoming events" widget; the
-     calendar page reads each member's own Google Calendar client-side
-     instead, so it needs the separate CALENDAR_EVENTS_CHANGED_EVENT nudge —
-     and even then, this new event only appears there for someone who has
-     already added the shared EngSoc calendar to their own Google account. */
-  async function handleCreateEvent(payload: FieldPayload) {
+  async function handleCreateAnnouncement(input: { content: string; imageUrl?: string | null }) {
     const token = sessionStorage.getItem('token');
     if (!token) {
       router.push('/login');
       return;
     }
 
-    await createEvent(token, {
-      title: payload.title as string,
-      startDate: payload.eventDate as string,
-      eventType: payload.type === 'EXTERNAL' ? 'external' : 'internal',
-      location: payload.location as string | undefined,
-      capacity: payload.capacity as number | undefined,
-      description: payload.description as string | undefined,
+    await createAnnouncement(token, {
+      content: input.content,
+      imageUrl: input.imageUrl ?? undefined,
     });
 
-    router.refresh();
-    window.dispatchEvent(new Event(CALENDAR_EVENTS_CHANGED_EVENT));
+    window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
   }
-
-  /* Only "New event" is wired up — tasks, announcements and requests have no
-     backend route mounted yet, so their submit stays disabled. */
-  const onSubmit: Partial<Record<FormView, (payload: FieldPayload) => Promise<void>>> = {
-    event: handleCreateEvent,
-  };
 
   /* A chosen request type's own form. Which type it is lives in state rather
      than in the payload now that the selector is gone — whoever wires the
@@ -412,26 +323,54 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     );
   }
 
-  if (view !== 'chooser') {
-    const form = forms[view];
+  // Its own bespoke composer (caption + image crop/position + a preview
+  // step) rather than a generic FormDialog — see AnnouncementComposer.
+  // Cancelling closes the whole "New" dialog rather than going back to the
+  // chooser: the composer's own back arrow is already spoken for by its
+  // preview<->compose step navigation.
+  if (view === 'announcement') {
+    return <AnnouncementComposer open={open} mode="create" onSubmit={handleCreateAnnouncement} onClose={onClose} />;
+  }
+
+  // Same reasoning as AnnouncementComposer above — a form this conditional
+  // (personal vs shared, all-day vs timed, type/capacity only for shared)
+  // doesn't fit FormDialog's generic declarative model.
+  if (view === 'event') {
+    const now = new Date();
+    now.setMinutes(0, 0, 0);
+    now.setHours(now.getHours() + 1);
+    const end = new Date(now);
+    end.setHours(end.getHours() + 1);
 
     return (
-      <FormDialog
+      <EventComposer
         open={open}
-        title={form.title}
-        submitLabel={form.submitLabel}
-        fields={form.fields}
-        onSubmit={onSubmit[view]}
+        prefill={{ mode: 'create', start: now, end, allDay: false }}
+        canCreateSharedEvent={canPostAnnouncement}
         onClose={onClose}
-        onBack={() => setView('chooser')}
       />
     );
   }
 
+  // Bespoke for the same reason as the two above — attaching a file needs a
+  // real async Drive upload, which FormDialog's declarative fields don't
+  // support (see TaskComposer).
+  if (view === 'task') {
+    return <TaskComposer open={open} directory={directory} onClose={onClose} />;
+  }
+
+  if (view !== 'chooser') {
+    return null;
+  }
+
+  // "New announcement" only shows for director/executive/admin — everyone
+  // else never sees a composer the backend would just 403 anyway.
+  const visibleOptions = options.filter((o) => o.view !== 'announcement' || canPostAnnouncement);
+
   return (
     <Dialog open={open} title="What would you like to work on?" size="sm" onClose={onClose}>
       <div className="mt-6 grid grid-cols-2 gap-4">
-        {options.map(({ view: target, label, icon: Icon }) => (
+        {visibleOptions.map(({ view: target, label, icon: Icon }) => (
           <button
             key={label}
             onClick={() => setView(target)}
