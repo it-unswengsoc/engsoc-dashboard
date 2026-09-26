@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Paperclip, X } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
 import { createTask, addTaskAttachment } from '@/services/tasks-api';
-import { getDriveDepartments, getDriveAccessToken, uploadDriveFile } from '@/services/documents-api';
+import DriveFilePicker, { type PickedAttachment } from '@/components/DriveFilePicker';
 import type { DirectoryUser } from '@/types/directory';
-import type { DriveDepartment } from '@/types/documents';
 import { PORT_OPTIONS } from '@/lib/ports';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
 
@@ -15,13 +14,6 @@ export interface TaskComposerProps {
   open: boolean;
   directory: DirectoryUser[];
   onClose: () => void;
-}
-
-interface PendingAttachment {
-  driveFileId: string;
-  name: string;
-  webViewLink: string | null;
-  mimeType: string | null;
 }
 
 /* Bespoke rather than the generic FormDialog — same reasoning as
@@ -42,10 +34,7 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
   const [assignTo, setAssignTo] = useState<'me' | 'port' | 'person'>('me');
   const [port, setPort] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
-  const [departments, setDepartments] = useState<DriveDepartment[]>([]);
-  const [driveId, setDriveId] = useState('');
-  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<PickedAttachment[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -61,38 +50,10 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
     setAssigneeId('');
     setPendingAttachments([]);
     setError('');
-
-    const token = sessionStorage.getItem('token');
-    if (token) {
-      getDriveDepartments(token)
-        .then(({ departments: depts }) => {
-          setDepartments(depts);
-          const firstDrive = depts.flatMap((d) => d.drives)[0];
-          if (firstDrive) setDriveId(firstDrive.id);
-        })
-        .catch(() => {});
-    }
   }, [open]);
 
-  async function handleFilePicked(file: File | undefined) {
-    if (!file || !driveId) return;
-    const token = sessionStorage.getItem('token');
-    if (!token) return;
-
-    setUploading(true);
-    setError('');
-    try {
-      const { accessToken } = await getDriveAccessToken(token);
-      const uploaded = await uploadDriveFile(accessToken, driveId, undefined, file);
-      setPendingAttachments((prev) => [
-        ...prev,
-        { driveFileId: uploaded.id, name: uploaded.name, webViewLink: uploaded.webViewLink, mimeType: uploaded.mimeType },
-      ]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to upload file');
-    } finally {
-      setUploading(false);
-    }
+  function handleAttach(picked: PickedAttachment) {
+    setPendingAttachments((prev) => [...prev, picked]);
   }
 
   function removePendingAttachment(driveFileId: string) {
@@ -142,7 +103,6 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
   const inputStyles =
     'w-full rounded-lg border border-transparent bg-gray-100 px-3 py-2 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]';
   const labelStyles = 'text-xs font-bold uppercase tracking-wide text-gray-500';
-  const drives = departments.flatMap((d) => d.drives.map((drive) => ({ ...drive, department: d.name })));
 
   return (
     <Dialog open={open} title="New task" size="2xl" onClose={onClose}>
@@ -250,34 +210,7 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
             </div>
           ))}
 
-          {drives.length > 0 ? (
-            <div className="flex items-center gap-2">
-              <select
-                value={driveId}
-                onChange={(e) => setDriveId(e.target.value)}
-                className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-bold text-gray-700"
-              >
-                {drives.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.department} / {d.name}
-                  </option>
-                ))}
-              </select>
-              <label className="cursor-pointer rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-[#3D6C94] transition-colors hover:bg-gray-50">
-                {uploading ? 'Uploading…' : 'Attach a file'}
-                <input
-                  type="file"
-                  className="hidden"
-                  disabled={uploading}
-                  onChange={(e) => handleFilePicked(e.target.files?.[0])}
-                />
-              </label>
-            </div>
-          ) : (
-            <p className="font-mono text-xs text-gray-400">
-              Connect Google Drive (sign out and back in with Google) to attach files.
-            </p>
-          )}
+          <DriveFilePicker onAttach={handleAttach} />
         </div>
 
         {error && (
@@ -297,7 +230,7 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={submitting || uploading}
+            disabled={submitting}
             className="flex-1 rounded-xl bg-[#B1C9DC] py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? 'Adding…' : 'Add task'}
