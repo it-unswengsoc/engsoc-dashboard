@@ -22,16 +22,15 @@ import FormDialog, {
   type FieldPayload,
   type FieldValues,
 } from '@/components/dialogs/FormDialog';
-import { createEvent } from '@/services/events-api';
 import { createAnnouncement } from '@/services/announcements-api';
 import { createTask } from '@/services/tasks-api';
 import { getProfile } from '@/services/auth-api';
 import { getDirectory } from '@/services/users-api';
 import type { DirectoryUser } from '@/types/directory';
 import { PORT_OPTIONS } from '@/lib/ports';
-import { CALENDAR_EVENTS_CHANGED_EVENT } from '@/lib/calendar';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
 import AnnouncementComposer from '@/components/announcements/AnnouncementComposer';
+import EventComposer from '@/components/calendar/EventComposer';
 
 interface NewItemDialogProps {
   open: boolean;
@@ -242,26 +241,6 @@ const requestTypes: {
   },
 ];
 
-/* Field names match POST /events's body except eventDate (-> startDate) and
-   type (INTERNAL/EXTERNAL -> internal/external) — mapped in
-   handleCreateEvent below. */
-const eventForm: FieldDef[] = [
-  { kind: 'text', name: 'title', label: 'Event title', required: true },
-  { kind: 'datetime', name: 'eventDate', label: 'Date and time', required: true, span: 'half' },
-  {
-    kind: 'segmented',
-    name: 'type',
-    label: 'Type',
-    span: 'half',
-    options: [
-      { value: 'INTERNAL', label: 'Internal' },
-      { value: 'EXTERNAL', label: 'External' },
-    ],
-  },
-  { kind: 'text', name: 'location', label: 'Location', span: 'half' },
-  { kind: 'number', name: 'capacity', label: 'Capacity', span: 'half' },
-  { kind: 'textarea', name: 'description', label: 'Description' },
-];
 
 /* Assignment is one-of, so the toggle picks the target and only that control
    follows — showing a port dropdown and a person box side by side read as
@@ -315,13 +294,6 @@ function taskForm(values: FieldValues, directory: DirectoryUser[]): FieldDef[] {
 
 type FormView = Exclude<View, 'chooser' | 'request-list'>;
 
-/* task's fields depend on the fetched member directory (state, only known
-   inside the component), so only event — whose fields are static — lives in
-   this table. task is assembled at render time below; announcement doesn't
-   go through FormDialog at all anymore (see AnnouncementComposer). */
-const staticForms: Record<'event', { title: string; submitLabel: string; fields: FieldDef[] }> = {
-  event: { title: 'New event', submitLabel: 'Create event', fields: eventForm },
-};
 const TASK_FORM_META = { title: 'New task', submitLabel: 'Add task' };
 
 export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
@@ -354,36 +326,6 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
       }
     }
   }, [open]);
-
-  /* Backend maps 1:1 onto eventForm's fields except eventDate -> startDate
-     and INTERNAL/EXTERNAL -> internal/external — matching the casing
-     EventType already uses on the calendar. The backend mirrors the created
-     event to the shared EngSoc Google Calendar itself. router.refresh() picks
-     up the dashboard's own Postgres-backed "upcoming events" widget; the
-     calendar page reads each member's own Google Calendar client-side
-     instead, so it needs the separate CALENDAR_EVENTS_CHANGED_EVENT nudge —
-     and even then, this new event only appears there for someone who has
-     already added the shared EngSoc calendar to their own Google account. */
-  async function handleCreateEvent(payload: FieldPayload) {
-    const token = sessionStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    await createEvent(token, {
-      title: payload.title as string,
-      startDate: payload.eventDate as string,
-      eventType: payload.type === 'EXTERNAL' ? 'external' : 'internal',
-      location: payload.location as string | undefined,
-      capacity: payload.capacity as number | undefined,
-      description: payload.description as string | undefined,
-    });
-
-    router.refresh();
-    window.dispatchEvent(new Event(CALENDAR_EVENTS_CHANGED_EVENT));
-    window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
-  }
 
   async function handleCreateAnnouncement(input: { content: string; imageUrl?: string | null }) {
     const token = sessionStorage.getItem('token');
@@ -420,9 +362,9 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   }
 
   /* Requests still have no backend route mounted, so its submit stays
-     disabled. announcement isn't here — it doesn't go through FormDialog. */
-  const onSubmit: Partial<Record<Exclude<FormView, 'announcement'>, (payload: FieldPayload) => Promise<void>>> = {
-    event: handleCreateEvent,
+     disabled. Neither announcement nor event are here — neither goes
+     through FormDialog (see AnnouncementComposer / EventComposer). */
+  const onSubmit: Partial<Record<Exclude<FormView, 'announcement' | 'event'>, (payload: FieldPayload) => Promise<void>>> = {
     task: handleCreateTask,
   };
 
@@ -475,11 +417,32 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     return <AnnouncementComposer open={open} mode="create" onSubmit={handleCreateAnnouncement} onClose={onClose} />;
   }
 
+  // Same reasoning as AnnouncementComposer above — a form this conditional
+  // (personal vs shared, all-day vs timed, type/capacity only for shared)
+  // doesn't fit FormDialog's generic declarative model.
+  if (view === 'event') {
+    const now = new Date();
+    now.setMinutes(0, 0, 0);
+    now.setHours(now.getHours() + 1);
+    const end = new Date(now);
+    end.setHours(end.getHours() + 1);
+
+    return (
+      <EventComposer
+        open={open}
+        prefill={{ mode: 'create', start: now, end, allDay: false }}
+        canCreateSharedEvent={canPostAnnouncement}
+        onClose={onClose}
+      />
+    );
+  }
+
   if (view !== 'chooser') {
     const form =
       view === 'task'
         ? { ...TASK_FORM_META, fields: (values: FieldValues) => taskForm(values, directory) }
-        : staticForms[view];
+        : undefined;
+    if (!form) return null;
 
     return (
       <FormDialog

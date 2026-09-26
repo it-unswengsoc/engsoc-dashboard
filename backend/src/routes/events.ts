@@ -6,9 +6,18 @@ import {
   updateEvent,
   deleteEvent,
 } from '../functions/events';
-import { verifyAuthToken } from './auth';
+import { verifyAuthToken, requireRole } from './auth';
+import { isUserAdmin } from '../functions/admin';
 
 const router = Router();
+
+/* Only the organizer or an admin can edit/delete an official event — PUT and
+   DELETE had no check at all before this, so any logged-in member could edit
+   or delete any event. Mirrors announcements.ts's canModify. */
+async function canModifyEvent(userId: number, organizerId: number | null): Promise<boolean> {
+  if (organizerId === userId) return true;
+  return isUserAdmin(userId);
+}
 
 /**
  * GET /api/event
@@ -70,9 +79,9 @@ router.get('/:eventId', async (req: Request, res: Response) => {
 
 /**
  * POST /api/event
- * Creates a new event. Requires authentication.
+ * Creates a new event. Director, executive or admin only.
  */
-router.post('/', verifyAuthToken, async (req: Request, res: Response) => {
+router.post('/', verifyAuthToken, requireRole(['director', 'executive', 'admin']), async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
     const { title, description, imageUrl, eventType, startDate, endDate, location, capacity } = req.body;
@@ -121,17 +130,26 @@ router.post('/', verifyAuthToken, async (req: Request, res: Response) => {
 
 /**
  * PUT /api/event/:eventId
- * Edits the details of an event. Requires authentication.
+ * Edits the details of an event. Organizer or admin only.
  */
 router.put('/:eventId', verifyAuthToken, async (req: Request, res: Response) => {
   try {
     const eventId = parseInt(req.params.eventId);
+    const user = (req as any).user;
 
     if (isNaN(eventId)) {
       return res.status(400).json({
         status: 'error',
         message: 'Invalid event ID',
       });
+    }
+
+    const existing = await getEventById(eventId);
+    if (!existing) {
+      return res.status(404).json({ status: 'error', message: 'Event not found' });
+    }
+    if (!(await canModifyEvent(user.userId, existing.organizerId))) {
+      return res.status(403).json({ status: 'error', message: 'Only the organizer or an admin can edit this event' });
     }
 
     const { title, description, imageUrl, eventType, startDate, endDate, location, status, capacity } = req.body;
@@ -171,17 +189,26 @@ router.put('/:eventId', verifyAuthToken, async (req: Request, res: Response) => 
 
 /**
  * DELETE /api/event/:eventId
- * Deletes an event. Requires authentication.
+ * Deletes an event. Organizer or admin only.
  */
 router.delete('/:eventId', verifyAuthToken, async (req: Request, res: Response) => {
   try {
     const eventId = parseInt(req.params.eventId);
+    const user = (req as any).user;
 
     if (isNaN(eventId)) {
       return res.status(400).json({
         status: 'error',
         message: 'Invalid event ID',
       });
+    }
+
+    const existing = await getEventById(eventId);
+    if (!existing) {
+      return res.status(404).json({ status: 'error', message: 'Event not found' });
+    }
+    if (!(await canModifyEvent(user.userId, existing.organizerId))) {
+      return res.status(403).json({ status: 'error', message: 'Only the organizer or an admin can delete this event' });
     }
 
     const deleted = await deleteEvent(eventId);
