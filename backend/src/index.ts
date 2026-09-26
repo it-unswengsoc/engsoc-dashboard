@@ -46,8 +46,14 @@ app.use(cors({
   credentials: true,
 }));
 app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Default body-parser limit is 100kb — comfortably enough for everything
+// except announcement images (functions/announcements.ts's
+// MAX_IMAGE_DATA_URI_LENGTH allows up to ~3MB of base64 there), which were
+// silently 413-ing here before that validation ever ran. Raised well past
+// that cap so the more precise, JSON-error-returning check in
+// createAnnouncement/updateAnnouncement is what actually enforces the limit.
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes — no /api prefix: this backend has its own domain now
 // (previously /api/backend/* routed here through the frontend's domain via
