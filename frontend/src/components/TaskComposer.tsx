@@ -21,9 +21,7 @@ export interface TaskComposerProps {
    Drive upload (pick a destination drive, upload, then link the result),
    which FormDialog's declarative fields don't support. A file is uploaded
    to Drive as soon as it's picked (so a slow upload doesn't block the rest
-   of the form), then linked to whichever task(s) get created on submit —
-   'port' assignment fans out to one task per member, so every one of them
-   gets every attachment. */
+   of the form), then linked to the task once it's created on submit. */
 export default function TaskComposer({ open, directory, onClose }: TaskComposerProps) {
   const router = useRouter();
   const [name, setName] = useState('');
@@ -33,7 +31,7 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
   const [dueTime, setDueTime] = useState('');
   const [assignTo, setAssignTo] = useState<'me' | 'port' | 'person'>('me');
   const [port, setPort] = useState('');
-  const [assigneeId, setAssigneeId] = useState('');
+  const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
   const [pendingAttachments, setPendingAttachments] = useState<PickedAttachment[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -47,10 +45,14 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
     setDueTime('');
     setAssignTo('me');
     setPort('');
-    setAssigneeId('');
+    setAssigneeIds([]);
     setPendingAttachments([]);
     setError('');
   }, [open]);
+
+  function toggleAssignee(id: number) {
+    setAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   function handleAttach(picked: PickedAttachment) {
     setPendingAttachments((prev) => [...prev, picked]);
@@ -82,7 +84,7 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
         dueDate: dueDate ? new Date(`${dueDate}T${dueTime || '00:00'}`).toISOString() : undefined,
         assignTo,
         port: assignTo === 'port' ? port : undefined,
-        assigneeId: assignTo === 'person' && assigneeId ? Number(assigneeId) : undefined,
+        assigneeIds: assignTo === 'person' ? assigneeIds : undefined,
       });
 
       if (pendingAttachments.length > 0) {
@@ -150,7 +152,7 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
                   assignTo === opt ? 'bg-[#B1C9DC] text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
                 }`}
               >
-                {opt === 'me' ? 'Just me' : opt === 'port' ? 'A port' : 'A person'}
+                {opt === 'me' ? 'Just me' : opt === 'port' ? 'A port' : 'People'}
               </button>
             ))}
           </div>
@@ -170,17 +172,27 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
           </label>
         )}
         {assignTo === 'person' && (
-          <label className="flex flex-col gap-1.5">
+          <div className="flex flex-col gap-1.5">
             <span className={labelStyles}>Who</span>
-            <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={inputStyles}>
-              <option value="">Select a member...</option>
-              {directory.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.firstName} {u.lastName}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="flex flex-wrap gap-2">
+              {directory.map((u) => {
+                const selected = assigneeIds.includes(u.id);
+                return (
+                  <button
+                    key={u.id}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => toggleAssignee(u.id)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+                      selected ? 'bg-[#3D6C94] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {u.firstName} {u.lastName}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         <label className="flex flex-col gap-1.5">
