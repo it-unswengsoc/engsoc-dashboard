@@ -41,7 +41,10 @@ function toBoardTask(raw: RawTask): BoardTask {
 }
 
 /* Needs the signed-in member's own token — GET /tasks/mine is scoped to
-   whoever's asking, there's no "all tasks" view. */
+   whoever's asking, there's no "all tasks" view. Cancelled tasks are left
+   out: TaskItem only knows done or not, so one would otherwise show as open
+   (and overdue) on the dashboard and calendar, where ticking it would
+   un-cancel it. */
 export async function getTasks(token: string): Promise<TaskItem[]> {
   if (USE_MOCK) {
     const { getTasks: mockGetTasks } = await import('@/mocks/functions/tasks');
@@ -54,7 +57,7 @@ export async function getTasks(token: string): Promise<TaskItem[]> {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load tasks');
-  return (data.data as RawTask[]).map(toTaskItem);
+  return (data.data as RawTask[]).filter((raw) => raw.status !== 'cancelled').map(toTaskItem);
 }
 
 /* Backs the task detail dialog — assignee or admin only (backend 403s

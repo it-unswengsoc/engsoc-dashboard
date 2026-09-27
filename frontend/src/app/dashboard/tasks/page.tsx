@@ -18,23 +18,35 @@ export default function TasksPage() {
   const [error, setError] = useState('');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [tasks, setTasks] = useState<BoardTask[]>([]);
-  /* Only the most recent load gets to set state — two re-fetches close
-     together can finish out of order, and the older one would show stale
-     rows. */
+  /* Only the most recent load gets to set anything — rows, error or the
+     loading flag. Two re-fetches close together can finish out of order, and
+     an older one would otherwise show stale rows, or an error the newer one
+     has already recovered from. */
   const latestLoad = useRef(0);
+  const hasLoaded = useRef(false);
 
   const load = useCallback(async (token: string) => {
     const loadId = ++latestLoad.current;
-    const me = await getProfile(token);
-    const board = me.port ? await getBoardTasks(token, me.port) : [];
-    if (loadId !== latestLoad.current) return;
-    setProfile(me);
-    setTasks(board);
+    try {
+      const me = await getProfile(token);
+      const board = me.port ? await getBoardTasks(token, me.port) : [];
+      if (loadId !== latestLoad.current) return;
+      hasLoaded.current = true;
+      setProfile(me);
+      setTasks(board);
+      setError('');
+    } catch (err) {
+      if (loadId !== latestLoad.current) return;
+      // A failed re-fetch keeps the board that's already showing.
+      if (!hasLoaded.current) setError(err instanceof Error ? err.message : 'Failed to load tasks');
+    } finally {
+      if (loadId === latestLoad.current) setLoading(false);
+    }
   }, []);
 
   const reload = useCallback(() => {
     const token = sessionStorage.getItem('token');
-    if (token) load(token).catch(() => {});
+    if (token) load(token);
   }, [load]);
 
   useEffect(() => {
@@ -43,10 +55,7 @@ export default function TasksPage() {
       router.push('/login');
       return;
     }
-
-    load(token)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load tasks'))
-      .finally(() => setLoading(false));
+    load(token);
   }, [router, load]);
 
   // Re-fetch after a task is created from the header's "New" dialog.
