@@ -6,7 +6,9 @@ export const mockProfile: Profile = {
   firstName: 'Admin',
   lastName: 'User',
   role: 'admin',
-  port: null,
+  // Publication, so the tasks board has a port to open on in mock mode —
+  // mocks/data/board-tasks.ts is that port's board.
+  port: 'publication',
   createdAt: '2024-01-01T00:00:00.000Z',
 };
 

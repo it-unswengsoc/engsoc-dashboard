@@ -1,7 +1,37 @@
+/* What the dashboard's "My tasks" panel and the calendar render. Deliberately
+   thin — those two only need a name, a due date and a tick. */
 export interface TaskItem {
   id: number;
   name: string;
   description: string | null;
   dueAt: string | null; // ISO date string; null if no due date was set
   completed: boolean;
+}
+
+/* ---------- Board shape ---------- */
+
+/* Matches the task_status enum in database/create-tables.sql. */
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+
+/* Someone a task is assigned to. `port` is theirs as it is now — it's what
+   puts the task on a port's board (see backend/src/database/tasks.ts). */
+export interface TaskAssignee {
+  id: number;
+  name: string;
+  port: string | null;
+}
+
+/* The fuller row the board needs. A task is one shared card: any of its
+   assignees can move it, and it moves for all of them. */
+export interface BoardTask {
+  id: number;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  assignees: TaskAssignee[];
+  assignedBy: { id: number; name: string } | null;
+  dueAt: string | null; // ISO date string
+  /* Set when the task came from a request, so the board can point back at it.
+     Mock-only for now: needs tasks.request_id, which doesn't exist yet. */
+  requestTitle?: string;
 }
