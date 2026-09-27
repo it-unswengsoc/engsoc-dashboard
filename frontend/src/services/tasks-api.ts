@@ -1,9 +1,9 @@
-import type { BoardTask, TaskItem } from '@/types/tasks';
+import type { BoardTask, TaskAssignee, TaskItem, TaskStatus } from '@/types/tasks';
 import { apiUrl } from '@/services/api-config';
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
-export type { BoardTask, TaskItem };
+export type { BoardTask, TaskItem, TaskStatus };
 
 /* Shape the backend actually returns (backend/src/functions/tasks.ts's Task
    interface) — mapped to TaskItem below, same pattern as events-api.ts. */
@@ -12,7 +12,10 @@ interface RawTask {
   title: string;
   description: string | null;
   dueDate: string | null;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  status: TaskStatus;
+  assignedBy: number | null;
+  assignedByName: string | null;
+  assignees: TaskAssignee[];
 }
 
 function toTaskItem(raw: RawTask): TaskItem {
@@ -25,8 +28,23 @@ function toTaskItem(raw: RawTask): TaskItem {
   };
 }
 
+function toBoardTask(raw: RawTask): BoardTask {
+  return {
+    id: raw.id,
+    title: raw.title,
+    description: raw.description,
+    status: raw.status,
+    assignees: raw.assignees,
+    assignedBy: raw.assignedBy !== null && raw.assignedByName ? { id: raw.assignedBy, name: raw.assignedByName } : null,
+    dueAt: raw.dueDate,
+  };
+}
+
 /* Needs the signed-in member's own token — GET /tasks/mine is scoped to
-   whoever's asking, there's no "all tasks" view. */
+   whoever's asking, there's no "all tasks" view. Cancelled tasks are left
+   out: TaskItem only knows done or not, so one would otherwise show as open
+   (and overdue) on the dashboard and calendar, where ticking it would
+   un-cancel it. */
 export async function getTasks(token: string): Promise<TaskItem[]> {
   if (USE_MOCK) {
     const { getTasks: mockGetTasks } = await import('@/mocks/functions/tasks');
@@ -39,7 +57,7 @@ export async function getTasks(token: string): Promise<TaskItem[]> {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load tasks');
-  return (data.data as RawTask[]).map(toTaskItem);
+  return (data.data as RawTask[]).filter((raw) => raw.status !== 'cancelled').map(toTaskItem);
 }
 
 /* Backs the task detail dialog — assignee or admin only (backend 403s
@@ -65,12 +83,12 @@ export interface CreateTaskInput {
   dueDate?: string; // ISO date string
   assignTo: 'me' | 'port' | 'person';
   port?: string; // required when assignTo === 'port'
-  assigneeId?: number; // required when assignTo === 'person'
+  assigneeIds?: number[]; // one or more, required when assignTo === 'person'
 }
 
-/* 'port' fans out to one task per member of that portfolio server-side (see
-   backend/src/functions/tasks.ts) — the array returned here can have more
-   than one row for that case. */
+/* Always one shared task, whoever it's assigned to — the backend still
+   answers with an array from when a port fanned out into one task per
+   member. */
 export async function createTask(token: string, input: CreateTaskInput): Promise<TaskItem[]> {
   if (USE_MOCK) {
     const { createTask: mockCreateTask } = await import('@/mocks/functions/tasks');
@@ -87,13 +105,9 @@ export async function createTask(token: string, input: CreateTaskInput): Promise
   return (data.data as RawTask[]).map(toTaskItem);
 }
 
-/* Only the assignee can update their own task — the backend 403s anyone
-   else (see backend/src/functions/tasks.ts's ForbiddenTaskError). */
-export async function updateTaskStatus(
-  token: string,
-  taskId: number,
-  status: 'pending' | 'completed'
-): Promise<TaskItem> {
+/* Any of the task's assignees can move it, to any status — the backend 403s
+   anyone else (see backend/src/functions/tasks.ts's ForbiddenTaskError). */
+export async function updateTaskStatus(token: string, taskId: number, status: TaskStatus): Promise<TaskItem> {
   if (USE_MOCK) {
     const { updateTaskStatus: mockUpdateTaskStatus } = await import('@/mocks/functions/tasks');
     return mockUpdateTaskStatus(taskId, status);
@@ -181,22 +195,19 @@ export async function deleteTaskAttachment(token: string, taskId: number, attach
   }
 }
 
-/* The board's fuller rows, for one port. Always mock for now: GET /tasks/mine
-   is scoped to the caller, and there's no port-wide query yet — the tasks
-   table has no port column, and a port-assigned task fans out into one row
-   per member (see backend/src/functions/tasks.ts), so a board over those
-   rows would show the same task once per assignee.
+/* A port's board: every task with at least one assignee currently in that
+   port. Port members and admins only — the backend 403s anyone else. */
+export async function getBoardTasks(token: string, port: string): Promise<BoardTask[]> {
+  if (USE_MOCK) {
+    const { getBoardTasks: mockGetBoardTasks } = await import('@/mocks/functions/tasks');
+    return mockGetBoardTasks(port);
+  }
 
-   Going real means, in a later PR:
-     - backend: GET /tasks?port=… (plus a port column, or grouping the
-       fanned-out rows back into one card)
-     - here: a `token` param, the USE_MOCK branch like getTasks, and a
-       toBoardTask(raw) mapper beside toTaskItem — RawTask already carries
-       status and assignee/assigner ids and names
-     - the tasks page: a client component, since the token lives in
-       sessionStorage
-   The `port` param is already the seam, so callers won't change shape. */
-export async function getBoardTasks(port: string): Promise<BoardTask[]> {
-  const { getBoardTasks: mockGetBoardTasks } = await import('@/mocks/functions/tasks');
-  return mockGetBoardTasks(port);
+  const res = await fetch(apiUrl(`/tasks?port=${encodeURIComponent(port)}`), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to load tasks');
+  return (data.data as RawTask[]).map(toBoardTask);
 }

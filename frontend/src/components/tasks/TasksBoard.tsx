@@ -1,16 +1,24 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { KanbanSquare, Link2 } from 'lucide-react';
 import { portLabel } from '@/lib/ports';
-import type { Member } from '@/types/members';
+import { updateTaskStatus } from '@/services/tasks-api';
 import type { BoardTask, TaskStatus } from '@/types/tasks';
 
 interface TasksBoardProps {
   tasks: BoardTask[];
-  currentUser: Member;
+  currentUserId: number;
   port: string;
+  /* Called after a move saves, so the page re-fetches — a fetch that started
+     before the save finished would otherwise be the last word on the card. */
+  onMoved?: () => void;
 }
+
+/* Past this many, a card shows "+n" instead of more avatars — a whole-port
+   task would otherwise run off the card. */
+const MAX_AVATARS = 3;
 
 const COLUMNS: { status: TaskStatus; label: string; accent: string }[] = [
   { status: 'pending', label: 'To do', accent: 'bg-[#E8C84A]' },
@@ -21,7 +29,7 @@ const COLUMNS: { status: TaskStatus; label: string; accent: string }[] = [
 
 /* Same urgency vocabulary as the dashboard's task rows and the requests page:
    red once it's on top of you, cream inside a week, blue while there's room. */
-function dueBadge(iso?: string): { label: string; styles: string } | null {
+function dueBadge(iso: string | null): { label: string; styles: string } | null {
   if (!iso) return null;
 
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -46,18 +54,48 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-export default function TasksBoard({ tasks, currentUser, port }: TasksBoardProps) {
+/* "Mine" means I'm any one of the assignees — a shared or whole-port task is
+   in every assignee's list. */
+function isAssignedTo(task: BoardTask, userId: number): boolean {
+  return task.assignees.some((a) => a.id === userId);
+}
+
+export default function TasksBoard({ tasks, currentUserId, port, onMoved }: TasksBoardProps) {
+  const router = useRouter();
   const [mineOnly, setMineOnly] = useState(false);
   const [board, setBoard] = useState(tasks);
   const [dragging, setDragging] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<TaskStatus | null>(null);
+  const [moveError, setMoveError] = useState('');
+  /* Cards whose move is still saving, and the column each was dropped in. A
+     saving card can't be dragged again, so two saves never race; and a
+     re-fetch that lands mid-save keeps the card where it was dropped, not
+     where the server had it before the save. */
+  const saving = useRef(new Map<number, TaskStatus>());
+  const [savingIds, setSavingIds] = useState<ReadonlySet<number>>(new Set());
+
+  function setSaving(taskId: number, status: TaskStatus | null) {
+    if (status === null) saving.current.delete(taskId);
+    else saving.current.set(taskId, status);
+    setSavingIds(new Set(saving.current.keys()));
+  }
+
+  // The page re-fetches when a task is created elsewhere — take the new rows.
+  useEffect(() => {
+    setBoard(
+      tasks.map((task) => {
+        const pending = saving.current.get(task.id);
+        return pending ? { ...task, status: pending } : task;
+      }),
+    );
+  }, [tasks]);
 
   const visible = useMemo(
-    () => (mineOnly ? board.filter((task) => task.assignedTo.id === currentUser.id) : board),
-    [board, mineOnly, currentUser.id],
+    () => (mineOnly ? board.filter((task) => isAssignedTo(task, currentUserId)) : board),
+    [board, mineOnly, currentUserId],
   );
 
-  const mineCount = board.filter((task) => task.assignedTo.id === currentUser.id).length;
+  const mineCount = board.filter((task) => isAssignedTo(task, currentUserId)).length;
   const overdueCount = visible.filter(
     (task) =>
       task.status !== 'completed' &&
@@ -65,16 +103,39 @@ export default function TasksBoard({ tasks, currentUser, port }: TasksBoardProps
       dueBadge(task.dueAt)?.label === 'Overdue',
   ).length;
 
-  /* Dropping only moves the card locally for now. PATCH /tasks/:id exists but
-     only takes pending/completed until the backend accepts all four statuses.
-     Only the assignee can move a card, matching the backend's guard. */
-  function moveTo(status: TaskStatus) {
-    if (dragging === null) return;
-    setBoard((prev) =>
-      prev.map((task) => (task.id === dragging ? { ...task, status } : task)),
-    );
+  /* Moves the card straight away, then saves it — putting it back where it
+     was if the save fails. Only an assignee can drag a card, matching the
+     backend's guard, and it moves for every assignee. */
+  async function moveTo(status: TaskStatus) {
+    const taskId = dragging;
     setDragging(null);
     setDragOver(null);
+
+    const task = board.find((t) => t.id === taskId);
+    if (!task || task.status === status || saving.current.has(task.id)) return;
+
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+
+    const previous = task.status;
+    const setStatus = (next: TaskStatus) =>
+      setBoard((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: next } : t)));
+
+    setMoveError('');
+    setStatus(status);
+    setSaving(task.id, status);
+    try {
+      await updateTaskStatus(token, task.id, status);
+      setSaving(task.id, null);
+      onMoved?.();
+    } catch (err) {
+      setSaving(task.id, null);
+      setStatus(previous);
+      setMoveError(err instanceof Error ? err.message : 'Failed to move task');
+    }
   }
 
   return (
@@ -123,6 +184,12 @@ export default function TasksBoard({ tasks, currentUser, port }: TasksBoardProps
         ))}
       </div>
 
+      {moveError && (
+        <p role="alert" className="mt-4 text-xs font-bold text-[#8B2E38]">
+          Couldn&apos;t move that task: {moveError}
+        </p>
+      )}
+
       {/* BOARD */}
       <div className="mt-6 grid gap-4 lg:grid-cols-4">
         {COLUMNS.map((column) => {
@@ -163,22 +230,26 @@ export default function TasksBoard({ tasks, currentUser, port }: TasksBoardProps
                 ) : (
                   cards.map((task) => {
                     const due = dueBadge(task.dueAt);
-                    const isMine = task.assignedTo.id === currentUser.id;
+                    const isMine = isAssignedTo(task, currentUserId);
+                    const canDrag = isMine && !savingIds.has(task.id);
+                    const shown = task.assignees.slice(0, MAX_AVATARS);
+                    const hidden = task.assignees.length - shown.length;
                     const isDone = task.status === 'completed' || task.status === 'cancelled';
 
                     return (
                       <article
                         key={task.id}
-                        draggable={isMine}
+                        draggable={canDrag}
+                        aria-busy={savingIds.has(task.id)}
                         onDragStart={() => setDragging(task.id)}
                         onDragEnd={() => {
                           setDragging(null);
                           setDragOver(null);
                         }}
                         className={`rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-[#B1C9DC] hover:shadow-md ${
-                          isMine ? 'cursor-grab active:cursor-grabbing' : ''
+                          canDrag ? 'cursor-grab active:cursor-grabbing' : ''
                         } ${
-                          dragging === task.id ? 'opacity-40' : ''
+                          dragging === task.id || savingIds.has(task.id) ? 'opacity-40' : ''
                         }`}
                       >
                         <p
@@ -198,12 +269,26 @@ export default function TasksBoard({ tasks, currentUser, port }: TasksBoardProps
 
                         <div className="mt-3 flex items-center justify-between gap-2">
                           <span
-                            title={task.assignedTo.name}
-                            className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-[9px] font-bold ${
-                              isMine ? 'bg-[#3D6C94] text-white' : 'bg-[#B1C9DC]/40 text-[#3D6C94]'
-                            }`}
+                            title={task.assignees.map((a) => a.name).join(', ')}
+                            className="flex items-center -space-x-1.5"
                           >
-                            {initials(task.assignedTo.name)}
+                            {shown.map((assignee) => (
+                              <span
+                                key={assignee.id}
+                                className={`flex h-6 w-6 items-center justify-center rounded-full font-mono text-[9px] font-bold ring-2 ring-white ${
+                                  assignee.id === currentUserId
+                                    ? 'bg-[#3D6C94] text-white'
+                                    : 'bg-[#DCE7F0] text-[#3D6C94]'
+                                }`}
+                              >
+                                {initials(assignee.name)}
+                              </span>
+                            ))}
+                            {hidden > 0 && (
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 font-mono text-[9px] font-bold text-gray-500 ring-2 ring-white">
+                                +{hidden}
+                              </span>
+                            )}
                           </span>
 
                           {due && !isDone && (
