@@ -8,6 +8,8 @@ import {
   dbMarkAllNotificationsRead,
   dbMarkNotificationRead,
 } from '../database/notifications';
+import { getUserProfile } from './auth';
+import { sendEmail, renderNotificationEmail, escapeHtml } from './email';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -65,6 +67,32 @@ export async function getNotificationById(notificationId: number): Promise<Notif
 }
 
 /**
+ * Emails every notification's recipient the same title/message already
+ * shown in-app — no separate copy needed per notification type. Fire-and-
+ * forget from the caller's point of view: awaited here so the individual
+ * sendEmail failures (already caught inside sendEmail itself) don't reject,
+ * but never awaited by createNotification/createNotificationsBulk's own
+ * callers, so a slow or failing email never delays the in-app notification
+ * actually existing. No-ops per-recipient if their profile can't be found.
+ */
+async function notifyByEmail(notifications: Notification[]): Promise<void> {
+  await Promise.all(
+    notifications.map(async (n) => {
+      try {
+        const profile = await getUserProfile(n.userId);
+        if (!profile) return;
+        const bodyHtml = `<p style="margin:0 0 12px;">${escapeHtml(n.title)}</p>${
+          n.message ? `<p style="margin:0;color:#555;">${escapeHtml(n.message)}</p>` : ''
+        }`;
+        await sendEmail(profile.email, n.title, renderNotificationEmail(profile.firstName, bodyHtml));
+      } catch (error) {
+        console.error('Notify by email error:', error);
+      }
+    })
+  );
+}
+
+/**
  * Creates a new notification for a user.
  * Returns the newly created notification, or null if creation failed.
  */
@@ -73,6 +101,7 @@ export async function createNotification(
 ): Promise<Notification | null> {
   try {
     const result = await dbCreateNotification(input)
+    if (result) void notifyByEmail([result]);
     return result
   } catch (error) {
     console.error('Create Notification error:', error);
@@ -91,7 +120,9 @@ export async function createNotificationsBulk(
   inputs: CreateNotificationInput[]
 ): Promise<Notification[]> {
   try {
-    return await dbCreateNotificationsBulk(inputs);
+    const created = await dbCreateNotificationsBulk(inputs);
+    void notifyByEmail(created);
+    return created;
   } catch (error) {
     console.error('Create notifications bulk error:', error);
     return [];
