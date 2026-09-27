@@ -17,6 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-ses": "^3.1141.0",
     "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/pg": "^8.18.0",
