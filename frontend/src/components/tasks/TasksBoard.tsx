@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { KanbanSquare, Link2 } from 'lucide-react';
 import { portLabel } from '@/lib/ports';
@@ -11,6 +11,9 @@ interface TasksBoardProps {
   tasks: BoardTask[];
   currentUserId: number;
   port: string;
+  /* Called after a move saves, so the page re-fetches — a fetch that started
+     before the save finished would otherwise be the last word on the card. */
+  onMoved?: () => void;
 }
 
 /* Past this many, a card shows "+n" instead of more avatars — a whole-port
@@ -57,16 +60,35 @@ function isAssignedTo(task: BoardTask, userId: number): boolean {
   return task.assignees.some((a) => a.id === userId);
 }
 
-export default function TasksBoard({ tasks, currentUserId, port }: TasksBoardProps) {
+export default function TasksBoard({ tasks, currentUserId, port, onMoved }: TasksBoardProps) {
   const router = useRouter();
   const [mineOnly, setMineOnly] = useState(false);
   const [board, setBoard] = useState(tasks);
   const [dragging, setDragging] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<TaskStatus | null>(null);
   const [moveError, setMoveError] = useState('');
+  /* Cards whose move is still saving, and the column each was dropped in. A
+     saving card can't be dragged again, so two saves never race; and a
+     re-fetch that lands mid-save keeps the card where it was dropped, not
+     where the server had it before the save. */
+  const saving = useRef(new Map<number, TaskStatus>());
+  const [savingIds, setSavingIds] = useState<ReadonlySet<number>>(new Set());
+
+  function setSaving(taskId: number, status: TaskStatus | null) {
+    if (status === null) saving.current.delete(taskId);
+    else saving.current.set(taskId, status);
+    setSavingIds(new Set(saving.current.keys()));
+  }
 
   // The page re-fetches when a task is created elsewhere — take the new rows.
-  useEffect(() => setBoard(tasks), [tasks]);
+  useEffect(() => {
+    setBoard(
+      tasks.map((task) => {
+        const pending = saving.current.get(task.id);
+        return pending ? { ...task, status: pending } : task;
+      }),
+    );
+  }, [tasks]);
 
   const visible = useMemo(
     () => (mineOnly ? board.filter((task) => isAssignedTo(task, currentUserId)) : board),
@@ -90,7 +112,7 @@ export default function TasksBoard({ tasks, currentUserId, port }: TasksBoardPro
     setDragOver(null);
 
     const task = board.find((t) => t.id === taskId);
-    if (!task || task.status === status) return;
+    if (!task || task.status === status || saving.current.has(task.id)) return;
 
     const token = sessionStorage.getItem('token');
     if (!token) {
@@ -104,9 +126,13 @@ export default function TasksBoard({ tasks, currentUserId, port }: TasksBoardPro
 
     setMoveError('');
     setStatus(status);
+    setSaving(task.id, status);
     try {
       await updateTaskStatus(token, task.id, status);
+      setSaving(task.id, null);
+      onMoved?.();
     } catch (err) {
+      setSaving(task.id, null);
       setStatus(previous);
       setMoveError(err instanceof Error ? err.message : 'Failed to move task');
     }
@@ -205,6 +231,7 @@ export default function TasksBoard({ tasks, currentUserId, port }: TasksBoardPro
                   cards.map((task) => {
                     const due = dueBadge(task.dueAt);
                     const isMine = isAssignedTo(task, currentUserId);
+                    const canDrag = isMine && !savingIds.has(task.id);
                     const shown = task.assignees.slice(0, MAX_AVATARS);
                     const hidden = task.assignees.length - shown.length;
                     const isDone = task.status === 'completed' || task.status === 'cancelled';
@@ -212,16 +239,17 @@ export default function TasksBoard({ tasks, currentUserId, port }: TasksBoardPro
                     return (
                       <article
                         key={task.id}
-                        draggable={isMine}
+                        draggable={canDrag}
+                        aria-busy={savingIds.has(task.id)}
                         onDragStart={() => setDragging(task.id)}
                         onDragEnd={() => {
                           setDragging(null);
                           setDragOver(null);
                         }}
                         className={`rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-[#B1C9DC] hover:shadow-md ${
-                          isMine ? 'cursor-grab active:cursor-grabbing' : ''
+                          canDrag ? 'cursor-grab active:cursor-grabbing' : ''
                         } ${
-                          dragging === task.id ? 'opacity-40' : ''
+                          dragging === task.id || savingIds.has(task.id) ? 'opacity-40' : ''
                         }`}
                       >
                         <p

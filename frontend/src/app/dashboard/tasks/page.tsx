@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getProfile } from '@/services/auth-api';
 import { getBoardTasks } from '@/services/tasks-api';
@@ -18,12 +18,24 @@ export default function TasksPage() {
   const [error, setError] = useState('');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [tasks, setTasks] = useState<BoardTask[]>([]);
+  /* Only the most recent load gets to set state — two re-fetches close
+     together can finish out of order, and the older one would show stale
+     rows. */
+  const latestLoad = useRef(0);
 
   const load = useCallback(async (token: string) => {
+    const loadId = ++latestLoad.current;
     const me = await getProfile(token);
+    const board = me.port ? await getBoardTasks(token, me.port) : [];
+    if (loadId !== latestLoad.current) return;
     setProfile(me);
-    setTasks(me.port ? await getBoardTasks(token, me.port) : []);
+    setTasks(board);
   }, []);
+
+  const reload = useCallback(() => {
+    const token = sessionStorage.getItem('token');
+    if (token) load(token).catch(() => {});
+  }, [load]);
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
@@ -39,13 +51,9 @@ export default function TasksPage() {
 
   // Re-fetch after a task is created from the header's "New" dialog.
   useEffect(() => {
-    function handleChanged() {
-      const token = sessionStorage.getItem('token');
-      if (token) load(token).catch(() => {});
-    }
-    window.addEventListener(DASHBOARD_DATA_CHANGED_EVENT, handleChanged);
-    return () => window.removeEventListener(DASHBOARD_DATA_CHANGED_EVENT, handleChanged);
-  }, [load]);
+    window.addEventListener(DASHBOARD_DATA_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(DASHBOARD_DATA_CHANGED_EVENT, reload);
+  }, [reload]);
 
   if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
   if (error) return <p className="text-sm text-[#8B2E38]">{error}</p>;
@@ -60,5 +68,5 @@ export default function TasksPage() {
     );
   }
 
-  return <TasksBoard tasks={tasks} currentUserId={profile.id} port={profile.port} />;
+  return <TasksBoard tasks={tasks} currentUserId={profile.id} port={profile.port} onMoved={reload} />;
 }
