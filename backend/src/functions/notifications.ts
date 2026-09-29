@@ -1,4 +1,3 @@
-import { Pool } from 'pg';
 import {
   dbCreateNotification,
   dbCreateNotificationsBulk,
@@ -10,12 +9,8 @@ import {
 } from '../database/notifications';
 import { getUserProfile } from './auth';
 import { sendEmail, renderNotificationEmail, escapeHtml } from './email';
+import pool from '../database/pool';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // RDS requires SSL — see functions/auth.ts's pool for why.
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
 
 // Matches the notification_type enum in database/create-tables.sql, minus
 // 'request' (nothing creates one of those yet).
@@ -169,5 +164,3 @@ export async function deleteNotification(notificationId: number): Promise<boolea
     return false;
   }
 }
-
-export default pool;

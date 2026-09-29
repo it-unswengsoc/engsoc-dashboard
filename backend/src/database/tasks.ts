@@ -1,10 +1,7 @@
-import { Pool, QueryResult } from 'pg';
+import { QueryResult } from 'pg';
 import { Task, TaskStatus } from '../functions/tasks';
+import pool from './pool';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
 
 /* Assignees come back as one JSON array per task (rather than one row per
    assignee) so a task stays a single row whatever its assignee count. */

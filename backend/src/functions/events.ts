@@ -1,4 +1,4 @@
-import { Pool, QueryResult } from 'pg';
+import { QueryResult } from 'pg';
 import {
   dbGetAllEvents,
   dbGetEventById,
@@ -8,11 +8,7 @@ import {
   dbSetGoogleCalendarEventId,
 } from '../database/events'
 import { syncEventCreate, syncEventUpdate, syncEventDelete } from './calendar-sync';
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // RDS requires SSL — see functions/auth.ts's pool for why.
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
+import pool from '../database/pool';
 
 export type EventType = 'internal' | 'external';
 
@@ -223,5 +219,3 @@ export async function deleteEvent(eventId: number): Promise<boolean> {
     return false;
   }
 }
-
-export default pool;
