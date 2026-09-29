@@ -9,7 +9,7 @@ CREATE TYPE user_role AS ENUM ('member', 'director', 'executive', 'admin');
 CREATE TYPE notification_type AS ENUM ('event', 'alert', 'announcement', 'task', 'request');
 CREATE TYPE event_status AS ENUM ('upcoming', 'ongoing', 'completed', 'cancelled');
 CREATE TYPE event_type AS ENUM ('internal', 'external');
-CREATE TYPE port_type AS ENUM ('cabinet', 'careers', 'IT', 'publication', 'marketing', 'socials', 'sponsorships', 'programs', 'outreach', 'HR');
+CREATE TYPE port_type AS ENUM ('cabinet', 'careers', 'IT', 'publication', 'marketing', 'socials', 'sponsorships', 'programs', 'outreach', 'HR', 'treasurer');
 CREATE TYPE task_status AS ENUM ('pending', 'in_progress', 'completed', 'cancelled');
 CREATE TYPE request_status AS ENUM ('pending', 'in_progress', 'approved', 'rejected', 'completed');
 
@@ -112,6 +112,9 @@ CREATE TABLE tasks (
   description TEXT,
   assigned_by INTEGER,
   event_id INTEGER,
+  -- Set when the task was created by accepting a request (see REQUESTS
+  -- below); its foreign key is added after that table exists.
+  request_id INTEGER,
   status task_status DEFAULT 'pending',
   due_date TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -173,7 +176,28 @@ CREATE TABLE task_attachments (
 -- and form_data holds that form's answers so new request types don't need
 -- schema changes — just a new request_type value and a new form on the
 -- frontend. handled_by is filled in once someone from the target port
--- picks it up.
+-- picks it up. Which port each type goes to, and who there can act on it,
+-- lives in backend/src/functions/request-types.ts.
+--
+-- Accepting a request creates one task for it (tasks.request_id), shared by
+-- whoever it's assigned to. is_anonymous hides the requester from whoever
+-- handles it (grievances); the row still records them so they can follow it
+-- under "My requests". needed_by is copied out of the form's own date field
+-- at submit, so every type sorts and badges the same way.
+--
+-- To pick this up on an existing database without losing data, migrate in
+-- place instead of resetting (ADD VALUE can't run inside a transaction
+-- block, so run it on its own):
+--   ALTER TYPE port_type ADD VALUE 'treasurer';
+--   ALTER TABLE requests ADD COLUMN is_anonymous BOOLEAN DEFAULT false;
+--   ALTER TABLE requests ADD COLUMN needed_by TIMESTAMP;
+--   ALTER TABLE requests ADD COLUMN notes TEXT;
+--   ALTER TABLE requests ADD COLUMN rejection_reason TEXT;
+--   ALTER TABLE tasks ADD COLUMN request_id INTEGER;
+--   ALTER TABLE tasks ADD CONSTRAINT tasks_request_id_fkey
+--     FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE SET NULL;
+--   CREATE INDEX idx_tasks_request_id ON tasks(request_id);
+--   ...then the request_attachments table and its index below, as written.
 -- ============================================================
 CREATE TABLE requests (
   id SERIAL PRIMARY KEY,
@@ -183,12 +207,35 @@ CREATE TABLE requests (
   title VARCHAR(255) NOT NULL,
   form_data JSONB,
   status request_status DEFAULT 'pending',
+  is_anonymous BOOLEAN DEFAULT false,
+  needed_by TIMESTAMP,
+  notes TEXT,
+  rejection_reason TEXT,
   handled_by INTEGER,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   resolved_at TIMESTAMP,
   FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE SET NULL,
   FOREIGN KEY (handled_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+ALTER TABLE tasks ADD CONSTRAINT tasks_request_id_fkey
+  FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE SET NULL;
+
+-- Files attached to a request (a reimbursement's receipt). Kept in Postgres
+-- rather than Drive so they're only reachable through the request's own
+-- access rules, and in their own table so listing requests never reads
+-- them. Capped at the backend (see functions/requests.ts).
+CREATE TABLE request_attachments (
+  id SERIAL PRIMARY KEY,
+  request_id INTEGER NOT NULL,
+  field_name VARCHAR(100) NOT NULL,
+  file_name VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  size_bytes INTEGER NOT NULL,
+  data BYTEA NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (request_id) REFERENCES requests(id) ON DELETE CASCADE
 );
 
 -- Example row for the "IT request to do a mass email" case:
@@ -324,6 +371,8 @@ CREATE INDEX idx_requests_requester_id ON requests(requester_id);
 CREATE INDEX idx_requests_target_port ON requests(target_port);
 CREATE INDEX idx_requests_status ON requests(status);
 CREATE INDEX idx_requests_handled_by ON requests(handled_by);
+CREATE INDEX idx_tasks_request_id ON tasks(request_id);
+CREATE INDEX idx_request_attachments_request_id ON request_attachments(request_id);
 
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_is_read ON notifications(is_read);

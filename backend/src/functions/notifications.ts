@@ -12,15 +12,15 @@ import { sendEmail, renderNotificationEmail, escapeHtml } from './email';
 import pool from '../database/pool';
 
 
-// Matches the notification_type enum in database/create-tables.sql, minus
-// 'request' (nothing creates one of those yet).
-export type NotificationType = 'event' | 'alert' | 'announcement' | 'task';
+// Matches the notification_type enum in database/create-tables.sql.
+export type NotificationType = 'event' | 'alert' | 'announcement' | 'task' | 'request';
 
 export interface Notification {
   id: number;
   userId: number;
   eventId: number | null;
   taskId: number | null;
+  requestId: number | null;
   type: NotificationType;
   title: string;
   message: string | null;
@@ -32,6 +32,7 @@ export interface CreateNotificationInput {
   userId: number;
   eventId?: number;
   taskId?: number;
+  requestId?: number;
   type: NotificationType;
   title: string;
   message?: string;

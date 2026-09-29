@@ -26,7 +26,9 @@ export type UserPortfolio =
   | 'sponsorships'
   | 'programs'
   | 'outreach'
-  | 'HR';
+  | 'HR'
+  // A port of one: the treasurer, who handles reimbursement requests.
+  | 'treasurer';
 export const USER_PORTFOLIOS: UserPortfolio[] = [
   'cabinet',
   'careers',
@@ -38,6 +40,7 @@ export const USER_PORTFOLIOS: UserPortfolio[] = [
   'programs',
   'outreach',
   'HR',
+  'treasurer',
 ];
 
 export interface AdminUser {
