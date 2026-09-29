@@ -15,13 +15,18 @@ import {
 const router = Router();
 
 /**
- * GET /drive/folders
+ * GET /drive/folders?counts=0
  * Lists every Shared Drive the signed-in member's own Google account can
  * see, grouped into departments (see listDepartments). `connected: false`
  * means this account has no stored Google refresh token yet (a
  * password-only account, or a Google account that hasn't signed in since
  * this feature shipped) — the frontend prompts them to sign out and back in
  * with Google in that case.
+ *
+ * `?counts=0` skips the per-drive file-count fetch (up to N extra Google
+ * API round-trips, one per Shared Drive) — pass it whenever the caller only
+ * needs drive names (e.g. a destination picker), not the Documents page's
+ * own folder cards, which is the one place that actually shows counts.
  */
 router.get('/folders', verifyAuthToken, async (req: Request, res: Response) => {
   try {
@@ -32,7 +37,8 @@ router.get('/folders', verifyAuthToken, async (req: Request, res: Response) => {
       return res.status(200).json({ status: 'success', data: [], connected: false });
     }
 
-    const departments = await listDepartments(refreshToken);
+    const includeFileCounts = req.query.counts !== '0';
+    const departments = await listDepartments(refreshToken, includeFileCounts);
     res.status(200).json({ status: 'success', data: departments, connected: true });
   } catch (error) {
     console.error('List drive folders error:', error);
