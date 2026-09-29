@@ -77,6 +77,13 @@ export function renderNotificationEmail(recipientName: string, bodyHtml: string)
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="x-apple-disable-message-reformatting">
+  <style>
+    /* Apple Mail/iOS auto-linkify plaintext that looks like a URL (e.g. the
+       WWW.UNSWENGSOC.COM footer line) and slap their own blue/underlined
+       default styling on it — this overrides that back to matching text. */
+    a[x-apple-data-detectors='true'] { color: inherit !important; text-decoration: none !important; }
+  </style>
 </head>
 <body style="margin:0;padding:0;background-color:#f7f7f7;font-family:'Montserrat',Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f7f7f7;">
@@ -106,7 +113,7 @@ export function renderNotificationEmail(recipientName: string, bodyHtml: string)
           </tr>
           <tr>
             <td style="background-color:#324158;padding:30px 10px 10px;text-align:center;">
-              <span style="font-size:14px;color:#ecf0f1;letter-spacing:1px;">WWW.UNSWENGSOC.COM</span>
+              <a href="https://www.unswengsoc.com" style="font-size:14px;color:#ecf0f1 !important;letter-spacing:1px;text-decoration:none;">WWW.UNSWENGSOC.COM</a>
             </td>
           </tr>
           <tr>
