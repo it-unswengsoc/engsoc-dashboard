@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { Heart, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import type { AnnouncementItem, AnnouncementComment } from '@/types/announcements';
 import {
@@ -19,8 +20,16 @@ import type { Profile } from '@/types/auth';
 import { roleLabel } from '@/lib/roles';
 import MentionText from '@/components/MentionText';
 import MentionTextarea from '@/components/MentionTextarea';
-import AnnouncementComposer from '@/components/announcements/AnnouncementComposer';
 import Dialog from '@/components/dialogs/Dialog';
+
+/* Every announcement row in the feed used to eagerly pull in
+   AnnouncementComposer's whole tree — including react-easy-crop, a real
+   image-cropping library — just in case that specific row's Edit got
+   clicked. Most of a feed is read, not edited; deferred until Edit
+   actually opens it instead. */
+const AnnouncementComposer = dynamic(() => import('@/components/announcements/AnnouncementComposer'), {
+  ssr: false,
+});
 
 function initialsOf(name: string | null): string {
   if (!name) return '?';
@@ -223,6 +232,12 @@ export default function AnnouncementRow({ onDeleted, ...announcement }: Announce
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [editing, setEditing] = useState(false);
+  // Rendering AnnouncementComposer at all — even with open={false} — is
+  // enough to make React resolve its dynamic() import, so gating only the
+  // Dialog's own visibility doesn't defer anything. This mounts it lazily
+  // on the first real Edit click, then leaves it mounted (so later
+  // open/close cycles keep Dialog's own close animation).
+  const [hasEditedOnce, setHasEditedOnce] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -322,7 +337,15 @@ export default function AnnouncementRow({ onDeleted, ...announcement }: Announce
           </p>
           <p className="font-mono text-[10px] text-gray-400">{timeAgo(createdAt)}</p>
         </div>
-        {canEdit && <PostMenu onEdit={() => setEditing(true)} onDelete={() => setDeleting(true)} />}
+        {canEdit && (
+          <PostMenu
+            onEdit={() => {
+              setHasEditedOnce(true);
+              setEditing(true);
+            }}
+            onDelete={() => setDeleting(true)}
+          />
+        )}
       </div>
 
       {/* Announcement image */}
@@ -390,13 +413,15 @@ export default function AnnouncementRow({ onDeleted, ...announcement }: Announce
         </div>
       )}
 
-      <AnnouncementComposer
-        open={editing}
-        mode="edit"
-        initial={{ content, imageUrl }}
-        onSubmit={handleEditSubmit}
-        onClose={() => setEditing(false)}
-      />
+      {hasEditedOnce && (
+        <AnnouncementComposer
+          open={editing}
+          mode="edit"
+          initial={{ content, imageUrl }}
+          onSubmit={handleEditSubmit}
+          onClose={() => setEditing(false)}
+        />
+      )}
 
       <ConfirmDeleteDialog open={deleting} onConfirm={handleDelete} onClose={() => setDeleting(false)} />
     </div>

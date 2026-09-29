@@ -1,11 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { getProfile } from '@/services/auth-api';
 import { search, type DriveSearchResultData } from '@/services/documents';
-import NewItemDialog from '@/components/dialogs/NewItemDialog';
 import NotificationBell from '@/components/NotificationBell';
+
+/* Header renders on every authenticated page, so a plain static import here
+   put NewItemDialog's whole tree — TaskComposer, EventComposer,
+   AnnouncementComposer, DriveFilePicker, react-easy-crop — into every
+   single page's initial load, whether "New" was ever clicked or not.
+   Loaded on demand instead, the moment it's actually opened. ssr:false is
+   safe (and required by next/dynamic for anything referencing
+   window/sessionStorage at module scope) since the whole dialog only ever
+   makes sense client-side, post-login. */
+const NewItemDialog = dynamic(() => import('@/components/dialogs/NewItemDialog'), { ssr: false });
 
 const SEARCH_DEBOUNCE_MS = 350;
 const MIN_QUERY_LENGTH = 2;
@@ -47,6 +57,7 @@ function SearchResultRow({ result, onNavigate }: { result: DriveSearchResultData
 export default function Header() {
   const [initials, setInitials] = useState('');
   const [newDialogOpen, setNewDialogOpen] = useState(false);
+  const [hasOpenedNewDialogOnce, setHasOpenedNewDialogOnce] = useState(false);
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<DriveSearchResultData[]>([]);
@@ -159,7 +170,10 @@ export default function Header() {
       <div className="flex items-center gap-3">
         {/* New button */}
         <button
-          onClick={() => setNewDialogOpen(true)}
+          onClick={() => {
+            setHasOpenedNewDialogOnce(true);
+            setNewDialogOpen(true);
+          }}
           className="flex items-center gap-2 rounded-xl bg-[#B1C9DC] px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98]"
         >
           <svg
@@ -189,7 +203,9 @@ export default function Header() {
         </Link>
       </div>
 
-      <NewItemDialog open={newDialogOpen} onClose={() => setNewDialogOpen(false)} />
+      {hasOpenedNewDialogOnce && (
+        <NewItemDialog open={newDialogOpen} onClose={() => setNewDialogOpen(false)} />
+      )}
     </header>
   );
 }
