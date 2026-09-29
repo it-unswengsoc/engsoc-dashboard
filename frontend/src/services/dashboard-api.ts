@@ -2,6 +2,7 @@ import type { EventItem } from '@/types/events';
 import type { TaskItem } from '@/types/tasks';
 import type { AnnouncementItem } from '@/types/announcements';
 import { apiUrl } from '@/services/api-config';
+import { readSessionCache, writeSessionCache } from '@/lib/session-cache';
 import { getEvents, toEventItem, type RawEvent } from '@/services/events-api';
 import { getTasks, toTaskItem, type RawTask } from '@/services/tasks-api';
 import { getAnnouncements, withAbsoluteImageUrl } from '@/services/announcements-api';
@@ -37,35 +38,15 @@ export async function getDashboard(token: string): Promise<DashboardData> {
   };
 }
 
-/* The last dashboard this tab loaded, so coming back to it (from another
-   page, or after a reload) shows it straight away while a fresh copy loads
-   behind it. Kept in memory for client-side navigation and in
-   sessionStorage for reloads; tied to the token it was loaded with, so a
-   different sign-in in the same tab never sees someone else's. Small
-   enough for sessionStorage now that images aren't inlined. */
+/* The last dashboard this tab loaded, shown straight away on the next
+   visit while a fresh copy loads (see lib/session-cache.ts). Small enough
+   for sessionStorage now that images aren't inlined. */
 const CACHE_KEY = 'dashboard-cache';
 
-let memoryCache: { token: string; data: DashboardData } | null = null;
-
 export function readCachedDashboard(token: string): DashboardData | null {
-  if (memoryCache?.token === token) return memoryCache.data;
-  try {
-    const stored = sessionStorage.getItem(CACHE_KEY);
-    if (!stored) return null;
-    const parsed = JSON.parse(stored) as { token: string; data: DashboardData };
-    if (parsed.token !== token) return null;
-    memoryCache = parsed;
-    return parsed.data;
-  } catch {
-    return null;
-  }
+  return readSessionCache<DashboardData>(CACHE_KEY, token);
 }
 
 export function writeCachedDashboard(token: string, data: DashboardData): void {
-  memoryCache = { token, data };
-  try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify(memoryCache));
-  } catch {
-    // Storage full or unavailable — the in-memory copy still covers navigation.
-  }
+  writeSessionCache(CACHE_KEY, token, data);
 }

@@ -54,7 +54,10 @@ function NodeIcon({ node }: { node: BrowserNode }) {
 export default function DriveColumn({ title, nodes, selectedId, onSelect, onOpenFile }: DriveColumnProps) {
   return (
     <div className="flex h-full min-w-[140px] flex-1 basis-0 flex-col overflow-y-auto border-r border-gray-100">
-      <h3 className="sticky top-0 truncate border-b border-gray-100 bg-white px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
+      {/* shrink-0: truncate sets overflow: hidden, which otherwise lets the
+          column squash this heading to make room once a long list
+          overflows it, clipping the text. */}
+      <h3 className="sticky top-0 shrink-0 truncate border-b border-gray-100 bg-white px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
         {title}
       </h3>
 
@@ -95,6 +98,26 @@ export default function DriveColumn({ title, nodes, selectedId, onSelect, onOpen
           })}
         </StaggerReveal>
       )}
+    </div>
+  );
+}
+
+/* Stands in for a column while its contents are loading. `title` is left
+   blank when it isn't known yet. */
+export function DriveColumnSkeleton({ title }: { title?: string }) {
+  return (
+    <div className="flex h-full min-w-[140px] flex-1 basis-0 flex-col border-r border-gray-100" aria-busy="true">
+      <h3 className="shrink-0 truncate border-b border-gray-100 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
+        {title || '\u00a0'}
+      </h3>
+      <div className="flex flex-col py-1">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="flex items-center gap-2 px-3 py-1.5">
+            <span className="h-6 w-6 shrink-0 animate-pulse rounded bg-gray-100" />
+            <span className="h-3 w-32 animate-pulse rounded bg-gray-100" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -14,8 +14,9 @@ import {
   uploadFile,
   remove,
 } from '@/services/documents';
-import DepartmentSidebar from './DepartmentSidebar';
-import DriveColumn from './DriveColumn';
+import { readSessionCache, writeSessionCache } from '@/lib/session-cache';
+import DepartmentSidebar, { DepartmentSidebarSkeleton } from './DepartmentSidebar';
+import DriveColumn, { DriveColumnSkeleton } from './DriveColumn';
 import DrivePreviewPane from './DrivePreviewPane';
 import NewDriveItemMenu from './NewDriveItemMenu';
 import NamePromptDialog from './NamePromptDialog';
@@ -35,6 +36,25 @@ const FILTERS: { label: string; category: DriveFileCategory | 'ALL' }[] = [
    it), but a folder tree nested arbitrarily deep would otherwise grow the
    DOM and the horizontally-scrolled strip without bound. */
 const MAX_VISIBLE_COLUMNS = 4;
+
+/* The department list barely changes, so the last one this tab loaded is
+   shown straight away on the next visit while a fresh copy loads (see
+   lib/session-cache.ts). */
+const DEPARTMENTS_CACHE_KEY = 'documents-departments-cache';
+
+interface CachedDepartments {
+  departments: DriveDepartmentData[];
+  connected: boolean;
+}
+
+function readCachedDepartments(): CachedDepartments | null {
+  try {
+    const token = sessionStorage.getItem('token');
+    return token ? readSessionCache<CachedDepartments>(DEPARTMENTS_CACHE_KEY, token) : null;
+  } catch {
+    return null;
+  }
+}
 
 type CreateDialog =
   | { kind: 'folder' }
@@ -57,16 +77,21 @@ export default function DocumentsView() {
   const router = useRouter();
   const [category, setCategory] = useState<DriveFileCategory | 'ALL'>('ALL');
 
-  const [departments, setDepartments] = useState<DriveDepartmentData[]>([]);
-  const [googleConnected, setGoogleConnected] = useState(true);
-  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [cached] = useState(readCachedDepartments);
+  const [departments, setDepartments] = useState<DriveDepartmentData[]>(cached?.departments ?? []);
+  const [googleConnected, setGoogleConnected] = useState(cached?.connected ?? true);
+  const [departmentsLoading, setDepartmentsLoading] = useState(cached === null);
   const [departmentsError, setDepartmentsError] = useState('');
-  const [activeDepartment, setActiveDepartment] = useState<DriveDepartmentData | null>(null);
+  const [activeDepartment, setActiveDepartment] = useState<DriveDepartmentData | null>(
+    cached?.departments[0] ?? null
+  );
 
   // columns[0] is always the active department's drives; columns[i] for
   // i > 0 is the contents of selected[i - 1]. Both track the *full* path,
   // even the part scrolled out of MAX_VISIBLE_COLUMNS.
-  const [columns, setColumns] = useState<BrowserNode[][]>([]);
+  const [columns, setColumns] = useState<BrowserNode[][]>(
+    cached?.departments[0] ? [cached.departments[0].drives.map(driveToBrowserNode)] : []
+  );
   const [selected, setSelected] = useState<BrowserNode[]>([]);
   const [pendingColumnAt, setPendingColumnAt] = useState<number | null>(null);
   const [openError, setOpenError] = useState('');
@@ -83,6 +108,20 @@ export default function DocumentsView() {
   useEffect(() => {
     selectedRef.current = selected;
   }, [selected]);
+  // Same for the active department, which the fresh department list below
+  // re-points at its updated copy.
+  const activeDepartmentRef = useRef(activeDepartment);
+  useEffect(() => {
+    activeDepartmentRef.current = activeDepartment;
+  }, [activeDepartment]);
+
+  // Keep the cache in step with what's on screen, including the file counts
+  // once they arrive.
+  useEffect(() => {
+    if (departmentsLoading || departmentsError) return;
+    const token = sessionStorage.getItem('token');
+    if (token) writeSessionCache<CachedDepartments>(DEPARTMENTS_CACHE_KEY, token, { departments, connected: googleConnected });
+  }, [departments, googleConnected, departmentsLoading, departmentsError]);
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
@@ -99,18 +138,35 @@ export default function DocumentsView() {
     // Shared Drive's count, one of which being unusually large can otherwise
     // hold up the entire page.
     getDepartments(token, false)
-      .then(({ departments, connected }) => {
+      .then(({ departments: fresh, connected }) => {
         if (cancelled) return;
-        setDepartments(departments);
         setGoogleConnected(connected);
-        if (departments.length > 0) {
-          setActiveDepartment(departments[0]);
-          setColumns([departments[0].drives.map(driveToBrowserNode)]);
+        // Keep the file counts already on screen (from the cache) until the
+        // slow path below brings fresh ones — this pass reports them as 0.
+        setDepartments((prev) => {
+          const countById = new Map<string, number>();
+          for (const dept of prev) for (const drive of dept.drives) countById.set(drive.id, drive.fileCount);
+          return fresh.map((dept) => ({
+            ...dept,
+            drives: dept.drives.map((drive) => ({ ...drive, fileCount: countById.get(drive.id) ?? drive.fileCount })),
+          }));
+        });
+
+        // The cached list may already be on screen and the member may have
+        // started browsing it — only reset the columns if they haven't.
+        const current = activeDepartmentRef.current;
+        const stillThere = current ? fresh.find((dept) => dept.name === current.name) : undefined;
+        const next = stillThere ?? fresh[0] ?? null;
+        setActiveDepartment(next);
+        if (!stillThere || selectedRef.current.length === 0) {
+          setColumns(next ? [next.drives.map(driveToBrowserNode)] : []);
+          setSelected([]);
         }
       })
       .catch((err) => {
         if (cancelled) return;
-        setDepartmentsError(err instanceof Error ? err.message : 'Failed to load Drive departments');
+        // A failed refresh keeps the cached list that's already showing.
+        if (!cached) setDepartmentsError(err instanceof Error ? err.message : 'Failed to load Drive departments');
       })
       .finally(() => {
         if (!cancelled) setDepartmentsLoading(false);
@@ -426,20 +482,30 @@ export default function DocumentsView() {
       {/* BROWSER */}
       <div className="mt-4 flex min-w-0 flex-1 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         {departmentsLoading ? (
-          <p className="p-6 font-mono text-xs text-gray-400">Loading…</p>
+          <>
+            <DepartmentSidebarSkeleton />
+            <div className="flex min-w-0 flex-1">
+              <DriveColumnSkeleton />
+            </div>
+            <DrivePreviewPane
+              node={null}
+              path={[]}
+              locationLabel=""
+              onRename={() => {}}
+              onDelete={() => {}}
+            />
+          </>
         ) : departmentsError ? (
           <p className="p-6 font-mono text-xs text-[#8B2E38]">{departmentsError}</p>
         ) : departments.length === 0 ? (
           <p className="p-6 font-mono text-xs text-gray-400">No shared drives found.</p>
         ) : (
           <>
-            <div className="shrink-0 py-4 pl-4">
-              <DepartmentSidebar
-                departments={departments}
-                activeDepartment={activeDepartment?.name ?? null}
-                onSelect={selectDepartment}
-              />
-            </div>
+            <DepartmentSidebar
+              departments={departments}
+              activeDepartment={activeDepartment?.name ?? null}
+              onSelect={selectDepartment}
+            />
 
             {/* No horizontal scrolling here on purpose — columns share
                 whatever width is actually available (down to a readable
@@ -459,15 +525,15 @@ export default function DocumentsView() {
                   />
                 );
               })}
-              {(showPendingColumn || uploading) && (
+              {uploading ? (
                 <div className="flex h-full min-w-[140px] flex-1 basis-0 flex-col border-r border-gray-100">
-                  <h3 className="border-b border-gray-100 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
+                  <h3 className="shrink-0 border-b border-gray-100 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
                     &nbsp;
                   </h3>
-                  <p className="px-3 py-6 text-center font-mono text-xs text-gray-400">
-                    {uploading ? 'Uploading…' : 'Loading…'}
-                  </p>
+                  <p className="px-3 py-6 text-center font-mono text-xs text-gray-400">Uploading…</p>
                 </div>
+              ) : (
+                showPendingColumn && <DriveColumnSkeleton title={selected[(pendingColumnAt ?? 1) - 1]?.name} />
               )}
             </div>
 
