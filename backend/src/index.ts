@@ -44,6 +44,11 @@ app.use(helmet());
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
+  // Frontend and backend are on different domains, so every request carrying
+  // an Authorization header is preceded by an OPTIONS preflight. Letting the
+  // browser cache the preflight answer (Chrome caps this at 2h, Firefox 24h)
+  // saves that extra round trip on every call after the first.
+  maxAge: 86400,
 }));
 app.use(morgan('dev'));
 // Default body-parser limit is 100kb — comfortably enough for everything
