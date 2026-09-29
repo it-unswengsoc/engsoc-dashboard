@@ -1,11 +1,13 @@
 import { QueryResult } from 'pg';
 import { Announcement, AnnouncementComment, CreateAnnouncementInput, UpdateAnnouncementInput } from '../functions/announcements';
 import pool from './pool';
+import { announcementImagePath } from '../functions/announcement-images';
 
 
 const ANNOUNCEMENT_SELECT = `
   SELECT a.id, a.author_id, u.first_name, u.last_name, u.role,
-         a.content, a.image_url, a.like_count, a.comment_count, a.created_at,
+         a.content, a.image_url IS NOT NULL AS has_image, a.updated_at,
+         a.like_count, a.comment_count, a.created_at,
          EXISTS (
            SELECT 1 FROM announcement_likes al
            WHERE al.announcement_id = a.id AND al.user_id = $1
@@ -25,7 +27,8 @@ function rowToAnnouncement(row: any): Announcement {
     authorName: row.first_name ? `${row.first_name} ${row.last_name}` : null,
     authorRole: row.role,
     content: row.content,
-    imageUrl: row.image_url,
+    // The image itself is served separately — see functions/announcement-images.ts.
+    imageUrl: row.has_image ? announcementImagePath(row.id, row.updated_at) : null,
     likeCount: row.like_count,
     isLikedByMe: row.is_liked_by_me,
     commentCount: row.comment_count,
@@ -61,6 +64,19 @@ export async function dbGetAnnouncementById(
   );
   if (result.rows.length === 0) return null;
   return rowToAnnouncement(result.rows[0]);
+}
+
+/**
+ * Fetches just an announcement's stored image (a data: URI), for
+ * GET /announcements/:id/image. Returns null if the announcement doesn't
+ * exist or has no image.
+ */
+export async function dbGetAnnouncementImage(announcementId: number): Promise<string | null> {
+  const result: QueryResult = await pool.query(
+    `SELECT image_url FROM announcements WHERE id = $1`,
+    [announcementId]
+  );
+  return result.rows[0]?.image_url ?? null;
 }
 
 /**

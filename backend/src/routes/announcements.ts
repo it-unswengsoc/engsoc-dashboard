@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import {
   getAllAnnouncements,
+  getAnnouncementImage,
   createAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
@@ -14,6 +15,7 @@ import {
 } from '../functions/announcements';
 import { verifyAuthToken, requireRole } from './auth';
 import { isUserAdmin } from '../functions/admin';
+import { decodeImageDataUri, isValidAnnouncementImageSignature } from '../functions/announcement-images';
 
 const router = Router();
 
@@ -45,6 +47,49 @@ router.get('/', verifyAuthToken, async (req: Request, res: Response) => {
       status: 'error',
       message: 'Internal server error',
     });
+  }
+});
+
+/**
+ * GET /announcements/:announcementId/image?v=...&sig=...
+ * Serves an announcement's image as a real image response, so list
+ * responses can link to it instead of inlining it. No verifyAuthToken — an
+ * <img> can't send one — so access is by the signed URL that only an
+ * authenticated list/create/update response hands out (see
+ * functions/announcement-images.ts).
+ */
+router.get('/:announcementId/image', async (req: Request, res: Response) => {
+  try {
+    const announcementId = parseInt(req.params.announcementId, 10);
+    const { v, sig } = req.query;
+    if (
+      isNaN(announcementId) ||
+      typeof v !== 'string' ||
+      typeof sig !== 'string' ||
+      !isValidAnnouncementImageSignature(announcementId, v, sig)
+    ) {
+      return res.status(403).json({ status: 'error', message: 'Invalid image link' });
+    }
+
+    const dataUri = await getAnnouncementImage(announcementId);
+    const image = dataUri ? decodeImageDataUri(dataUri) : null;
+    if (!image) {
+      return res.status(404).json({ status: 'error', message: 'Image not found' });
+    }
+
+    res.set({
+      'Content-Type': image.contentType,
+      // The URL changes whenever the image does (v = updated_at), so it's
+      // safe to keep for good. private: never shared caches.
+      'Cache-Control': 'private, max-age=31536000, immutable',
+      // helmet defaults this to same-origin, which would stop the
+      // frontend's own domain from displaying it.
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
+    res.status(200).send(image.body);
+  } catch (error) {
+    console.error('Get announcement image error:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error' });
   }
 });
 
