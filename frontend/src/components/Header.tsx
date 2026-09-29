@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { getProfile } from '@/services/auth-api';
+import { useProfile } from '@/lib/profile-context';
 import { search, type DriveSearchResultData } from '@/services/documents';
 import NotificationBell from '@/components/NotificationBell';
 
@@ -55,7 +55,10 @@ function SearchResultRow({ result, onNavigate }: { result: DriveSearchResultData
 }
 
 export default function Header() {
-  const [initials, setInitials] = useState('');
+  const { profile } = useProfile();
+  const initials = profile
+    ? ((profile.firstName?.[0] ?? '') + (profile.lastName?.[0] ?? '')).toUpperCase()
+    : '';
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [hasOpenedNewDialogOnce, setHasOpenedNewDialogOnce] = useState(false);
 
@@ -67,19 +70,6 @@ export default function Header() {
 
   const searchBoxRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const token = sessionStorage.getItem('token');
-    if (!token) return;
-
-    getProfile(token)
-      .then((profile) => {
-        const first = profile.firstName?.[0] ?? '';
-        const last = profile.lastName?.[0] ?? '';
-        setInitials((first + last).toUpperCase());
-      })
-      .catch(() => {});
-  }, []);
 
   // A global search across every Shared Drive (and My Drive) the member can
   // see — same access boundary as the documents page's column browser, just

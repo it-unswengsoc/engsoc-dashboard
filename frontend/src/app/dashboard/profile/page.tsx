@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { LogOut, Mail } from 'lucide-react';
 import { getProfile, updateProfile } from '@/services/auth-api';
 import type { Profile } from '@/types/auth';
+import { useProfile } from '@/lib/profile-context';
 
 const inputStyles =
   'w-full rounded-lg border border-transparent bg-gray-100 px-3 py-2 text-sm text-gray-900 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]';
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { setProfile: setSharedProfile } = useProfile();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -73,6 +75,8 @@ export default function ProfilePage() {
     try {
       const updated = await updateProfile(token, firstName.trim(), lastName.trim());
       setProfile(updated);
+      // Header initials and the dashboard greeting read the shared copy.
+      setSharedProfile(updated);
       setEditing(false);
     } catch (err) {
       if (err instanceof Error && err.message === 'Unauthorized') {

@@ -14,9 +14,8 @@ import {
   deleteAnnouncement,
 } from '@/services/announcements-api';
 import { getDirectory } from '@/services/users-api';
-import { getProfile } from '@/services/auth-api';
+import { useProfile } from '@/lib/profile-context';
 import type { DirectoryUser } from '@/types/directory';
-import type { Profile } from '@/types/auth';
 import { roleLabel } from '@/lib/roles';
 import MentionText from '@/components/MentionText';
 import MentionTextarea from '@/components/MentionTextarea';
@@ -230,7 +229,7 @@ export default function AnnouncementRow({ onDeleted, ...announcement }: Announce
   const [commentCount, setCommentCount] = useState(announcement.commentCount);
   const [directory, setDirectory] = useState<DirectoryUser[] | null>(null);
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { profile } = useProfile();
   const [editing, setEditing] = useState(false);
   // Rendering AnnouncementComposer at all — even with open={false} — is
   // enough to make React resolve its dynamic() import, so gating only the
@@ -239,12 +238,6 @@ export default function AnnouncementRow({ onDeleted, ...announcement }: Announce
   // open/close cycles keep Dialog's own close animation).
   const [hasEditedOnce, setHasEditedOnce] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    const token = sessionStorage.getItem('token');
-    if (!token) return;
-    getProfile(token).then(setProfile).catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (!commentsOpen) return;

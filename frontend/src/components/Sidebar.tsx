@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ import {
   LogOut,
   type LucideIcon,
 } from "lucide-react";
-import { getProfile } from "@/services/auth-api";
+import { useProfile } from "@/lib/profile-context";
 
 const dashboardLinks: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Home", href: "/dashboard", icon: Home },
@@ -30,18 +30,12 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { profile } = useProfile();
 
   // Shown only for an admin — checked against the real role on every load
   // rather than cached, so a role change (granted or revoked in the admin
   // panel) is reflected the next time this member loads the dashboard.
-  useEffect(() => {
-    const token = sessionStorage.getItem("token");
-    if (!token) return;
-    getProfile(token)
-      .then((profile) => setIsAdmin(profile.role === "admin"))
-      .catch(() => setIsAdmin(false));
-  }, []);
+  const isAdmin = profile?.role === "admin";
 
   const links = isAdmin ? [...dashboardLinks, adminLink] : dashboardLinks;
 
