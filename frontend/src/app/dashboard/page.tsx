@@ -36,24 +36,117 @@ function groupEventsByDay(events: EventRowData[]) {
 const UPCOMING_EVENTS_LIMIT = 20;
 const OPEN_TASKS_LIMIT = 20;
 
+/* Generic pulsing placeholder bar — composed into the section skeletons
+   below, each sized to roughly match its real row so nothing jumps once
+   the real data swaps in. */
+function SkeletonBar({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-gray-200 ${className}`} />;
+}
+
+function StatCardSkeleton({ colour }: { colour: string }) {
+  return (
+    <div className="flex flex-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="w-1.5 shrink-0" style={{ backgroundColor: colour, opacity: 0.35 }} />
+      <div className="px-4 py-4">
+        <SkeletonBar className="mb-2.5 h-3 w-20" />
+        <SkeletonBar className="h-7 w-10" />
+      </div>
+    </div>
+  );
+}
+
+function AnnouncementRowSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-3">
+        <SkeletonBar className="h-9 w-9 shrink-0 rounded-full" />
+        <div className="flex-1">
+          <SkeletonBar className="mb-1.5 h-3.5 w-40" />
+          <SkeletonBar className="h-2.5 w-20" />
+        </div>
+      </div>
+      <div className="px-4 py-4">
+        <SkeletonBar className="mb-2 h-3 w-full" />
+        <SkeletonBar className="h-3 w-5/6" />
+      </div>
+    </div>
+  );
+}
+
+function EventRowSkeleton() {
+  return (
+    <div className="flex items-start gap-2.5 px-3 py-3.5">
+      <SkeletonBar className="h-9 w-9 shrink-0 rounded-lg" />
+      <div className="flex flex-1 flex-col gap-1.5">
+        <SkeletonBar className="h-3.5 w-32" />
+        <SkeletonBar className="h-2.5 w-20" />
+      </div>
+    </div>
+  );
+}
+
+function TaskRowSkeleton() {
+  return (
+    <div className="flex items-center gap-2.5 px-3 py-3.5">
+      <SkeletonBar className="h-5 w-5 shrink-0 rounded-md" />
+      <div className="flex flex-1 flex-col gap-1.5">
+        <SkeletonBar className="h-3.5 w-28" />
+        <SkeletonBar className="h-2.5 w-16" />
+      </div>
+    </div>
+  );
+}
+
+interface Fetched<T> {
+  data: T[];
+  loading: boolean;
+  error: string;
+}
+
+const INITIAL_FETCHED = { data: [], loading: true, error: '' };
+
 /* Client-side, not server-rendered: tasks and announcements now carry
    per-user data (whose task it is, whether *I* liked this), which needs the
    JWT held in sessionStorage — a Server Component can't reach that. Same
-   pattern as DocumentsView/AdminView. */
+   pattern as DocumentsView/AdminView.
+
+   Events, tasks, and announcements are fetched independently rather than
+   behind one shared Promise.all — each section now renders (or shows its
+   own skeleton) the moment its own request resolves, instead of the whole
+   page staying blank on a single "Loading…" line until the slowest of the
+   three finishes. */
 export default function HomePage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  const [events, setEvents] = useState<EventItem[]>([]);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [eventsState, setEventsState] = useState<Fetched<EventItem>>(INITIAL_FETCHED);
+  const [tasksState, setTasksState] = useState<Fetched<TaskItem>>(INITIAL_FETCHED);
+  const [announcementsState, setAnnouncementsState] = useState<Fetched<AnnouncementItem>>(INITIAL_FETCHED);
 
-  const load = useCallback(async (token: string) => {
-    const [e, t, a] = await Promise.all([getEvents(), getTasks(token), getAnnouncements(token)]);
-    setEvents(e);
-    setTasks(t);
-    setAnnouncements(a);
+  const load = useCallback((token: string) => {
+    setEventsState((s) => ({ ...s, loading: true, error: '' }));
+    getEvents()
+      .then((data) => setEventsState({ data, loading: false, error: '' }))
+      .catch((err) =>
+        setEventsState({ data: [], loading: false, error: err instanceof Error ? err.message : 'Failed to load events' })
+      );
+
+    setTasksState((s) => ({ ...s, loading: true, error: '' }));
+    getTasks(token)
+      .then((data) => setTasksState({ data, loading: false, error: '' }))
+      .catch((err) =>
+        setTasksState({ data: [], loading: false, error: err instanceof Error ? err.message : 'Failed to load tasks' })
+      );
+
+    setAnnouncementsState((s) => ({ ...s, loading: true, error: '' }));
+    getAnnouncements(token)
+      .then((data) => setAnnouncementsState({ data, loading: false, error: '' }))
+      .catch((err) =>
+        setAnnouncementsState({
+          data: [],
+          loading: false,
+          error: err instanceof Error ? err.message : 'Failed to load announcements',
+        })
+      );
   }, []);
 
   useEffect(() => {
@@ -62,10 +155,7 @@ export default function HomePage() {
       router.push('/login');
       return;
     }
-
-    load(token)
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load dashboard'))
-      .finally(() => setLoading(false));
+    load(token);
   }, [router, load]);
 
   // Re-fetch after a task/event/announcement is created via the header's
@@ -73,22 +163,23 @@ export default function HomePage() {
   useEffect(() => {
     function handleChanged() {
       const token = sessionStorage.getItem('token');
-      if (token) load(token).catch(() => {});
+      if (token) load(token);
     }
     window.addEventListener(DASHBOARD_DATA_CHANGED_EVENT, handleChanged);
     return () => window.removeEventListener(DASHBOARD_DATA_CHANGED_EVENT, handleChanged);
   }, [load]);
 
   function handleTaskToggled(id: number, completed: boolean) {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed } : t)));
+    setTasksState((s) => ({ ...s, data: s.data.map((t) => (t.id === id ? { ...t, completed } : t)) }));
   }
 
   function handleAnnouncementDeleted(id: number) {
-    setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+    setAnnouncementsState((s) => ({ ...s, data: s.data.filter((a) => a.id !== id) }));
   }
 
-  if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
-  if (error) return <p className="text-sm text-[#8B2E38]">{error}</p>;
+  const { data: events, loading: eventsLoading, error: eventsError } = eventsState;
+  const { data: tasks, loading: tasksLoading, error: tasksError } = tasksState;
+  const { data: announcements, loading: announcementsLoading, error: announcementsError } = announcementsState;
 
   const stats = toDashboardStats(tasks, events, announcements);
   const upcomingEvents = toUpcomingEventRows(events, UPCOMING_EVENTS_LIMIT);
@@ -104,26 +195,35 @@ export default function HomePage() {
 
         {/* UPPER BOX SECTION */}
         <StaggerReveal className="mt-6 flex flex-wrap justify-evenly gap-5" y={18}>
-          <StatCard
-            label={"OPEN TASKS"}
-            value={stats.openTasks}
-            colour={"#F4EFD3"}
-          />
-          <StatCard
-            label={"UPCOMING EVENTS"}
-            value={stats.upcomingEvents}
-            colour={"#B1C9DC"}
-          />
-          <StatCard
-            label={"NEW ANNOUNCEMENTS"}
-            value={stats.newAnnouncements}
-            colour={"#ED6672"}
-          />
+          {tasksLoading ? (
+            <StatCardSkeleton colour="#F4EFD3" />
+          ) : (
+            <StatCard label={"OPEN TASKS"} value={stats.openTasks} colour={"#F4EFD3"} />
+          )}
+          {eventsLoading ? (
+            <StatCardSkeleton colour="#B1C9DC" />
+          ) : (
+            <StatCard label={"UPCOMING EVENTS"} value={stats.upcomingEvents} colour={"#B1C9DC"} />
+          )}
+          {announcementsLoading ? (
+            <StatCardSkeleton colour="#ED6672" />
+          ) : (
+            <StatCard label={"NEW ANNOUNCEMENTS"} value={stats.newAnnouncements} colour={"#ED6672"} />
+          )}
         </StaggerReveal>
 
         {/* ANNOUNCEMENTS SECTION */}
         <div className="mt-6">
-          {recentAnnouncements.length === 0 ? (
+          {announcementsLoading ? (
+            <div className="flex flex-col gap-4">
+              <AnnouncementRowSkeleton />
+              <AnnouncementRowSkeleton />
+            </div>
+          ) : announcementsError ? (
+            <p className="rounded-2xl border border-dashed border-gray-200 py-10 text-center font-mono text-sm text-[#8B2E38]">
+              {announcementsError}
+            </p>
+          ) : recentAnnouncements.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-gray-200 py-10 text-center font-mono text-sm text-gray-400">
               No announcements yet.
             </p>
@@ -146,7 +246,17 @@ export default function HomePage() {
             Upcoming Events
           </h2>
 
-          {upcomingEvents.length === 0 ? (
+          {eventsLoading ? (
+            <div className="divide-y divide-gray-200 border-t border-gray-200">
+              <EventRowSkeleton />
+              <EventRowSkeleton />
+              <EventRowSkeleton />
+            </div>
+          ) : eventsError ? (
+            <p className="border-t border-gray-200 px-4 py-6 text-center font-mono text-xs text-[#8B2E38]">
+              {eventsError}
+            </p>
+          ) : upcomingEvents.length === 0 ? (
             <p className="border-t border-gray-200 px-4 py-6 text-center font-mono text-xs text-gray-400">
               None upcoming.
             </p>
@@ -176,7 +286,17 @@ export default function HomePage() {
             </h2>
           </div>
 
-          {openTasks.length === 0 ? (
+          {tasksLoading ? (
+            <div className="divide-y divide-gray-200 border-t border-gray-200">
+              <TaskRowSkeleton />
+              <TaskRowSkeleton />
+              <TaskRowSkeleton />
+            </div>
+          ) : tasksError ? (
+            <p className="border-t border-gray-200 px-4 py-6 text-center font-mono text-xs text-[#8B2E38]">
+              {tasksError}
+            </p>
+          ) : openTasks.length === 0 ? (
             <p className="border-t border-gray-200 px-4 py-6 text-center font-mono text-xs text-gray-400">
               None upcoming.
             </p>
