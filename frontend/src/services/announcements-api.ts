@@ -5,6 +5,16 @@ const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
 
 export type { AnnouncementItem, AnnouncementComment };
 
+/* The backend links each image as a path on its own origin (a signed
+   /announcements/:id/image URL — see backend functions/announcement-images.ts)
+   rather than inlining it, and this app talks to the backend on a separate
+   domain, so the path needs the API's origin in front of it. */
+export function withAbsoluteImageUrl(announcement: AnnouncementItem): AnnouncementItem {
+  return announcement.imageUrl?.startsWith('/')
+    ? { ...announcement, imageUrl: apiUrl(announcement.imageUrl) }
+    : announcement;
+}
+
 /* Unlike GET /events, GET /announcements requires auth — isLikedByMe is
    computed per requesting user, so the backend needs to know who's asking.
    Called client-side with the signed-in member's own token (see
@@ -21,7 +31,7 @@ export async function getAnnouncements(token: string): Promise<AnnouncementItem[
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to load announcements');
-  return data.data as AnnouncementItem[];
+  return (data.data as AnnouncementItem[]).map(withAbsoluteImageUrl);
 }
 
 /* Director/executive/admin only — the backend enforces this (403s
@@ -43,7 +53,7 @@ export async function createAnnouncement(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to create announcement');
-  return data.data as AnnouncementItem;
+  return withAbsoluteImageUrl(data.data as AnnouncementItem);
 }
 
 /* Author or admin only — the backend enforces this (403s otherwise); the
@@ -66,7 +76,7 @@ export async function updateAnnouncement(
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to update announcement');
-  return data.data as AnnouncementItem;
+  return withAbsoluteImageUrl(data.data as AnnouncementItem);
 }
 
 /* Author or admin only — the backend enforces this (403s otherwise); the
@@ -100,7 +110,7 @@ export async function likeAnnouncement(token: string, announcementId: number): P
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to like announcement');
-  return data.data as AnnouncementItem;
+  return withAbsoluteImageUrl(data.data as AnnouncementItem);
 }
 
 export async function unlikeAnnouncement(token: string, announcementId: number): Promise<AnnouncementItem> {
@@ -115,7 +125,7 @@ export async function unlikeAnnouncement(token: string, announcementId: number):
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to unlike announcement');
-  return data.data as AnnouncementItem;
+  return withAbsoluteImageUrl(data.data as AnnouncementItem);
 }
 
 export async function getComments(token: string, announcementId: number): Promise<AnnouncementComment[]> {

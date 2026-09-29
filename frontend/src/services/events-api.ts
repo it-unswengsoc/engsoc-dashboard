@@ -10,7 +10,7 @@ export type { EventType, EventItem };
    but field names/casing still differ from the frontend's own EventItem
    (kept stable on purpose so the calendar UI didn't need to change names
    too). Mapped below rather than renaming EventItem everywhere. */
-interface RawEvent {
+export interface RawEvent {
   id: number;
   title: string;
   eventType: 'internal' | 'external';
@@ -24,7 +24,7 @@ interface RawEvent {
   instagramUrl: string | null;
 }
 
-function toEventItem(raw: RawEvent): EventItem {
+export function toEventItem(raw: RawEvent): EventItem {
   return {
     id: raw.id,
     name: raw.title,

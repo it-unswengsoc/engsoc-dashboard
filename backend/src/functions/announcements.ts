@@ -1,6 +1,7 @@
 import {
   dbGetAllAnnouncements,
   dbGetAnnouncementById,
+  dbGetAnnouncementImage,
   dbCreateAnnouncement,
   dbUpdateAnnouncement,
   dbDeleteAnnouncement,
@@ -57,6 +58,19 @@ export interface AnnouncementComment {
   authorRole: AuthorRole | null;
   content: string;
   createdAt: string;
+}
+
+/**
+ * Returns an announcement's stored image as a data: URI, or null if it
+ * doesn't exist or has no image.
+ */
+export async function getAnnouncementImage(announcementId: number): Promise<string | null> {
+  try {
+    return await dbGetAnnouncementImage(announcementId);
+  } catch (error) {
+    console.error('Get announcement image error:', error);
+    return null;
+  }
 }
 
 /**

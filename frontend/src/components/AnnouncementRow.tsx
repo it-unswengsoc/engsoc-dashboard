@@ -344,7 +344,7 @@ export default function AnnouncementRow({ onDeleted, ...announcement }: Announce
       {/* Announcement image */}
       {imageUrl && (
         <div className="aspect-video w-full overflow-hidden">
-          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+          <img src={imageUrl} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
         </div>
       )}
 
