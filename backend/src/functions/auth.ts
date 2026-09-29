@@ -1,23 +1,12 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { Pool, QueryResult } from 'pg';
+import { QueryResult } from 'pg';
+import pool from '../database/pool';
 
 const SALT_ROUNDS = 10;
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 const JWT_EXPIRY = '7d';
 
-// Initialize database pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // RDS rejects plaintext connections outright ("no pg_hba.conf entry ...
-  // no encryption") — confirmed by connecting directly and reproducing the
-  // rejection, then resolving it with this exact option. rejectUnauthorized:
-  // false still encrypts the connection; it just skips validating RDS's
-  // certificate against a trusted CA, avoiding needing to bundle AWS's own
-  // RDS CA certificate. Skipped locally (VERCEL unset) since a local
-  // Postgres for dev typically doesn't support SSL at all.
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
 
 /**
  * Hash a password using bcrypt
@@ -296,5 +285,3 @@ export async function updateUserProfile(
     return false;
   }
 }
-
-export default pool;

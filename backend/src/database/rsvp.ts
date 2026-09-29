@@ -1,9 +1,6 @@
-import { Pool, QueryResult } from 'pg';
+import { QueryResult } from 'pg';
+import pool from './pool';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
 
 export type RsvpStatus = 'going' | 'not_going';
 

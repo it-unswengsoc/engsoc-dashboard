@@ -1,10 +1,7 @@
-import { Pool, QueryResult } from 'pg';
+import { QueryResult } from 'pg';
 import { Announcement, AnnouncementComment, CreateAnnouncementInput, UpdateAnnouncementInput } from '../functions/announcements';
+import pool from './pool';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
 
 const ANNOUNCEMENT_SELECT = `
   SELECT a.id, a.author_id, u.first_name, u.last_name, u.role,

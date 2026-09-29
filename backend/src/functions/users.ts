@@ -1,10 +1,7 @@
-import { Pool, QueryResult } from 'pg';
+import { QueryResult } from 'pg';
 import type { AuthorRole } from './announcements';
+import pool from '../database/pool';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
 
 /* A minimal, non-admin member directory — every active user, without the
    admin-only fields (isActive/lastLogin/hasGoogleAccount) that

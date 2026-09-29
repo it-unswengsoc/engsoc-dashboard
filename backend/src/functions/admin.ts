@@ -1,10 +1,7 @@
-import { Pool, QueryResult } from 'pg';
+import { QueryResult } from 'pg';
 import type { AuthorRole } from './announcements';
+import pool from '../database/pool';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
 
 // Same four-level role the users.role column (a Postgres `user_role` enum)
 // already enforces — reusing announcements.ts's AuthorRole rather than

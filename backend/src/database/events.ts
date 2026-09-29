@@ -1,11 +1,7 @@
-import { Pool, QueryResult } from 'pg';
+import { QueryResult } from 'pg';
 import { Event, CreateEventInput, UpdateEventInput } from '../functions/events';
+import pool from './pool';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // RDS requires SSL — see functions/auth.ts's pool for why.
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
 
 const EVENT_COLUMNS = `id, title, description, image_url, event_type, start_date, end_date,
        location, organizer_id, status, capacity, google_calendar_event_id, facebook_url,

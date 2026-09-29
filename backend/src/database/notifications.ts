@@ -1,11 +1,7 @@
-import { Pool, QueryResult } from 'pg';
+import { QueryResult } from 'pg';
 import { Notification, CreateNotificationInput } from '../functions/notifications';
+import pool from './pool';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // RDS requires SSL — see functions/auth.ts's pool for why.
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
 
 /**
  * Maps a raw database row to the Notification interface,

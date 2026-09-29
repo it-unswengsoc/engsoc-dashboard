@@ -1,4 +1,3 @@
-import { Pool } from 'pg';
 import {
   dbGetTasksForUser,
   dbGetTasksForPort,
@@ -10,11 +9,8 @@ import {
 import { listDirectoryUsers, getUserPort } from './users';
 import { createNotificationsBulk } from './notifications';
 import { isUserAdmin, USER_PORTFOLIOS } from './admin';
+import pool from '../database/pool';
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.VERCEL ? { rejectUnauthorized: false } : false,
-});
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export const TASK_STATUSES: TaskStatus[] = ['pending', 'in_progress', 'completed', 'cancelled'];
@@ -186,5 +182,3 @@ export async function getTaskById(taskId: number, userId: number): Promise<Task 
   }
   return task;
 }
-
-export default pool;
