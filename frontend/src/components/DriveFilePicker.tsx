@@ -36,7 +36,10 @@ export default function DriveFilePicker({ onAttach }: DriveFilePickerProps) {
   useEffect(() => {
     const token = sessionStorage.getItem('token');
     if (!token) return;
-    getDriveDepartments(token)
+    // false: this picker only ever shows drive names in a dropdown, never a
+    // file count — skips a real per-drive Google API cost the Documents
+    // page's own folder cards still need.
+    getDriveDepartments(token, false)
       .then(({ departments: depts }) => {
         setDepartments(depts);
         const firstDrive = depts.flatMap((d) => d.drives)[0];

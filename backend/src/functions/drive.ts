@@ -125,11 +125,19 @@ function toCapabilities(caps: drive_v3.Schema$File['capabilities'] | drive_v3.Sc
 
 /**
  * Lists every Shared Drive the given member's own Google account can see,
- * grouped into departments (see DEPARTMENT_DEFS), with each drive's item
- * count and its real capabilities for this specific member. A department
- * with no matching drives is omitted rather than shown empty.
+ * grouped into departments (see DEPARTMENT_DEFS), with each drive's real
+ * capabilities for this specific member. A department with no matching
+ * drives is omitted rather than shown empty.
+ *
+ * includeFileCounts defaults to true (the Documents page's folder cards
+ * show a real count), but costs one extra Google API round-trip *per
+ * Shared Drive* — with ~11 department drives that's up to 11 parallel
+ * calls, each with Google's own latency, adding multiple real seconds.
+ * Callers that never display a count (e.g. DriveFilePicker's drive-picker
+ * dropdown, used from the task attachment flows) should pass false and
+ * skip that cost entirely — it was previously always paid even there.
  */
-export async function listDepartments(refreshToken: string): Promise<DriveDepartment[]> {
+export async function listDepartments(refreshToken: string, includeFileCounts = true): Promise<DriveDepartment[]> {
   const drive = getDriveClient(refreshToken);
 
   const drivesRes = await drive.drives.list({
@@ -143,20 +151,24 @@ export async function listDepartments(refreshToken: string): Promise<DriveDepart
 
   const summaries = await Promise.all(
     allDrives.map(async (sharedDrive) => {
-      const countRes = await drive.files.list({
-        q: 'trashed = false',
-        driveId: sharedDrive.id!,
-        corpora: 'drive',
-        includeItemsFromAllDrives: true,
-        supportsAllDrives: true,
-        fields: 'files(id)',
-        pageSize: 1000,
-      });
+      let fileCount = 0;
+      if (includeFileCounts) {
+        const countRes = await drive.files.list({
+          q: 'trashed = false',
+          driveId: sharedDrive.id!,
+          corpora: 'drive',
+          includeItemsFromAllDrives: true,
+          supportsAllDrives: true,
+          fields: 'files(id)',
+          pageSize: 1000,
+        });
+        fileCount = countRes.data.files?.length ?? 0;
+      }
 
       return {
         id: sharedDrive.id!,
         name: sharedDrive.name!,
-        fileCount: countRes.data.files?.length ?? 0,
+        fileCount,
         colour: DRIVE_COLOURS[sharedDrive.name!] ?? DEFAULT_DRIVE_COLOUR,
         // Shared Drives don't carry a webViewLink of their own the way files
         // and folders do (drives.list has no such field) — this is Drive's

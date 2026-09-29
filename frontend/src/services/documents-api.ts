@@ -23,13 +23,21 @@ export interface DriveEntriesResult {
    Drive themselves), which needs the JWT held in sessionStorage — a Server
    Component can't reach that. Every Shared Drive their account can see,
    grouped into departments by the backend. */
-export async function getDriveDepartments(token: string): Promise<DriveDepartmentsResult> {
+/* includeFileCounts: false skips a real per-Shared-Drive Google API cost
+   (up to N extra round-trips, one per drive) — pass it whenever the caller
+   only needs drive names (e.g. DriveFilePicker's destination dropdown),
+   not the Documents page's own folder cards, the one place that actually
+   displays a count. */
+export async function getDriveDepartments(
+  token: string,
+  includeFileCounts = true
+): Promise<DriveDepartmentsResult> {
   if (USE_MOCK) {
     const { getDriveDepartments: mockGetDriveDepartments } = await import('@/mocks/functions/documents');
     return { departments: await mockGetDriveDepartments(), connected: true };
   }
 
-  const res = await fetch(apiUrl('/drive/folders'), {
+  const res = await fetch(apiUrl(`/drive/folders${includeFileCounts ? '' : '?counts=0'}`), {
     headers: { Authorization: `Bearer ${token}` },
     cache: 'no-store',
   });
