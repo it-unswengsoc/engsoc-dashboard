@@ -1,9 +1,7 @@
 import { google, calendar_v3 } from 'googleapis';
 import { Event } from './events';
+import { getGoogleAuthClient } from './google-auth-cache';
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
 const GOOGLE_DRIVE_REFRESH_TOKEN = process.env.GOOGLE_DRIVE_REFRESH_TOKEN || '';
 
 /* The shared EngSoc calendar events get mirrored to. Defaults to the
@@ -18,9 +16,7 @@ const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary';
 /* Reuses the same service-level refresh token as Drive (functions/drive.ts)
    — it already carries the calendar scope (see functions/google.ts). */
 function getCalendarClient(): calendar_v3.Calendar {
-  const auth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
-  auth.setCredentials({ refresh_token: GOOGLE_DRIVE_REFRESH_TOKEN });
-  return google.calendar({ version: 'v3', auth });
+  return google.calendar({ version: 'v3', auth: getGoogleAuthClient(GOOGLE_DRIVE_REFRESH_TOKEN) });
 }
 
 /* Google Calendar has no "no end time" concept for a timed event — falls

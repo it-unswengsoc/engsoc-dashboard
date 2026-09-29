@@ -1,9 +1,6 @@
 import { google, drive_v3 } from 'googleapis';
 import { Readable } from 'stream';
-
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
+import { getGoogleAuthClient } from './google-auth-cache';
 
 /* Reads as the signed-in member's own Google identity (their stored
    google_refresh_token — see functions/auth.ts) rather than one shared
@@ -11,9 +8,7 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
    actually see it in their own Google Drive — same access boundary Google
    itself already enforces, not a second one this app has to maintain. */
 function getDriveClient(refreshToken: string): drive_v3.Drive {
-  const auth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
-  auth.setCredentials({ refresh_token: refreshToken });
-  return google.drive({ version: 'v3', auth });
+  return google.drive({ version: 'v3', auth: getGoogleAuthClient(refreshToken) });
 }
 
 /* Purely cosmetic — a colour swatch for Shared Drives whose name is

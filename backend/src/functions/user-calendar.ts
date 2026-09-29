@@ -1,9 +1,7 @@
 import { google, calendar_v3 } from 'googleapis';
 import { dbGetEventIdsByGoogleCalendarEventIds } from '../database/events';
+import { getGoogleAuthClient } from './google-auth-cache';
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || '';
 const GOOGLE_DRIVE_REFRESH_TOKEN = process.env.GOOGLE_DRIVE_REFRESH_TOKEN || '';
 const GOOGLE_CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || 'primary';
 
@@ -45,15 +43,11 @@ export interface CreateUserCalendarEventInput {
 export type UpdateUserCalendarEventInput = Partial<CreateUserCalendarEventInput>;
 
 function getServiceCalendarClient(): calendar_v3.Calendar {
-  const auth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
-  auth.setCredentials({ refresh_token: GOOGLE_DRIVE_REFRESH_TOKEN });
-  return google.calendar({ version: 'v3', auth });
+  return google.calendar({ version: 'v3', auth: getGoogleAuthClient(GOOGLE_DRIVE_REFRESH_TOKEN) });
 }
 
 function getUserCalendarClient(refreshToken: string): calendar_v3.Calendar {
-  const auth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI);
-  auth.setCredentials({ refresh_token: refreshToken });
-  return google.calendar({ version: 'v3', auth });
+  return google.calendar({ version: 'v3', auth: getGoogleAuthClient(refreshToken) });
 }
 
 /* GOOGLE_CALENDAR_ID is an alias ('primary') from the service account's own
@@ -117,9 +111,13 @@ export async function getUserCalendarEvents(
   timeMax: string
 ): Promise<UserCalendarEvent[]> {
   const calendar = getUserCalendarClient(refreshToken);
-  const sharedCalendarId = await resolveSharedCalendarId();
-
-  const calendarList = await calendar.calendarList.list();
+  // Independent of each other, so side by side: on a cold instance each
+  // starts with its own token refresh (the shared account's, then the
+  // member's), and waiting on one before starting the other doubled that.
+  const [sharedCalendarId, calendarList] = await Promise.all([
+    resolveSharedCalendarId(),
+    calendar.calendarList.list(),
+  ]);
   // `selected === false` is a calendar the member has explicitly hidden in
   // their own Google Calendar UI — respecting that keeps this view matching
   // what they'd actually see there.
