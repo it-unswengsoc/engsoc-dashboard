@@ -27,6 +27,9 @@ const roboto = Roboto({
 export const metadata: Metadata = {
   title: 'EngSoc Dashboard',
   description: 'Engineering Society Dashboard',
+  verification: {
+    google: 'yfUF4EcdpmLheUCoQRkgPSSysubwRVjD8qETmCDACi8',
+  },
 };
 
 export default function RootLayout({
