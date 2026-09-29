@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { login } from '@/services/auth-api';
 import { apiUrl } from '@/services/api-config';
@@ -159,6 +160,16 @@ function LoginForm() {
               <a href={IT_CONTACT_HREF} className="font-bold text-[#AD1C2B] hover:underline">
                 Contact IT
               </a>
+            </p>
+
+            <p className="mt-4 text-center text-xs text-gray-400">
+              <Link href="/privacy" className="hover:text-gray-600 hover:underline">
+                Privacy Policy
+              </Link>
+              <span className="mx-2">·</span>
+              <Link href="/terms" className="hover:text-gray-600 hover:underline">
+                Terms of Service
+              </Link>
             </p>
           </div>
         </div>
