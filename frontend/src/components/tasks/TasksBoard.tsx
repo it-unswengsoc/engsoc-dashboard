@@ -311,3 +311,54 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
     </div>
   );
 }
+
+/* Stands in for the board while its tasks are still loading: the real
+   header and column headings straight away, with placeholder cards where
+   the tasks will go. `port` is null until the viewer's profile arrives. */
+export function TasksBoardSkeleton({ port }: { port: string | null }) {
+  return (
+    <div aria-label="Loading" aria-busy="true">
+      <div className="flex items-center gap-3">
+        <KanbanSquare className="h-7 w-7 text-gray-900" strokeWidth={2} />
+        <h1 className="text-3xl font-bold leading-none text-gray-900">Tasks</h1>
+        {port ? (
+          <span className="rounded-full bg-[#B1C9DC]/30 px-3.5 py-1.5 font-mono text-xs font-bold uppercase leading-none tracking-wide text-[#3D6C94]">
+            {portLabel(port)}
+          </span>
+        ) : (
+          <span className="h-7 w-24 animate-pulse rounded-full bg-gray-100" />
+        )}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span className="h-9 w-32 animate-pulse rounded-lg bg-gray-100" />
+        <span className="h-9 w-28 animate-pulse rounded-lg bg-gray-100" />
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-4">
+        {COLUMNS.map((column, i) => (
+          <section key={column.status} className="flex min-h-[8rem] flex-col rounded-2xl border border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${column.accent}`} />
+              <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-gray-500">
+                {column.label}
+              </span>
+            </div>
+            <div className="flex flex-1 flex-col gap-2 px-2 pb-2">
+              {/* Fewer placeholders further right, roughly how a real board fills up. */}
+              {Array.from({ length: Math.max(1, 3 - i) }, (_, j) => (
+                <div key={j} className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+                  <div className="h-3.5 w-4/5 animate-pulse rounded bg-gray-100" />
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="h-6 w-6 animate-pulse rounded-full bg-gray-100" />
+                    <div className="h-4 w-14 animate-pulse rounded bg-gray-100" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
