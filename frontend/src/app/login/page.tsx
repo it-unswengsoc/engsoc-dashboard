@@ -84,7 +84,7 @@ function LoginForm() {
 
         <div className="flex flex-1 items-center justify-center py-12">
           <div className="w-full max-w-sm">
-            <h1 className="text-4xl font-bold text-gray-900">Sign in</h1>
+            <h1 className="text-4xl font-bold text-gray-900">Sign in to EngSoc Dashboard</h1>
             <p className="mt-3 text-sm text-gray-500">
               Login using your <span className="font-bold text-gray-700">@unswengsoc</span>{' '}
               account
