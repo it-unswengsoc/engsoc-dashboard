@@ -1,4 +1,6 @@
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import nodemailer, { type Transporter } from 'nodemailer';
+import { EMAIL_IMAGES } from '../assets/emailImages';
 
 const AWS_REGION = process.env.AWS_SES_REGION || 'ap-southeast-2';
 const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'noreply@unswengsoc.com';
@@ -7,45 +9,57 @@ const SES_FROM_EMAIL = process.env.SES_FROM_EMAIL || 'noreply@unswengsoc.com';
    whole backend on import — only matters the moment something actually
    tries to send. Uses its own explicit credentials (not the default
    provider chain) since this runs on Vercel, not on AWS compute — there's
-   no IAM role to fall back to. */
-function getSesClient(): SESClient | null {
+   no IAM role to fall back to.
+   nodemailer (not the plain SES SDK) because inline images need a real MIME
+   multipart/related message — the plain SendEmailCommand API has no
+   attachment support at all, only SendRawEmailCommand with a hand-built
+   MIME payload, which nodemailer builds for us from a plain `attachments`
+   list instead. */
+function getTransport(): Transporter | null {
   const accessKeyId = process.env.AWS_SES_ACCESS_KEY_ID;
   const secretAccessKey = process.env.AWS_SES_SECRET_ACCESS_KEY;
   if (!accessKeyId || !secretAccessKey) return null;
 
-  return new SESClient({
-    region: AWS_REGION,
-    credentials: { accessKeyId, secretAccessKey },
-  });
+  const sesClient = new SESv2Client({ region: AWS_REGION, credentials: { accessKeyId, secretAccessKey } });
+  return nodemailer.createTransport({ SES: { sesClient, SendEmailCommand } });
 }
 
+/* The same 5 images the club's own Google Apps Script bulk-email tool
+   embeds (engsocLogo, facebookLogo, instagramLogo, linkedInLogo,
+   youtubeLogo — see src/assets/emailImages.ts) — referenced in the
+   template below as src="cid:<name>", exactly like that script's
+   inlineImages option. */
+const emailAttachments = EMAIL_IMAGES.map((img) => ({
+  filename: img.filename,
+  content: Buffer.from(img.base64, 'base64'),
+  contentType: img.contentType,
+  cid: img.cid,
+}));
+
 /**
- * Sends one HTML email via SES. Best-effort by design — every caller in
- * this app treats a failed email exactly like a failed Google Calendar
- * sync or push notification: logged, never thrown, never blocks whatever
- * real thing (a task getting assigned, an announcement getting posted)
- * triggered it. Silently no-ops if SES isn't configured yet (no access
- * key/secret set) rather than erroring on every notification in the
- * meantime.
+ * Sends one HTML email via SES (through nodemailer, for inline-image
+ * support). Best-effort by design — every caller in this app treats a
+ * failed email exactly like a failed Google Calendar sync or push
+ * notification: logged, never thrown, never blocks whatever real thing (a
+ * task getting assigned, an announcement getting posted) triggered it.
+ * Silently no-ops if SES isn't configured yet (no access key/secret set)
+ * rather than erroring on every notification in the meantime.
  */
 export async function sendEmail(to: string, subject: string, bodyHtml: string): Promise<void> {
-  const client = getSesClient();
-  if (!client) {
+  const transport = getTransport();
+  if (!transport) {
     console.warn('SES not configured (AWS_SES_ACCESS_KEY_ID/AWS_SES_SECRET_ACCESS_KEY missing) — skipping email:', subject);
     return;
   }
 
   try {
-    await client.send(
-      new SendEmailCommand({
-        Source: SES_FROM_EMAIL,
-        Destination: { ToAddresses: [to] },
-        Message: {
-          Subject: { Data: subject, Charset: 'UTF-8' },
-          Body: { Html: { Data: bodyHtml, Charset: 'UTF-8' } },
-        },
-      })
-    );
+    await transport.sendMail({
+      from: `"UNSW Engineering Society" <${SES_FROM_EMAIL}>`,
+      to,
+      subject,
+      html: bodyHtml,
+      attachments: emailAttachments,
+    });
   } catch (error) {
     console.error('SES send error:', error);
   }
@@ -53,11 +67,10 @@ export async function sendEmail(to: string, subject: string, bodyHtml: string): 
 
 /* Brand shell around a notification's own title/message — the same two
    fields already shown in-app (see functions/notifications.ts), so no
-   separate copywriting is needed per notification type. No embedded
-   logo/social-icon images (cid: attachments) yet — swap the header/footer
-   blocks below for real <img> tags once those assets exist; everything
-   else (colours, fonts, layout, sign-off) matches the club's existing
-   branded email template. */
+   separate copywriting is needed per notification type. Structure/colours/
+   images match the club's existing branded email template (the one used by
+   its Apps Script bulk-email tool) — logo + social icons are the same
+   images, referenced the same way (src="cid:..."). */
 export function renderNotificationEmail(recipientName: string, bodyHtml: string): string {
   return `<!DOCTYPE html>
 <html>
@@ -72,7 +85,7 @@ export function renderNotificationEmail(recipientName: string, bodyHtml: string)
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;">
           <tr>
             <td style="padding:30px 30px 10px;text-align:center;">
-              <span style="font-size:20px;font-weight:700;letter-spacing:1px;color:#264653;">UNSW ENGINEERING SOCIETY</span>
+              <img src="cid:engsocLogo" alt="UNSW Engineering Society" width="166" style="display:inline-block;border:none;height:auto;max-width:166px;width:36%;">
             </td>
           </tr>
           <tr>
@@ -92,8 +105,16 @@ export function renderNotificationEmail(recipientName: string, bodyHtml: string)
             </td>
           </tr>
           <tr>
-            <td style="background-color:#324158;padding:24px 10px;text-align:center;">
+            <td style="background-color:#324158;padding:30px 10px 10px;text-align:center;">
               <span style="font-size:14px;color:#ecf0f1;letter-spacing:1px;">WWW.UNSWENGSOC.COM</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#324158;padding:10px 10px 30px;text-align:center;">
+              <a href="https://www.facebook.com/UNSWEngSoc" style="display:inline-block;margin:0 5px;"><img src="cid:facebookLogo" alt="Facebook" width="32" style="display:block;border:none;"></a>
+              <a href="https://www.instagram.com/unswengsoc/" style="display:inline-block;margin:0 5px;"><img src="cid:instagramLogo" alt="Instagram" width="32" style="display:block;border:none;"></a>
+              <a href="https://www.linkedin.com/company/unsw-engineering-society" style="display:inline-block;margin:0 5px;"><img src="cid:linkedInLogo" alt="LinkedIn" width="32" style="display:block;border:none;"></a>
+              <a href="https://www.youtube.com/channel/UCjsJfEq4qIQXBf59w1zdYhQ" style="display:inline-block;margin:0 5px;"><img src="cid:youtubeLogo" alt="YouTube" width="32" style="display:block;border:none;"></a>
             </td>
           </tr>
         </table>
