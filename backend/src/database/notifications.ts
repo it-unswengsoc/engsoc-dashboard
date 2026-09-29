@@ -13,6 +13,7 @@ function rowToNotification(row: any): Notification {
     userId: row.user_id,
     eventId: row.event_id,
     taskId: row.task_id,
+    requestId: row.request_id,
     type: row.type,
     title: row.title,
     message: row.message,
@@ -27,7 +28,7 @@ function rowToNotification(row: any): Notification {
  */
 export async function dbGetNotificationsForUser(userId: number): Promise<Notification[]> {
   const result: QueryResult = await pool.query(
-    `SELECT id, user_id, event_id, task_id, type, title, message, is_read, created_at
+    `SELECT id, user_id, event_id, task_id, request_id, type, title, message, is_read, created_at
      FROM notifications
      WHERE user_id = $1
      ORDER BY created_at DESC`,
@@ -44,7 +45,7 @@ export async function dbGetNotificationById(
   notificationId: number
 ): Promise<Notification | null> {
   const result: QueryResult = await pool.query(
-    `SELECT id, user_id, event_id, task_id, type, title, message, is_read, created_at
+    `SELECT id, user_id, event_id, task_id, request_id, type, title, message, is_read, created_at
      FROM notifications
      WHERE id = $1`,
     [notificationId]
@@ -62,13 +63,14 @@ export async function dbCreateNotification(
 ): Promise<Notification | null> {
   const result: QueryResult = await pool.query(
     `INSERT INTO notifications
-       (user_id, event_id, task_id, type, title, message, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW())
-     RETURNING id, user_id, event_id, task_id, type, title, message, is_read, created_at`,
+       (user_id, event_id, task_id, request_id, type, title, message, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+     RETURNING id, user_id, event_id, task_id, request_id, type, title, message, is_read, created_at`,
     [
       input.userId,
       input.eventId ?? null,
       input.taskId ?? null,
+      input.requestId ?? null,
       input.type,
       input.title,
       input.message ?? null,
@@ -93,15 +95,25 @@ export async function dbCreateNotificationsBulk(
   const values: string[] = [];
   const params: (string | number | null)[] = [];
   inputs.forEach((input, i) => {
-    const base = i * 6;
-    values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, NOW())`);
-    params.push(input.userId, input.eventId ?? null, input.taskId ?? null, input.type, input.title, input.message ?? null);
+    const base = i * 7;
+    values.push(
+      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, NOW())`
+    );
+    params.push(
+      input.userId,
+      input.eventId ?? null,
+      input.taskId ?? null,
+      input.requestId ?? null,
+      input.type,
+      input.title,
+      input.message ?? null
+    );
   });
 
   const result: QueryResult = await pool.query(
-    `INSERT INTO notifications (user_id, event_id, task_id, type, title, message, created_at)
+    `INSERT INTO notifications (user_id, event_id, task_id, request_id, type, title, message, created_at)
      VALUES ${values.join(', ')}
-     RETURNING id, user_id, event_id, task_id, type, title, message, is_read, created_at`,
+     RETURNING id, user_id, event_id, task_id, request_id, type, title, message, is_read, created_at`,
     params
   );
   return result.rows.map(rowToNotification);
@@ -118,7 +130,7 @@ export async function dbMarkNotificationRead(
     `UPDATE notifications
      SET is_read = true
      WHERE id = $1
-     RETURNING id, user_id, event_id, type, title, message, is_read, created_at`,
+     RETURNING id, user_id, event_id, task_id, request_id, type, title, message, is_read, created_at`,
     [notificationId]
   );
   if (result.rows.length === 0) return null;
