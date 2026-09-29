@@ -10,6 +10,7 @@ import {
   dbGetRequestAttachment,
   dbGetRequestViewer,
   dbGetPortMemberIds,
+  dbGetTreasurerIds,
   type NewAttachment,
 } from '../database/requests';
 import { createNotificationsBulk, type CreateNotificationInput } from './notifications';
@@ -187,7 +188,10 @@ export async function submitRequest(userId: number, input: SubmitRequestInput): 
   });
   if (!record) throw new Error('Request was not created');
 
-  const approverIds = await dbGetPortMemberIds(type.targetPort, type.approverRoles);
+  const approverIds =
+    type.approvers.kind === 'treasurer'
+      ? await dbGetTreasurerIds()
+      : await dbGetPortMemberIds(type.targetPort, type.approvers.roles);
   await notify(
     approverIds.filter((id) => id !== viewer.id),
     {

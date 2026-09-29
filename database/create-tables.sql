@@ -9,7 +9,7 @@ CREATE TYPE user_role AS ENUM ('member', 'director', 'executive', 'admin');
 CREATE TYPE notification_type AS ENUM ('event', 'alert', 'announcement', 'task', 'request');
 CREATE TYPE event_status AS ENUM ('upcoming', 'ongoing', 'completed', 'cancelled');
 CREATE TYPE event_type AS ENUM ('internal', 'external');
-CREATE TYPE port_type AS ENUM ('cabinet', 'careers', 'IT', 'publication', 'marketing', 'socials', 'sponsorships', 'programs', 'outreach', 'HR', 'treasurer');
+CREATE TYPE port_type AS ENUM ('cabinet', 'careers', 'IT', 'publication', 'marketing', 'socials', 'sponsorships', 'programs', 'outreach', 'HR');
 CREATE TYPE task_status AS ENUM ('pending', 'in_progress', 'completed', 'cancelled');
 CREATE TYPE request_status AS ENUM ('pending', 'in_progress', 'approved', 'rejected', 'completed');
 
@@ -40,6 +40,10 @@ CREATE TABLE users (
   -- without them needing to be present in a browser. Null for password-only
   -- accounts, or a Google account that hasn't signed in since this was added.
   google_refresh_token TEXT,
+  -- The treasurer, who handles reimbursement requests. A position rather
+  -- than a port, so they keep their own port (Cabinet). At most one at a
+  -- time (see one_treasurer below); set in the admin panel.
+  is_treasurer BOOLEAN NOT NULL DEFAULT false,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -175,8 +179,7 @@ CREATE TABLE task_attachments (
 -- action it. request_type distinguishes the form used (e.g. 'mass_email'),
 -- and form_data holds that form's answers so new request types don't need
 -- schema changes — just a new request_type value and a new form on the
--- frontend. handled_by is filled in once someone from the target port
--- picks it up. Which port each type goes to, and who there can act on it,
+-- frontend. handled_by is filled in once whoever handles it picks it up. Which port each type goes to, and who there can act on it,
 -- lives in backend/src/functions/request-types.ts.
 --
 -- Accepting a request creates one task for it (tasks.request_id), shared by
@@ -186,9 +189,9 @@ CREATE TABLE task_attachments (
 -- at submit, so every type sorts and badges the same way.
 --
 -- To pick this up on an existing database without losing data, migrate in
--- place instead of resetting (ADD VALUE can't run inside a transaction
--- block, so run it on its own):
---   ALTER TYPE port_type ADD VALUE 'treasurer';
+-- place instead of resetting:
+--   ALTER TABLE users ADD COLUMN is_treasurer BOOLEAN NOT NULL DEFAULT false;
+--   CREATE UNIQUE INDEX one_treasurer ON users (is_treasurer) WHERE is_treasurer;
 --   ALTER TABLE requests ADD COLUMN is_anonymous BOOLEAN DEFAULT false;
 --   ALTER TABLE requests ADD COLUMN needed_by TIMESTAMP;
 --   ALTER TABLE requests ADD COLUMN notes TEXT;
@@ -372,6 +375,7 @@ CREATE INDEX idx_requests_target_port ON requests(target_port);
 CREATE INDEX idx_requests_status ON requests(status);
 CREATE INDEX idx_requests_handled_by ON requests(handled_by);
 CREATE INDEX idx_tasks_request_id ON tasks(request_id);
+CREATE UNIQUE INDEX one_treasurer ON users (is_treasurer) WHERE is_treasurer;
 CREATE INDEX idx_request_attachments_request_id ON request_attachments(request_id);
 
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);

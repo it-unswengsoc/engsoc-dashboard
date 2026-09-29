@@ -26,9 +26,7 @@ export type UserPortfolio =
   | 'sponsorships'
   | 'programs'
   | 'outreach'
-  | 'HR'
-  // A port of one: the treasurer, who handles reimbursement requests.
-  | 'treasurer';
+  | 'HR';
 export const USER_PORTFOLIOS: UserPortfolio[] = [
   'cabinet',
   'careers',
@@ -40,7 +38,6 @@ export const USER_PORTFOLIOS: UserPortfolio[] = [
   'programs',
   'outreach',
   'HR',
-  'treasurer',
 ];
 
 export interface AdminUser {
@@ -50,6 +47,8 @@ export interface AdminUser {
   lastName: string;
   role: UserRole;
   port: UserPortfolio | null;
+  // The treasurer handles reimbursement requests. At most one user at a time.
+  isTreasurer: boolean;
   isActive: boolean;
   createdAt: string;
   lastLogin: string | null;
@@ -69,6 +68,7 @@ function rowToAdminUser(row: any): AdminUser {
     lastName: row.last_name,
     role: row.role,
     port: row.port,
+    isTreasurer: row.is_treasurer,
     isActive: row.is_active,
     createdAt: row.created_at,
     lastLogin: row.last_login,
@@ -95,7 +95,7 @@ export async function isUserAdmin(userId: number): Promise<boolean> {
  */
 export async function listUsers(): Promise<AdminUser[]> {
   const result: QueryResult = await pool.query(
-    `SELECT id, email, first_name, last_name, role, port, is_active, created_at, last_login, google_id
+    `SELECT id, email, first_name, last_name, role, port, is_treasurer, is_active, created_at, last_login, google_id
      FROM users
      ORDER BY first_name, last_name`
   );
@@ -103,19 +103,21 @@ export async function listUsers(): Promise<AdminUser[]> {
 }
 
 /**
- * Updates a user's role and/or portfolio. Both are independently optional —
- * undefined leaves that column untouched, whereas port: null explicitly
- * clears it back to unassigned (role has no such "clear" state; it's never
- * nullable). Returns null if the user doesn't exist or neither field was
- * given to update.
+ * Updates a user's role, portfolio and/or treasurer flag. Each is
+ * independently optional — undefined leaves that column untouched, whereas
+ * port: null explicitly clears it back to unassigned (role has no such
+ * "clear" state; it's never nullable). Making someone treasurer takes the
+ * flag off whoever had it, in the same transaction, so handing over is one
+ * change. Returns null if the user doesn't exist or no field was given.
  */
 export async function updateUserRoleAndPortfolio(
   userId: number,
   role: UserRole | undefined,
-  port: UserPortfolio | null | undefined
+  port: UserPortfolio | null | undefined,
+  isTreasurer?: boolean
 ): Promise<AdminUser | null> {
   const sets: string[] = [];
-  const values: (string | number | null)[] = [];
+  const values: (string | number | boolean | null)[] = [];
 
   if (role !== undefined) {
     values.push(role);
@@ -125,15 +127,34 @@ export async function updateUserRoleAndPortfolio(
     values.push(port);
     sets.push(`port = $${values.length}`);
   }
+  if (isTreasurer !== undefined) {
+    values.push(isTreasurer);
+    sets.push(`is_treasurer = $${values.length}`);
+  }
   if (sets.length === 0) return null;
 
   values.push(userId);
-  const result: QueryResult = await pool.query(
-    `UPDATE users SET ${sets.join(', ')}, updated_at = NOW()
-     WHERE id = $${values.length}
-     RETURNING id, email, first_name, last_name, role, port, is_active, created_at, last_login, google_id`,
-    values
-  );
-
-  return result.rows.length > 0 ? rowToAdminUser(result.rows[0]) : null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (isTreasurer) {
+      await client.query(
+        `UPDATE users SET is_treasurer = false, updated_at = NOW() WHERE is_treasurer AND id <> $1`,
+        [userId]
+      );
+    }
+    const result: QueryResult = await client.query(
+      `UPDATE users SET ${sets.join(', ')}, updated_at = NOW()
+       WHERE id = $${values.length}
+       RETURNING id, email, first_name, last_name, role, port, is_treasurer, is_active, created_at, last_login, google_id`,
+      values
+    );
+    await client.query('COMMIT');
+    return result.rows.length > 0 ? rowToAdminUser(result.rows[0]) : null;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }

@@ -8,12 +8,16 @@ import type { UserPortfolio } from './admin';
 
 export type ApproverRole = 'director' | 'executive';
 
+/* Who sees incoming requests of a type and can accept, reject, assign and
+   complete them: members of targetPort holding one of `roles`, or the
+   treasurer (users.is_treasurer), a position rather than a port. */
+export type Approvers = { kind: 'port'; roles: ApproverRole[] } | { kind: 'treasurer' };
+
 export interface RequestTypeDef {
   label: string; // "Event photo request", for notifications
+  /* The port it's filed under, and whose members it can be assigned to. */
   targetPort: UserPortfolio;
-  /* Who in targetPort sees incoming requests of this type and can accept,
-     reject, assign and complete them. */
-  approverRoles: ApproverRole[];
+  approvers: Approvers;
   /* Whether accepting hands the work to port members as a task. When false,
      the approver handles it themselves and nobody else sees it. */
   assignable: boolean;
@@ -34,7 +38,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
   marketing: {
     label: 'Marketing request',
     targetPort: 'marketing',
-    approverRoles: ['director', 'executive'],
+    approvers: { kind: 'port', roles: ['director', 'executive'] },
     assignable: true,
     confidential: false,
     allowsAnonymous: false,
@@ -44,7 +48,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
   mass_email: {
     label: 'Mass email request',
     targetPort: 'IT',
-    approverRoles: ['director', 'executive'],
+    approvers: { kind: 'port', roles: ['director', 'executive'] },
     assignable: true,
     confidential: false,
     allowsAnonymous: false,
@@ -53,7 +57,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
   event_photos: {
     label: 'Event photo request',
     targetPort: 'publication',
-    approverRoles: ['director', 'executive'],
+    approvers: { kind: 'port', roles: ['director', 'executive'] },
     assignable: true,
     confidential: false,
     allowsAnonymous: false,
@@ -62,7 +66,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
   multimedia: {
     label: 'Multimedia request',
     targetPort: 'publication',
-    approverRoles: ['director', 'executive'],
+    approvers: { kind: 'port', roles: ['director', 'executive'] },
     assignable: true,
     confidential: false,
     allowsAnonymous: false,
@@ -70,9 +74,11 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
   },
   reimbursement: {
     label: 'Reimbursement request',
-    targetPort: 'treasurer',
-    approverRoles: ['director', 'executive'],
-    assignable: true,
+    // Filed under Cabinet, where the treasurer sits, but handled by the
+    // treasurer alone.
+    targetPort: 'cabinet',
+    approvers: { kind: 'treasurer' },
+    assignable: false,
     confidential: false,
     allowsAnonymous: false,
     titleField: 'title',
@@ -82,7 +88,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
   grievance: {
     label: 'Grievance',
     targetPort: 'HR',
-    approverRoles: ['executive'],
+    approvers: { kind: 'port', roles: ['executive'] },
     assignable: false,
     confidential: true,
     allowsAnonymous: true,
@@ -99,13 +105,16 @@ export interface Viewer {
   id: number;
   role: string;
   port: string | null;
+  isTreasurer: boolean;
 }
 
-/* Directors/executives of the type's port (executives only, for a
-   grievance), plus admins for anything that isn't confidential. */
+/* The type's approvers (directors/executives of its port, executives only
+   for a grievance, the treasurer for a reimbursement), plus admins for
+   anything that isn't confidential. */
 export function canActOn(viewer: Viewer, type: RequestTypeDef): boolean {
   if (viewer.role === 'admin' && !type.confidential) return true;
-  return viewer.port === type.targetPort && (type.approverRoles as string[]).includes(viewer.role);
+  if (type.approvers.kind === 'treasurer') return viewer.isTreasurer;
+  return viewer.port === type.targetPort && (type.approvers.roles as string[]).includes(viewer.role);
 }
 
 /* The request types a viewer handles, for filtering the incoming list. */

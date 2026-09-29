@@ -255,13 +255,21 @@ export async function dbGetRequestAttachment(
 /** The fields request access checks need about the person asking. */
 export async function dbGetRequestViewer(
   userId: number
-): Promise<{ id: number; role: string; port: string | null; name: string } | null> {
+): Promise<{ id: number; role: string; port: string | null; isTreasurer: boolean; name: string } | null> {
   const result: QueryResult = await pool.query(
-    `SELECT id, role, port, first_name, last_name FROM users WHERE id = $1 AND is_active = true`,
+    `SELECT id, role, port, is_treasurer, first_name, last_name FROM users WHERE id = $1 AND is_active = true`,
     [userId]
   );
   const row = result.rows[0];
-  return row ? { id: row.id, role: row.role, port: row.port, name: `${row.first_name} ${row.last_name}` } : null;
+  return row
+    ? { id: row.id, role: row.role, port: row.port, isTreasurer: row.is_treasurer, name: `${row.first_name} ${row.last_name}` }
+    : null;
+}
+
+/** The active treasurer, if there is one (at most one, by the one_treasurer index). */
+export async function dbGetTreasurerIds(): Promise<number[]> {
+  const result: QueryResult = await pool.query(`SELECT id FROM users WHERE is_active = true AND is_treasurer`);
+  return result.rows.map((row) => row.id);
 }
 
 /** Active members of a port holding one of the given roles. */
