@@ -1,6 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { verifyAuthToken, requireAdmin } from './auth';
-import { listUsers, updateUserRoleAndPortfolio, USER_ROLES, USER_PORTFOLIOS } from '../functions/admin';
+import {
+  listUsers,
+  updateUserRoleAndPortfolio,
+  InactiveTreasurerError,
+  USER_ROLES,
+  USER_PORTFOLIOS,
+} from '../functions/admin';
 
 const router = Router();
 
@@ -56,6 +62,9 @@ router.patch('/users/:userId', verifyAuthToken, requireAdmin, async (req: Reques
 
     res.status(200).json({ status: 'success', data: updated });
   } catch (error) {
+    if (error instanceof InactiveTreasurerError) {
+      return res.status(400).json({ status: 'error', message: error.message });
+    }
     console.error('Update user error:', error);
     res.status(500).json({ status: 'error', message: 'Failed to update user' });
   }

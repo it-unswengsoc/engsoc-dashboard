@@ -102,6 +102,9 @@ export async function listUsers(): Promise<AdminUser[]> {
   return result.rows.map(rowToAdminUser);
 }
 
+/** Thrown when an inactive user is made treasurer — the route answers 400. */
+export class InactiveTreasurerError extends Error {}
+
 /**
  * Updates a user's role, portfolio and/or treasurer flag. Each is
  * independently optional — undefined leaves that column untouched, whereas
@@ -138,6 +141,15 @@ export async function updateUserRoleAndPortfolio(
   try {
     await client.query('BEGIN');
     if (isTreasurer) {
+      // Check the new treasurer before taking the flag off the old one, so a
+      // wrong id or a deactivated account never leaves nobody holding it.
+      // Locked so it can't be deactivated or deleted mid-handover.
+      const target = await client.query(`SELECT is_active FROM users WHERE id = $1 FOR UPDATE`, [userId]);
+      if (target.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      if (!target.rows[0].is_active) throw new InactiveTreasurerError('An inactive user cannot be made treasurer');
       await client.query(
         `UPDATE users SET is_treasurer = false, updated_at = NOW() WHERE is_treasurer AND id <> $1`,
         [userId]
