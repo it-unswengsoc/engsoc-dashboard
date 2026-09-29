@@ -7,7 +7,7 @@ export type { BoardTask, TaskItem, TaskStatus };
 
 /* Shape the backend actually returns (backend/src/functions/tasks.ts's Task
    interface) — mapped to TaskItem below, same pattern as events-api.ts. */
-interface RawTask {
+export interface RawTask {
   id: number;
   title: string;
   description: string | null;
@@ -18,7 +18,7 @@ interface RawTask {
   assignees: TaskAssignee[];
 }
 
-function toTaskItem(raw: RawTask): TaskItem {
+export function toTaskItem(raw: RawTask): TaskItem {
   return {
     id: raw.id,
     name: raw.title,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import EventRow from "@/components/EventRow";
 import StatCard from "@/components/StatCard";
@@ -8,14 +8,9 @@ import TaskRow from "@/components/TaskRow";
 import AnnouncementRow from "@/components/AnnouncementRow";
 import WelcomeHeading from "@/components/WelcomeHeading";
 import StaggerReveal from "@/components/StaggerReveal";
-import { getEvents } from '@/services/events-api';
-import { getTasks } from '@/services/tasks-api';
-import { getAnnouncements } from '@/services/announcements-api';
+import { getDashboard, readCachedDashboard, writeCachedDashboard, type DashboardData } from '@/services/dashboard-api';
 import { toUpcomingEventRows, toOpenTaskRows, toRecentAnnouncements, toDashboardStats } from "@/services/dashboard";
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
-import type { EventItem } from '@/types/events';
-import type { TaskItem } from '@/types/tasks';
-import type { AnnouncementItem } from '@/types/announcements';
 import type { EventRowData } from "@/types/dashboard";
 
 /* Events are already sorted by date/time ascending, so same-day events end
@@ -97,60 +92,53 @@ function TaskRowSkeleton() {
   );
 }
 
-interface Fetched<T> {
-  data: T[];
-  loading: boolean;
-  error: string;
+/* sessionStorage throws in some private/locked-down modes; a missing
+   token just means no cached dashboard to start from. */
+function readToken(): string | null {
+  try {
+    return sessionStorage.getItem('token');
+  } catch {
+    return null;
+  }
 }
-
-const INITIAL_FETCHED = { data: [], loading: true, error: '' };
 
 /* Client-side, not server-rendered: tasks and announcements now carry
    per-user data (whose task it is, whether *I* liked this), which needs the
    JWT held in sessionStorage — a Server Component can't reach that. Same
    pattern as DocumentsView/AdminView.
 
-   Events, tasks, and announcements are fetched independently rather than
-   behind one shared Promise.all — each section now renders (or shows its
-   own skeleton) the moment its own request resolves, instead of the whole
-   page staying blank on a single "Loading…" line until the slowest of the
-   three finishes. */
+   Everything comes from one GET /dashboard, so the sections fill in
+   together instead of one by one. The last dashboard this tab loaded is
+   shown straight away while that request runs (see readCachedDashboard),
+   so skeletons only show on the first visit. */
 export default function HomePage() {
   const router = useRouter();
 
-  const [eventsState, setEventsState] = useState<Fetched<EventItem>>(INITIAL_FETCHED);
-  const [tasksState, setTasksState] = useState<Fetched<TaskItem>>(INITIAL_FETCHED);
-  const [announcementsState, setAnnouncementsState] = useState<Fetched<AnnouncementItem>>(INITIAL_FETCHED);
+  const [data, setData] = useState<DashboardData | null>(() => {
+    const token = readToken();
+    return token ? readCachedDashboard(token) : null;
+  });
+  const [error, setError] = useState('');
+  /* Only the most recent load gets to set anything — a re-fetch after the
+     "New" dialog can overlap the first load and finish before it. */
+  const latestLoad = useRef(0);
 
   const load = useCallback((token: string) => {
-    setEventsState((s) => ({ ...s, loading: true, error: '' }));
-    getEvents()
-      .then((data) => setEventsState({ data, loading: false, error: '' }))
-      .catch((err) =>
-        setEventsState({ data: [], loading: false, error: err instanceof Error ? err.message : 'Failed to load events' })
-      );
-
-    setTasksState((s) => ({ ...s, loading: true, error: '' }));
-    getTasks(token)
-      .then((data) => setTasksState({ data, loading: false, error: '' }))
-      .catch((err) =>
-        setTasksState({ data: [], loading: false, error: err instanceof Error ? err.message : 'Failed to load tasks' })
-      );
-
-    setAnnouncementsState((s) => ({ ...s, loading: true, error: '' }));
-    getAnnouncements(token)
-      .then((data) => setAnnouncementsState({ data, loading: false, error: '' }))
-      .catch((err) =>
-        setAnnouncementsState({
-          data: [],
-          loading: false,
-          error: err instanceof Error ? err.message : 'Failed to load announcements',
-        })
-      );
+    const loadId = ++latestLoad.current;
+    getDashboard(token)
+      .then((fresh) => {
+        if (loadId !== latestLoad.current) return;
+        setData(fresh);
+        setError('');
+      })
+      .catch((err) => {
+        if (loadId !== latestLoad.current) return;
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard');
+      });
   }, []);
 
   useEffect(() => {
-    const token = sessionStorage.getItem('token');
+    const token = readToken();
     if (!token) {
       router.push('/login');
       return;
@@ -162,24 +150,36 @@ export default function HomePage() {
   // "New" dialog, wherever on the dashboard shell that happens to be open.
   useEffect(() => {
     function handleChanged() {
-      const token = sessionStorage.getItem('token');
+      const token = readToken();
       if (token) load(token);
     }
     window.addEventListener(DASHBOARD_DATA_CHANGED_EVENT, handleChanged);
     return () => window.removeEventListener(DASHBOARD_DATA_CHANGED_EVENT, handleChanged);
   }, [load]);
 
+  // Keeps the cache in step with what's on screen, including a ticked task
+  // or deleted announcement, so coming back never shows it undone.
+  useEffect(() => {
+    const token = readToken();
+    if (data && token) writeCachedDashboard(token, data);
+  }, [data]);
+
   function handleTaskToggled(id: number, completed: boolean) {
-    setTasksState((s) => ({ ...s, data: s.data.map((t) => (t.id === id ? { ...t, completed } : t)) }));
+    setData((d) => d && { ...d, tasks: d.tasks.map((t) => (t.id === id ? { ...t, completed } : t)) });
   }
 
   function handleAnnouncementDeleted(id: number) {
-    setAnnouncementsState((s) => ({ ...s, data: s.data.filter((a) => a.id !== id) }));
+    setData((d) => d && { ...d, announcements: d.announcements.filter((a) => a.id !== id) });
   }
 
-  const { data: events, loading: eventsLoading, error: eventsError } = eventsState;
-  const { data: tasks, loading: tasksLoading, error: tasksError } = tasksState;
-  const { data: announcements, loading: announcementsLoading, error: announcementsError } = announcementsState;
+  // A failed refresh keeps whatever is already on screen; the error only
+  // shows when there's nothing to show instead.
+  const loading = data === null && !error;
+  const loadError = data === null ? error : '';
+
+  const events = data?.events ?? [];
+  const tasks = data?.tasks ?? [];
+  const announcements = data?.announcements ?? [];
 
   const stats = toDashboardStats(tasks, events, announcements);
   const upcomingEvents = toUpcomingEventRows(events, UPCOMING_EVENTS_LIMIT);
@@ -195,17 +195,17 @@ export default function HomePage() {
 
         {/* UPPER BOX SECTION */}
         <StaggerReveal className="mt-6 flex flex-wrap justify-evenly gap-5" y={18}>
-          {tasksLoading ? (
+          {loading ? (
             <StatCardSkeleton colour="#F4EFD3" />
           ) : (
             <StatCard label={"OPEN TASKS"} value={stats.openTasks} colour={"#F4EFD3"} />
           )}
-          {eventsLoading ? (
+          {loading ? (
             <StatCardSkeleton colour="#B1C9DC" />
           ) : (
             <StatCard label={"UPCOMING EVENTS"} value={stats.upcomingEvents} colour={"#B1C9DC"} />
           )}
-          {announcementsLoading ? (
+          {loading ? (
             <StatCardSkeleton colour="#ED6672" />
           ) : (
             <StatCard label={"NEW ANNOUNCEMENTS"} value={stats.newAnnouncements} colour={"#ED6672"} />
@@ -214,14 +214,14 @@ export default function HomePage() {
 
         {/* ANNOUNCEMENTS SECTION */}
         <div className="mt-6">
-          {announcementsLoading ? (
+          {loading ? (
             <div className="flex flex-col gap-4">
               <AnnouncementRowSkeleton />
               <AnnouncementRowSkeleton />
             </div>
-          ) : announcementsError ? (
+          ) : loadError ? (
             <p className="rounded-2xl border border-dashed border-gray-200 py-10 text-center font-mono text-sm text-[#8B2E38]">
-              {announcementsError}
+              {loadError}
             </p>
           ) : recentAnnouncements.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-gray-200 py-10 text-center font-mono text-sm text-gray-400">
@@ -246,15 +246,15 @@ export default function HomePage() {
             Upcoming Events
           </h2>
 
-          {eventsLoading ? (
+          {loading ? (
             <div className="divide-y divide-gray-200 border-t border-gray-200">
               <EventRowSkeleton />
               <EventRowSkeleton />
               <EventRowSkeleton />
             </div>
-          ) : eventsError ? (
+          ) : loadError ? (
             <p className="border-t border-gray-200 px-4 py-6 text-center font-mono text-xs text-[#8B2E38]">
-              {eventsError}
+              {loadError}
             </p>
           ) : upcomingEvents.length === 0 ? (
             <p className="border-t border-gray-200 px-4 py-6 text-center font-mono text-xs text-gray-400">
@@ -286,15 +286,15 @@ export default function HomePage() {
             </h2>
           </div>
 
-          {tasksLoading ? (
+          {loading ? (
             <div className="divide-y divide-gray-200 border-t border-gray-200">
               <TaskRowSkeleton />
               <TaskRowSkeleton />
               <TaskRowSkeleton />
             </div>
-          ) : tasksError ? (
+          ) : loadError ? (
             <p className="border-t border-gray-200 px-4 py-6 text-center font-mono text-xs text-[#8B2E38]">
-              {tasksError}
+              {loadError}
             </p>
           ) : openTasks.length === 0 ? (
             <p className="border-t border-gray-200 px-4 py-6 text-center font-mono text-xs text-gray-400">
