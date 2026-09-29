@@ -75,6 +75,14 @@ export default function DocumentsView() {
   const [uploading, setUploading] = useState(false);
 
   const requestIdRef = useRef(0);
+  // Tracks the live `selected` value for the background count-fill effect
+  // below, which resolves well after the effect that reads it first ran —
+  // a plain closure over `selected` there would see it as it was the
+  // instant the page loaded, not whatever the member has since navigated to.
+  const selectedRef = useRef(selected);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
@@ -83,8 +91,16 @@ export default function DocumentsView() {
       return;
     }
 
-    getDepartments(token)
+    let cancelled = false;
+
+    // Fast path: drive names only, no per-drive file-count fetch (see
+    // services/documents-api.ts) — gets the department list and the first
+    // column on screen in well under a second instead of waiting on every
+    // Shared Drive's count, one of which being unusually large can otherwise
+    // hold up the entire page.
+    getDepartments(token, false)
       .then(({ departments, connected }) => {
+        if (cancelled) return;
         setDepartments(departments);
         setGoogleConnected(connected);
         if (departments.length > 0) {
@@ -93,9 +109,53 @@ export default function DocumentsView() {
         }
       })
       .catch((err) => {
+        if (cancelled) return;
         setDepartmentsError(err instanceof Error ? err.message : 'Failed to load Drive departments');
       })
-      .finally(() => setDepartmentsLoading(false));
+      .finally(() => {
+        if (!cancelled) setDepartmentsLoading(false);
+      });
+
+    // Slow path, in the background: the real per-drive counts, patched into
+    // whatever's already on screen once they arrive rather than blocking it.
+    getDepartments(token, true)
+      .then(({ departments: withCounts }) => {
+        if (cancelled) return;
+        const countById = new Map<string, number>();
+        for (const dept of withCounts) for (const drive of dept.drives) countById.set(drive.id, drive.fileCount);
+
+        setDepartments((prev) =>
+          prev.map((dept) => ({
+            ...dept,
+            drives: dept.drives.map((drive) => ({ ...drive, fileCount: countById.get(drive.id) ?? drive.fileCount })),
+          }))
+        );
+        setActiveDepartment((prev) =>
+          prev
+            ? { ...prev, drives: prev.drives.map((drive) => ({ ...drive, fileCount: countById.get(drive.id) ?? drive.fileCount })) }
+            : prev
+        );
+        // Only the top-level drive column can show stale counts from this
+        // fetch — once the member has navigated into a folder, whatever's
+        // in later columns was never part of this department-level count.
+        if (selectedRef.current.length === 0) {
+          setColumns((prev) =>
+            prev.length === 0
+              ? prev
+              : [
+                  prev[0].map((node) =>
+                    node.kind === 'drive' ? { ...node, fileCount: countById.get(node.id) ?? node.fileCount } : node
+                  ),
+                  ...prev.slice(1),
+                ]
+          );
+        }
+      })
+      .catch(() => {}); // best-effort — the fast-path counts (0) just never update if this fails
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   function selectDepartment(department: DriveDepartmentData) {

@@ -2,8 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { updateTaskStatus } from '@/services/tasks-api';
-import TaskDetailDialog from '@/components/TaskDetailDialog';
+
+/* TaskRow renders on the dashboard's "Open Tasks" widget and the /tasks
+   page, both on every load. A plain static import here bundled
+   TaskDetailDialog's whole tree — including DriveFilePicker — into that
+   initial load regardless of whether any row was ever clicked. Loaded on
+   demand instead; see the identical fix on AnnouncementComposer. */
+const TaskDetailDialog = dynamic(() => import('@/components/TaskDetailDialog'), { ssr: false });
 
 interface TaskRowProps {
   id: number;
@@ -44,6 +51,7 @@ export default function TaskRow({ id, daysTillDue, name, dateString, time, compl
   const [done, setDone] = useState(completed);
   const [saving, setSaving] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [hasOpenedDetailOnce, setHasOpenedDetailOnce] = useState(false);
 
   async function handleToggle(checked: boolean) {
     const token = sessionStorage.getItem('token');
@@ -94,7 +102,10 @@ export default function TaskRow({ id, daysTillDue, name, dateString, time, compl
       {/* Task details */}
       <div className="flex flex-col gap-0.5">
         <button
-          onClick={() => setDetailOpen(true)}
+          onClick={() => {
+            setHasOpenedDetailOnce(true);
+            setDetailOpen(true);
+          }}
           className={`text-left text-sm font-bold transition-colors hover:underline ${
             done ? 'text-gray-400 line-through' : 'text-gray-900'
           }`}
@@ -113,15 +124,17 @@ export default function TaskRow({ id, daysTillDue, name, dateString, time, compl
         </div>
       </div>
 
-      <TaskDetailDialog
-        open={detailOpen}
-        taskId={id}
-        onClose={() => setDetailOpen(false)}
-        onCompletionChanged={(taskId, completed) => {
-          setDone(completed);
-          onToggled(taskId, completed);
-        }}
-      />
+      {hasOpenedDetailOnce && (
+        <TaskDetailDialog
+          open={detailOpen}
+          taskId={id}
+          onClose={() => setDetailOpen(false)}
+          onCompletionChanged={(taskId, completed) => {
+            setDone(completed);
+            onToggled(taskId, completed);
+          }}
+        />
+      )}
     </div>
   );
 }

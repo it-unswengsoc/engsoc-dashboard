@@ -185,8 +185,8 @@ export interface DirectoryContentsResult {
   connected: boolean;
 }
 
-export async function getDepartments(token: string): Promise<DepartmentsResult> {
-  const { departments, connected } = await getDriveDepartments(token);
+export async function getDepartments(token: string, includeFileCounts = true): Promise<DepartmentsResult> {
+  const { departments, connected } = await getDriveDepartments(token, includeFileCounts);
   return { departments: departments.map(toDriveDepartment), connected };
 }
 
