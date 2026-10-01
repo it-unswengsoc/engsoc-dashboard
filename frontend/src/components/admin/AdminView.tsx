@@ -117,6 +117,10 @@ export default function AdminView() {
 
   const allVisibleSelected = filteredUsers.length > 0 && filteredUsers.every((u) => selectedIds.has(u.id));
   const someVisibleSelected = filteredUsers.some((u) => selectedIds.has(u.id));
+  /* Selections survive a filter change, but bulk edits only reach selected
+     people who are showing — a filter hiding someone (it matches saved
+     values) would otherwise hide the edit staged on them too. */
+  const visibleSelectedIds = filteredUsers.filter((u) => selectedIds.has(u.id)).map((u) => u.id);
 
   function toggleSelectAll() {
     setSelectedIds((prev) => {
@@ -187,7 +191,7 @@ export default function AdminView() {
     if (bulkRole !== NO_CHANGE) patch.role = bulkRole as UserRole;
     if (bulkPort !== NO_CHANGE) patch.port = bulkPort === '' ? null : bulkPort;
 
-    selectedIds.forEach((id) => stage(id, patch));
+    visibleSelectedIds.forEach((id) => stage(id, patch));
 
     setSelectedIds(new Set());
     setBulkRole(NO_CHANGE);
@@ -342,9 +346,9 @@ export default function AdminView() {
           )}
         </div>
 
-        {selectedIds.size > 0 && (
+        {visibleSelectedIds.length > 0 && (
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#B1C9DC] bg-[#B1C9DC]/10 px-4 py-3">
-            <span className="text-sm font-bold text-gray-900">{selectedIds.size} selected</span>
+            <span className="text-sm font-bold text-gray-900">{visibleSelectedIds.length} selected</span>
 
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">Role</span>
