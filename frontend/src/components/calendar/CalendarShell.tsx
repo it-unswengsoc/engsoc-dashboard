@@ -22,7 +22,7 @@ import {
 import { toOpenTaskRows } from '@/services/dashboard';
 import { getMyCalendarEvents } from '@/services/user-calendar-api';
 import { getTasks } from '@/services/tasks-api';
-import type { TaskItem } from '@/types/tasks';
+import type { TaskItem, TaskStatus } from '@/types/tasks';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
 
 const DUE_TASKS_LIMIT = 5;
@@ -128,13 +128,13 @@ export default function CalendarShell({ children }: CalendarShellProps) {
     return () => window.removeEventListener(DASHBOARD_DATA_CHANGED_EVENT, loadTasks);
   }, []);
 
-  function handleTaskToggled(id: number, completed: boolean) {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, completed } : t)));
+  function handleTaskStatusChanged(id: number, status: TaskStatus) {
+    const completed = status === 'completed';
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status, completed } : t)));
   }
 
   const taskItems = useMemo(() => toTaskCalendarItems(tasks), [tasks]);
   const dueTasks = useMemo(() => toOpenTaskRows(tasks, DUE_TASKS_LIMIT), [tasks]);
-  const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
 
   const items = useMemo(() => [...eventItems, ...taskItems], [eventItems, taskItems]);
 
@@ -197,8 +197,7 @@ export default function CalendarShell({ children }: CalendarShellProps) {
                   <TaskRow
                     key={task.id}
                     {...task}
-                    completed={taskById.get(task.id)?.completed ?? false}
-                    onToggled={handleTaskToggled}
+                    onStatusChanged={handleTaskStatusChanged}
                   />
                 ))
               )}

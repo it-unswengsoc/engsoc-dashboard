@@ -8,6 +8,7 @@ export const mockTasks: TaskItem[] = [
     description: 'Rough out the new dashboard layout before Friday\'s review.',
     dueAt: at(0, '21:30'),
     completed: false,
+    status: 'pending',
   },
   {
     id: 2,
@@ -15,6 +16,7 @@ export const mockTasks: TaskItem[] = [
     description: null,
     dueAt: at(3, '21:30'),
     completed: false,
+    status: 'pending',
   },
   {
     id: 3,
@@ -22,6 +24,7 @@ export const mockTasks: TaskItem[] = [
     description: null,
     dueAt: at(12, '21:30'),
     completed: false,
+    status: 'pending',
   },
   {
     id: 4,
@@ -29,6 +32,7 @@ export const mockTasks: TaskItem[] = [
     description: null,
     dueAt: at(-6, '17:00'),
     completed: true,
+    status: 'completed',
   },
   {
     id: 5,
@@ -36,6 +40,7 @@ export const mockTasks: TaskItem[] = [
     description: null,
     dueAt: at(-2, '17:00'),
     completed: true,
+    status: 'completed',
   },
   {
     id: 6,
@@ -43,6 +48,7 @@ export const mockTasks: TaskItem[] = [
     description: null,
     dueAt: at(5, '12:00'),
     completed: false,
+    status: 'pending',
   },
   {
     id: 7,
@@ -50,5 +56,6 @@ export const mockTasks: TaskItem[] = [
     description: null,
     dueAt: at(8, '10:00'),
     completed: false,
+    status: 'pending',
   },
 ];

@@ -28,7 +28,7 @@ export interface TaskDetailDialogProps {
   onClose: () => void;
   /* Opened from the dashboard or calendar, where the task is fetched by id
      and the dialog moves it itself — this hears about it afterwards. */
-  onCompletionChanged?: (id: number, completed: boolean) => void;
+  onStatusChanged?: (id: number, status: TaskStatus) => void;
   /* Opened from the tasks board: the card already carries the task, with
      its status and who's on it, so nothing is fetched. */
   boardTask?: BoardTask;
@@ -326,7 +326,7 @@ export default function TaskDetailDialog({
   open,
   taskId,
   onClose,
-  onCompletionChanged,
+  onStatusChanged,
   boardTask,
   currentUserId,
   onStatusChange,
@@ -446,7 +446,7 @@ export default function TaskDetailDialog({
     setOwnError('');
     try {
       await updateTaskStatus(token, fetched.id, status);
-      onCompletionChanged?.(fetched.id, status === 'completed');
+      onStatusChanged?.(fetched.id, status);
     } catch (err) {
       setFetched((f) => f && { ...f, status: previous });
       setOwnError(err instanceof Error ? err.message : 'Failed to move task');

@@ -59,6 +59,7 @@ export async function createTask(input: CreateTaskInput): Promise<TaskItem[]> {
     description: input.description ?? null,
     dueAt: input.dueDate ?? null,
     completed: false,
+    status: 'pending',
   };
 
   mockTasks.push(created);
@@ -84,6 +85,7 @@ export async function updateTaskStatus(taskId: number, status: TaskStatus): Prom
   if (boardTask) boardTask.status = status;
   if (task) {
     task.completed = status === 'completed';
+    task.status = status;
     return task;
   }
   return {
@@ -92,6 +94,7 @@ export async function updateTaskStatus(taskId: number, status: TaskStatus): Prom
     description: boardTask!.description,
     dueAt: boardTask!.dueAt,
     completed: status === 'completed',
+    status,
   };
 }
 
@@ -113,7 +116,7 @@ export async function getBoardTask(taskId: number): Promise<BoardTask> {
     id: task.id,
     title: task.name,
     description: task.description,
-    status: task.completed ? 'completed' : 'pending',
+    status: task.status,
     assignees: [me],
     assignedBy: { id: me.id, name: me.name },
     dueAt: task.dueAt,

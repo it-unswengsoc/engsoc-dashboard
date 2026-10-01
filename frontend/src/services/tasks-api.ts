@@ -29,6 +29,7 @@ export function toTaskItem(raw: RawTask): TaskItem {
     description: raw.description,
     dueAt: raw.dueDate,
     completed: raw.status === 'completed',
+    status: raw.status,
   };
 }
 

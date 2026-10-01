@@ -12,6 +12,7 @@ import { getDashboard, readCachedDashboard, writeCachedDashboard, type Dashboard
 import { toUpcomingEventRows, toOpenTaskRows, toRecentAnnouncements, toDashboardStats } from "@/services/dashboard";
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
 import type { EventRowData } from "@/types/dashboard";
+import type { TaskStatus } from "@/types/tasks";
 
 /* Events are already sorted by date/time ascending, so same-day events end
    up adjacent — collapsing them under one date chip, ordered by time. */
@@ -164,8 +165,9 @@ export default function HomePage() {
     if (data && token) writeCachedDashboard(token, data);
   }, [data]);
 
-  function handleTaskToggled(id: number, completed: boolean) {
-    setData((d) => d && { ...d, tasks: d.tasks.map((t) => (t.id === id ? { ...t, completed } : t)) });
+  function handleTaskStatusChanged(id: number, status: TaskStatus) {
+    const completed = status === 'completed';
+    setData((d) => d && { ...d, tasks: d.tasks.map((t) => (t.id === id ? { ...t, status, completed } : t)) });
   }
 
   function handleAnnouncementDeleted(id: number) {
@@ -185,7 +187,6 @@ export default function HomePage() {
   const upcomingEvents = toUpcomingEventRows(events, UPCOMING_EVENTS_LIMIT);
   const openTasks = toOpenTaskRows(tasks, OPEN_TASKS_LIMIT);
   const recentAnnouncements = toRecentAnnouncements(announcements);
-  const taskById = new Map(tasks.map((t) => [t.id, t]));
 
   return (
     <div className="flex justify-center items-start gap-20">
@@ -309,8 +310,7 @@ export default function HomePage() {
                 <TaskRow
                   key={task.id}
                   {...task}
-                  completed={taskById.get(task.id)?.completed ?? false}
-                  onToggled={handleTaskToggled}
+                  onStatusChanged={handleTaskStatusChanged}
                 />
               ))}
             </StaggerReveal>

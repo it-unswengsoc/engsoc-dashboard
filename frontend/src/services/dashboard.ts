@@ -58,11 +58,12 @@ export function toEventRow(event: EventItem): EventRowData {
 
 export function toTaskRow(task: TaskItem): TaskRowData {
   if (task.dueAt === null) {
-    return { id: task.id, daysTillDue: null, name: task.name, dateString: '', time: '' };
+    return { id: task.id, status: task.status, daysTillDue: null, name: task.name, dateString: '', time: '' };
   }
   const d = new Date(task.dueAt);
   return {
     id: task.id,
+    status: task.status,
     daysTillDue: daysUntil(d),
     name: task.name,
     dateString: toLongDate(d),

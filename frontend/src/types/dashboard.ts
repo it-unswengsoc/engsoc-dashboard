@@ -1,3 +1,4 @@
+import type { TaskStatus } from '@/types/tasks';
 import type { EventType } from '@/types/events';
 
 /* Display shapes — what the dashboard page's row components take,
@@ -15,6 +16,7 @@ export interface EventRowData {
 
 export interface TaskRowData {
   id: number;
+  status: TaskStatus;
   daysTillDue: number | null; // null if no due date was set
   name: string;
   dateString: string; // "Mon, 1 June"; "" if no due date
