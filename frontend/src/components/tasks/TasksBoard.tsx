@@ -71,7 +71,9 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
   const [board, setBoard] = useState(tasks);
   const [dragging, setDragging] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<TaskStatus | null>(null);
-  const [moveError, setMoveError] = useState('');
+  /* The last failed move, and which card it was — so a dialog only shows
+     the error for its own card, not one from a different drag. */
+  const [moveFailure, setMoveFailure] = useState<{ taskId: number; message: string } | null>(null);
   /* The card whose details are showing, kept by id so a board refetch
      shows its latest copy — and kept after closing, so the dialog still has
      it to show while it animates out. */
@@ -140,7 +142,7 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
     const setStatus = (next: TaskStatus) =>
       setBoard((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: next } : t)));
 
-    setMoveError('');
+    setMoveFailure(null);
     setStatus(status);
     setSaving(task.id, status);
     try {
@@ -150,11 +152,13 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
     } catch (err) {
       setSaving(task.id, null);
       setStatus(previous);
-      setMoveError(err instanceof Error ? err.message : 'Failed to move task');
+      setMoveFailure({ taskId: task.id, message: err instanceof Error ? err.message : 'Failed to move task' });
     }
   }
 
   function openTask(taskId: number) {
+    // An error from an earlier move of this card is stale by the time it's reopened.
+    setMoveFailure((prev) => (prev?.taskId === taskId ? null : prev));
     setOpenTaskId(taskId);
     setTaskDialogOpen(true);
     setHasOpenedTask(true);
@@ -208,9 +212,9 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
         ))}
       </div>
 
-      {moveError && (
+      {moveFailure && (
         <p role="alert" className="mt-4 text-xs font-bold text-[#8B2E38]">
-          Couldn&apos;t move that task: {moveError}
+          Couldn&apos;t move that task: {moveFailure.message}
         </p>
       )}
 
@@ -357,7 +361,7 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
               : undefined
           }
           statusSaving={openedTask ? savingIds.has(openedTask.id) : false}
-          statusError={moveError}
+          statusError={moveFailure && moveFailure.taskId === openedTask?.id ? moveFailure.message : undefined}
           onClose={() => setTaskDialogOpen(false)}
         />
       )}
