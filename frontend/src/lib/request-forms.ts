@@ -212,6 +212,28 @@ export const REQUEST_FORMS: RequestForm[] = [
   },
 ];
 
+/* Short names for link answers, shown on their buttons instead of the
+   form's full question. Any other link answer uses its question. */
+const LINK_LABELS: Record<string, string> = {
+  sheetUrl: 'Google Sheet',
+  templateUrl: 'Email template',
+};
+
+/* An answer counts as a link only if it parses as an http(s) URL, so
+   free text ("d", "see GC") stays text and nothing like javascript: can
+   end up in an href. A bare "docs.google.com/…" gets https:// in front. */
+function asWebLink(value: string): string | null {
+  const trimmed = value.trim();
+  if (/\s/.test(trimmed)) return null;
+  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(candidate);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname.includes('.') ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 export function requestForm(requestType: string): RequestForm | undefined {
   return REQUEST_FORMS.find((form) => form.value === requestType);
 }
@@ -245,7 +267,13 @@ export function toAnswers(requestType: string, formData: Record<string, unknown>
     } else {
       text = String(value);
     }
-    answers.push({ label: field.label, value: text });
+
+    const href = field.kind === 'text' ? asWebLink(text) : null;
+    answers.push(
+      href
+        ? { label: field.label, value: text, link: { href, label: LINK_LABELS[field.name] ?? field.label } }
+        : { label: field.label, value: text },
+    );
   }
   return answers;
 }
