@@ -17,6 +17,14 @@ const TASK_SELECT = `
            '[]'
          ) AS assignees,
          t.event_id, t.request_id, rq.title AS request_title,
+         COALESCE(
+           (SELECT json_agg(json_build_object('id', a.id, 'fileName', a.file_name, 'mimeType', a.mime_type,
+                                              'sizeBytes', a.size_bytes)
+                            ORDER BY a.id)
+            FROM request_attachments a
+            WHERE a.request_id = t.request_id),
+           '[]'
+         ) AS request_attachments,
          t.status, t.due_date, t.created_at, t.updated_at, t.completed_at
   FROM tasks t
   LEFT JOIN users ab ON ab.id = t.assigned_by
@@ -36,6 +44,7 @@ function rowToTask(row: any): Task {
     eventId: row.event_id,
     requestId: row.request_id,
     requestTitle: row.request_title,
+    requestAttachments: row.request_attachments,
     status: row.status,
     dueDate: row.due_date,
     createdAt: row.created_at,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Paperclip, Trash2, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Download, Paperclip, Trash2, ExternalLink } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
 import Select from '@/components/dialogs/Select';
 import {
@@ -14,6 +14,7 @@ import {
   type TaskAttachment,
 } from '@/services/tasks-api';
 import DriveFilePicker, { type PickedAttachment } from '@/components/DriveFilePicker';
+import { downloadRequestAttachment } from '@/services/requests-api';
 import type { BoardTask, TaskStatus } from '@/types/tasks';
 
 export interface TaskDetailDialogProps {
@@ -107,6 +108,18 @@ export default function TaskDetailDialog({
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fileError, setFileError] = useState('');
+
+  async function downloadFile(requestId: number, file: { id: number; fileName: string }) {
+    const token = sessionStorage.getItem('token');
+    if (!token) return;
+    setFileError('');
+    try {
+      await downloadRequestAttachment(token, requestId, file);
+    } catch (err) {
+      setFileError(err instanceof Error ? err.message : 'Failed to download file');
+    }
+  }
 
   useEffect(() => {
     // The board hands in everything its view shows; nothing to fetch.
@@ -293,6 +306,33 @@ export default function TaskDetailDialog({
           </div>
         )}
 
+        {/* What the requester attached (a reimbursement's receipt), for the
+            people doing the work — the backend lets a request's task
+            assignees download its files. */}
+        {isAssignee && boardTask.requestId && (boardTask.requestAttachments?.length ?? 0) > 0 && (
+          <div className="border-t border-gray-200 px-7 pb-6 pt-4">
+            <span className="text-[13px] font-semibold text-gray-500">Files from the request</span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {boardTask.requestAttachments!.map((file) => (
+                <button
+                  key={file.id}
+                  type="button"
+                  onClick={() => downloadFile(boardTask.requestId!, file)}
+                  className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-[#B1C9DC] hover:text-[#3D6C94]"
+                >
+                  <Paperclip className="h-4 w-4 shrink-0 text-gray-400" />
+                  {file.fileName}
+                  <Download className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                </button>
+              ))}
+            </div>
+            {fileError && (
+              <p role="alert" className="mt-2 text-xs font-bold text-[#8B2E38]">
+                {fileError}
+              </p>
+            )}
+          </div>
+        )}
       </Dialog>
     );
   }
