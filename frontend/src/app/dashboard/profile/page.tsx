@@ -6,6 +6,7 @@ import { LogOut, Mail } from 'lucide-react';
 import { getProfile, updateProfile } from '@/services/auth-api';
 import type { Profile } from '@/types/auth';
 import { useProfile } from '@/lib/profile-context';
+import { portLabel } from '@/lib/ports';
 
 const inputStyles =
   'w-full rounded-lg border border-transparent bg-gray-100 px-3 py-2 text-sm text-gray-900 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]';
@@ -184,6 +185,7 @@ export default function ProfilePage() {
               </label>
 
               <Field label="Role" value={profile.role} className="capitalize" />
+              <Field label="Portfolio" value={profile.port ? portLabel(profile.port) : 'Unassigned'} />
               <Field
                 label="Member since"
                 value={new Date(profile.createdAt).toLocaleDateString()}
@@ -206,6 +208,7 @@ export default function ProfilePage() {
             <Field label="First name" value={profile.firstName} />
             <Field label="Last name" value={profile.lastName} />
             <Field label="Role" value={profile.role} className="capitalize" />
+            <Field label="Portfolio" value={profile.port ? portLabel(profile.port) : 'Unassigned'} />
             <Field
               label="Member since"
               value={new Date(profile.createdAt).toLocaleDateString()}
