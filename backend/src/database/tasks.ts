@@ -156,3 +156,38 @@ export async function dbUpdateTaskStatus(taskId: number, status: TaskStatus): Pr
   if (result.rows.length === 0) return null;
   return dbGetTaskById(result.rows[0].id);
 }
+
+/**
+ * Edits a task's own details — only the fields given; `null` clears a
+ * description or due date. Status and assignees change elsewhere.
+ */
+export async function dbUpdateTaskDetails(
+  taskId: number,
+  fields: { title?: string; description?: string | null; dueDate?: string | null }
+): Promise<Task | null> {
+  const sets: string[] = [];
+  const values: unknown[] = [taskId];
+  if (fields.title !== undefined) {
+    values.push(fields.title);
+    sets.push(`title = $${values.length}`);
+  }
+  if (fields.description !== undefined) {
+    values.push(fields.description);
+    sets.push(`description = $${values.length}`);
+  }
+  if (fields.dueDate !== undefined) {
+    values.push(fields.dueDate);
+    sets.push(`due_date = $${values.length}`);
+  }
+  if (sets.length === 0) return dbGetTaskById(taskId);
+
+  const result: QueryResult = await pool.query(
+    `UPDATE tasks
+     SET ${sets.join(', ')}, updated_at = NOW()
+     WHERE id = $1
+     RETURNING id`,
+    values
+  );
+  if (result.rows.length === 0) return null;
+  return dbGetTaskById(result.rows[0].id);
+}

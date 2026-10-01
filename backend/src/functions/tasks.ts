@@ -5,6 +5,7 @@ import {
   dbIsTaskAssignee,
   dbCreateTask,
   dbUpdateTaskStatus,
+  dbUpdateTaskDetails,
 } from '../database/tasks';
 import { listDirectoryUsers, getUserPort } from './users';
 import { createNotificationsBulk } from './notifications';
@@ -62,6 +63,15 @@ export class ForbiddenTaskError extends Error {}
 
 /** Thrown for a status outside task_status — the route answers 400. */
 export class InvalidTaskStatusError extends Error {}
+
+/** Thrown for an invalid edit (empty title, bad date) — the route answers 400. */
+export class InvalidTaskEditError extends Error {}
+
+export interface TaskDetailsEdit {
+  title?: string;
+  description?: string | null;
+  dueDate?: string | null;
+}
 
 /**
  * Retrieves every task the user is an assignee on, soonest due date first
@@ -176,16 +186,50 @@ export async function updateTaskStatus(taskId: number, userId: number, status: s
 }
 
 /**
- * Fetches a single task — any of its assignees, or an admin (there's no
- * "tasks I've assigned to others" view yet, so the assigner can't reach this
- * today; same restriction as updateTaskStatus, just also allowing admin). Throws
+ * Edits a task's title, description or due date. Only whoever created it
+ * (assigned_by) can; anyone else gets ForbiddenTaskError (a 403). Returns
+ * null if the task doesn't exist.
+ */
+export async function updateTaskDetails(taskId: number, userId: number, edit: TaskDetailsEdit): Promise<Task | null> {
+  const fields: TaskDetailsEdit = {};
+  if (edit.title !== undefined) {
+    const title = typeof edit.title === 'string' ? edit.title.trim() : '';
+    if (!title) throw new InvalidTaskEditError('Title is required');
+    if (title.length > 255) throw new InvalidTaskEditError('Title must be 255 characters or fewer');
+    fields.title = title;
+  }
+  if (edit.description !== undefined) {
+    fields.description = typeof edit.description === 'string' ? edit.description.trim() || null : null;
+  }
+  if (edit.dueDate !== undefined) {
+    if (edit.dueDate !== null && (typeof edit.dueDate !== 'string' || isNaN(new Date(edit.dueDate).getTime()))) {
+      throw new InvalidTaskEditError('Due date must be a valid date');
+    }
+    fields.dueDate = edit.dueDate;
+  }
+
+  const existing = await dbGetTaskById(taskId);
+  if (!existing) return null;
+  if (existing.assignedBy !== userId) {
+    throw new ForbiddenTaskError('Only the person who created this task can edit it');
+  }
+  return dbUpdateTaskDetails(taskId, fields);
+}
+
+/**
+ * Fetches a single task — any of its assignees, whoever created it, or an
+ * admin. Throws
  * ForbiddenTaskError if the requester isn't allowed to see it (caught by the
  * route as a 403); returns null if the task doesn't exist at all.
  */
 export async function getTaskById(taskId: number, userId: number): Promise<Task | null> {
   const task = await dbGetTaskById(taskId);
   if (!task) return null;
-  if (!task.assignees.some((a) => a.id === userId) && !(await isUserAdmin(userId))) {
+  if (
+    !task.assignees.some((a) => a.id === userId) &&
+    task.assignedBy !== userId &&
+    !(await isUserAdmin(userId))
+  ) {
     throw new ForbiddenTaskError('You can only view your own tasks');
   }
   return task;

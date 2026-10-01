@@ -1,5 +1,5 @@
 import type { BoardTask, TaskAssignee, TaskItem, TaskStatus } from '@/types/tasks';
-import type { CreateTaskInput } from '@/services/tasks-api';
+import type { CreateTaskInput, TaskDetailsEdit } from '@/services/tasks-api';
 import { mockTasks } from '@/mocks/data/tasks';
 import { mockBoardTasks } from '@/mocks/data/board-tasks';
 import { mockProfile } from '@/mocks/data/auth';
@@ -99,6 +99,35 @@ export async function getTask(taskId: number): Promise<TaskItem> {
   const task = mockTasks.find((t) => t.id === taskId);
   if (!task) throw new Error('Task not found');
   return task;
+}
+
+/* A dashboard-only mock task has no board row; it reads as one the mock
+   user made for themself. */
+export async function getBoardTask(taskId: number): Promise<BoardTask> {
+  const boardTask = mockBoardTasks.find((t) => t.id === taskId);
+  if (boardTask) return { ...boardTask };
+  const task = mockTasks.find((t) => t.id === taskId);
+  if (!task) throw new Error('Task not found');
+  const me = mockPerson(mockProfile.id);
+  return {
+    id: task.id,
+    title: task.name,
+    description: task.description,
+    status: task.completed ? 'completed' : 'pending',
+    assignees: [me],
+    assignedBy: { id: me.id, name: me.name },
+    dueAt: task.dueAt,
+  };
+}
+
+export async function updateTaskDetails(taskId: number, edit: TaskDetailsEdit): Promise<BoardTask> {
+  const current = await getBoardTask(taskId);
+  if (current.assignedBy?.id !== mockProfile.id) throw new Error('Only the person who created this task can edit it');
+  const task = mockTasks.find((t) => t.id === taskId);
+  if (task) Object.assign(task, { name: edit.title, description: edit.description, dueAt: edit.dueDate });
+  const boardTask = mockBoardTasks.find((t) => t.id === taskId);
+  if (boardTask) Object.assign(boardTask, { title: edit.title, description: edit.description, dueAt: edit.dueDate });
+  return { ...current, title: edit.title, description: edit.description, dueAt: edit.dueDate };
 }
 
 /* Same rule as the real GET /tasks?port=…: any assignee in the port. A copy
