@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, Clock, Download, Inbox, Paperclip, Plus, Send } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
 import { portLabel } from '@/lib/ports';
@@ -123,7 +123,16 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
 
   /* Who the assignee picker offers: active members of the request's port. */
   const [members, setMembers] = useState<Member[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
   const [membersError, setMembersError] = useState('');
+  /* People already on a request who are no longer active in its port, so
+     can't stay on it — taken off the picker's selection, and named so the
+     change isn't silent. */
+  const [droppedAssignees, setDroppedAssignees] = useState<Member[]>([]);
+  /* Only the latest member list may land: an admin can open requests from
+     different ports one after another, and a slow earlier list would
+     otherwise fill the later dialog with the wrong port's members. */
+  const latestMembersLoad = useRef(0);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -187,12 +196,27 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
     setDraftNotes(request.notes ?? '');
     setActionError('');
     setAssigning(mode);
+    setDroppedAssignees([]);
     if (request.assignable) {
+      const loadId = ++latestMembersLoad.current;
       setMembers([]);
       setMembersError('');
+      setMembersLoading(true);
       getPortMembers(readToken(), request.targetPort)
-        .then(setMembers)
-        .catch((err) => setMembersError(err instanceof Error ? err.message : 'Failed to load members'));
+        .then((list) => {
+          if (loadId !== latestMembersLoad.current) return;
+          setMembers(list);
+          const available = new Set(list.map((m) => m.id));
+          setDraftAssignees(request.assignees.filter((m) => available.has(m.id)));
+          setDroppedAssignees(request.assignees.filter((m) => !available.has(m.id)));
+        })
+        .catch((err) => {
+          if (loadId !== latestMembersLoad.current) return;
+          setMembersError(err instanceof Error ? err.message : 'Failed to load members');
+        })
+        .finally(() => {
+          if (loadId === latestMembersLoad.current) setMembersLoading(false);
+        });
     }
   }
 
@@ -571,9 +595,23 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
                 Assign to
               </span>
 
-              {membersError && <p className="text-xs font-bold text-[#8B2E38]">{membersError}</p>}
-              {!membersError && members.length === 0 && (
+              {membersError ? (
+                <p className="text-xs font-bold text-[#8B2E38]">{membersError}</p>
+              ) : membersLoading ? (
                 <p className="font-mono text-xs text-gray-400">Loading {portLabel(selected.targetPort)} members…</p>
+              ) : (
+                members.length === 0 && (
+                  <p className="font-mono text-xs text-gray-400">
+                    No active members in {portLabel(selected.targetPort)} to assign.
+                  </p>
+                )
+              )}
+              {droppedAssignees.length > 0 && (
+                <p className="text-xs text-gray-500">
+                  {droppedAssignees.map((m) => m.name).join(', ')}{' '}
+                  {droppedAssignees.length === 1 ? 'is' : 'are'} no longer active in {portLabel(selected.targetPort)}, so
+                  saving takes them off this request.
+                </p>
               )}
 
               <div className="grid gap-1 sm:grid-cols-2">
