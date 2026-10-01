@@ -94,6 +94,23 @@ export async function getTask(token: string, taskId: number): Promise<TaskItem> 
   return toTaskItem(data.data as RawTask);
 }
 
+/* The same task in the board's shape — lets the dashboard open the board's
+   dialog. Assignees, whoever created it, and admins only. */
+export async function getBoardTask(token: string, taskId: number): Promise<BoardTask> {
+  if (USE_MOCK) {
+    const { getBoardTask: mockGetBoardTask } = await import('@/mocks/functions/tasks');
+    return mockGetBoardTask(taskId);
+  }
+
+  const res = await fetch(apiUrl(`/tasks/${taskId}`), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to load task');
+  return toBoardTask(data.data as RawTask);
+}
+
 export interface CreateTaskInput {
   title: string;
   description?: string;
@@ -138,6 +155,30 @@ export async function updateTaskStatus(token: string, taskId: number, status: Ta
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || 'Failed to update task');
   return toTaskItem(data.data as RawTask);
+}
+
+export interface TaskDetailsEdit {
+  title: string;
+  description: string | null;
+  dueDate: string | null; // ISO date string; null clears it
+}
+
+/* Only whoever created the task can edit it — the backend 403s anyone
+   else. */
+export async function updateTaskDetails(token: string, taskId: number, edit: TaskDetailsEdit): Promise<BoardTask> {
+  if (USE_MOCK) {
+    const { updateTaskDetails: mockUpdateTaskDetails } = await import('@/mocks/functions/tasks');
+    return mockUpdateTaskDetails(taskId, edit);
+  }
+
+  const res = await fetch(apiUrl(`/tasks/${taskId}`), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(edit),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to save task');
+  return toBoardTask(data.data as RawTask);
 }
 
 /* The file's bytes are never sent here — see documents-api.ts's

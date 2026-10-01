@@ -4,9 +4,11 @@ import {
   getTasksForPort,
   createTasks,
   updateTaskStatus,
+  updateTaskDetails,
   getTaskById,
   ForbiddenTaskError,
   InvalidTaskStatusError,
+  InvalidTaskEditError,
 } from '../functions/tasks';
 import { addTaskAttachment, getTaskAttachments, deleteTaskAttachment } from '../functions/task-attachments';
 import { verifyAuthToken } from './auth';
@@ -110,22 +112,31 @@ router.post('/', verifyAuthToken, async (req: Request, res: Response) => {
 /**
  * PATCH /tasks/:taskId
  * Moves a task to any task_status — the dashboard checkbox or a board
- * column. Any of the task's assignees can move it. Body: { status }.
+ * column; any of the task's assignees can. Or edits its title, description
+ * or due date; only whoever created it can. Body: { status } and/or
+ * { title?, description?, dueDate? } (null clears description or dueDate).
  */
 router.patch('/:taskId', verifyAuthToken, async (req: Request, res: Response) => {
   try {
     const taskId = parseInt(req.params.taskId);
     const user = (req as any).user;
-    const { status } = req.body as { status?: string };
+    const { status, title, description, dueDate } = req.body as {
+      status?: string;
+      title?: string;
+      description?: string | null;
+      dueDate?: string | null;
+    };
+    const isEdit = title !== undefined || description !== undefined || dueDate !== undefined;
 
     if (isNaN(taskId)) {
       return res.status(400).json({ status: 'error', message: 'Invalid task ID' });
     }
-    if (!status) {
-      return res.status(400).json({ status: 'error', message: 'Missing required field: status' });
+    if (!status && !isEdit) {
+      return res.status(400).json({ status: 'error', message: 'Nothing to update' });
     }
 
-    const task = await updateTaskStatus(taskId, user.userId, status);
+    let task = isEdit ? await updateTaskDetails(taskId, user.userId, { title, description, dueDate }) : null;
+    if (status) task = await updateTaskStatus(taskId, user.userId, status);
     if (!task) {
       return res.status(404).json({ status: 'error', message: 'Task not found' });
     }
@@ -135,7 +146,7 @@ router.patch('/:taskId', verifyAuthToken, async (req: Request, res: Response) =>
     if (error instanceof ForbiddenTaskError) {
       return res.status(403).json({ status: 'error', message: error.message });
     }
-    if (error instanceof InvalidTaskStatusError) {
+    if (error instanceof InvalidTaskStatusError || error instanceof InvalidTaskEditError) {
       return res.status(400).json({ status: 'error', message: error.message });
     }
     console.error('Update task error:', error);
@@ -145,7 +156,7 @@ router.patch('/:taskId', verifyAuthToken, async (req: Request, res: Response) =>
 
 /**
  * GET /tasks/:taskId
- * A single task's full details — assignee or admin only. Backs the task
+ * A single task's full details — assignee, creator or admin only. Backs the task
  * detail dialog.
  */
 router.get('/:taskId', verifyAuthToken, async (req: Request, res: Response) => {

@@ -11,9 +11,11 @@ import { ForbiddenTaskError } from './tasks';
 
 export type { TaskAttachment };
 
+/* Its assignees, whoever created it (who can edit it), and admins. */
 async function canAccessTask(taskId: number, userId: number): Promise<boolean> {
   const task = await dbGetTaskById(taskId);
   if (!task) return false;
+  if (task.assignedBy === userId) return true;
   if (await dbIsTaskAssignee(taskId, userId)) return true;
   return isUserAdmin(userId);
 }

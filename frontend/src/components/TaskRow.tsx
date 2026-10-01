@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { updateTaskStatus } from '@/services/tasks-api';
 
-/* TaskRow renders on the dashboard's "Open Tasks" widget and the /tasks
-   page, both on every load. A plain static import here bundled
-   TaskDetailDialog's whole tree — including DriveFilePicker — into that
-   initial load regardless of whether any row was ever clicked. Loaded on
-   demand instead; see the identical fix on AnnouncementComposer. */
+/* TaskRow renders on the dashboard's "Open Tasks" widget and the calendar,
+   both on every load. A plain static import here bundled TaskDetailDialog's
+   whole tree into that initial load regardless of whether any row was ever
+   clicked. Loaded on demand instead; see the identical fix on
+   AnnouncementComposer. The dialog fetches the task itself and shows it
+   the way the tasks board does. */
 const TaskDetailDialog = dynamic(() => import('@/components/TaskDetailDialog'), { ssr: false });
 
 interface TaskRowProps {
