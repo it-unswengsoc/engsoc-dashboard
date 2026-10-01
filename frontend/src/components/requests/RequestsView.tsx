@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Check, Clock, Download, ExternalLink, Inbox, Link2, Paperclip, Plus, Send } from 'lucide-react';
+import { AlertTriangle, Check, Clock, Download, ExternalLink, Inbox, Link2, Paperclip, Plus, Search, Send } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
+import Select from '@/components/dialogs/Select';
 import { portLabel } from '@/lib/ports';
 import {
   acceptRequest,
@@ -110,6 +111,10 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
   const handlesAny = data.handles.length > 0;
   const [tab, setTab] = useState<Tab>(handlesAny ? 'inbox' : 'mine');
   const [filter, setFilter] = useState<Filter>('ALL');
+  /* Narrows the list to one request type — offered once a list mixes
+     types (admins see every port's; Publications gets two). */
+  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
   /* Each action answers with the updated request, which replaces its copy
@@ -151,7 +156,24 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
   const streams = useMemo(() => ({ inbox: incoming, mine }), [incoming, mine]);
 
   const stream = streams[tab];
-  const visible = filter === 'ALL' ? stream : stream.filter((r) => r.status === filter);
+  /* Status, type and search all apply together. Search matches the title,
+     who sent it, its type, the port, and the answers themselves. */
+  const typeOptions = useMemo(() => {
+    const types = new Map(stream.map((r) => [r.requestType, r.typeLabel]));
+    return [
+      { value: 'ALL', label: 'All types' },
+      ...[...types].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label)),
+    ];
+  }, [stream]);
+  const needle = query.trim().toLowerCase();
+  const visible = stream.filter((r) => {
+    if (filter !== 'ALL' && r.status !== filter) return false;
+    if (typeFilter !== 'ALL' && r.requestType !== typeFilter) return false;
+    if (!needle) return true;
+    return [r.title, r.requesterName ?? '', r.typeLabel, portLabel(r.targetPort), ...r.answers.map((a) => a.value)]
+      .some((text) => text.toLowerCase().includes(needle));
+  });
+  const narrowed = filter !== 'ALL' || typeFilter !== 'ALL' || needle !== '';
 
   /* Selection follows the filter: if the selected request is filtered out,
      fall back to the first one still on screen. */
@@ -303,6 +325,8 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
               setTab(value);
               setSelectedId(null);
               setFilter('ALL');
+              setTypeFilter('ALL');
+              setQuery('');
               setActionError('');
             }}
             className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold transition-colors ${
@@ -324,7 +348,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
         ))}
       </div>
 
-      {/* STATUS FILTERS */}
+      {/* STATUS FILTERS, then search and the type filter */}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
           <button
@@ -339,12 +363,44 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
             {f.label}
           </button>
         ))}
+
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <label className="relative">
+            <span className="sr-only">Search requests</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search requests…"
+              className="w-60 rounded-lg border border-transparent bg-gray-100 py-2 pl-9 pr-3 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]"
+            />
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          </label>
+          {typeOptions.length > 2 && (
+            <div className="w-52">
+              <Select value={typeFilter} options={typeOptions} onChange={setTypeFilter} />
+            </div>
+          )}
+        </div>
       </div>
 
       {visible.length === 0 ? (
-        <p className="mt-8 rounded-2xl border border-gray-200 bg-white px-4 py-16 text-center font-mono text-xs text-gray-400 shadow-sm">
-          Nothing here.
-        </p>
+        <div className="mt-8 rounded-2xl border border-gray-200 bg-white px-4 py-16 text-center shadow-sm">
+          <p className="font-mono text-xs text-gray-400">{narrowed ? 'No requests match.' : 'Nothing here.'}</p>
+          {narrowed && (
+            <button
+              type="button"
+              onClick={() => {
+                setFilter('ALL');
+                setTypeFilter('ALL');
+                setQuery('');
+              }}
+              className="mt-3 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-gray-600 transition-colors hover:bg-gray-50"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
       ) : (
         <div className="mt-6 grid gap-5 lg:grid-cols-[20rem_1fr]">
           {/* LIST — runs to the bottom of the viewport and scrolls inside,
