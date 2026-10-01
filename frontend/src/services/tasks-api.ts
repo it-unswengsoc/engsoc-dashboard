@@ -16,6 +16,9 @@ export interface RawTask {
   assignedBy: number | null;
   assignedByName: string | null;
   assignees: TaskAssignee[];
+  requestId?: number | null;
+  requestTitle?: string | null;
+  requestAttachments?: { id: number; fileName: string; mimeType: string; sizeBytes: number }[];
 }
 
 export function toTaskItem(raw: RawTask): TaskItem {
@@ -37,6 +40,9 @@ function toBoardTask(raw: RawTask): BoardTask {
     assignees: raw.assignees,
     assignedBy: raw.assignedBy !== null && raw.assignedByName ? { id: raw.assignedBy, name: raw.assignedByName } : null,
     dueAt: raw.dueDate,
+    requestId: raw.requestId ?? undefined,
+    requestTitle: raw.requestTitle ?? undefined,
+    requestAttachments: raw.requestAttachments ?? [],
   };
 }
 

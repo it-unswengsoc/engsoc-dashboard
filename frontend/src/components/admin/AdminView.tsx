@@ -16,6 +16,11 @@ const PORT_SELECT_OPTIONS = [{ value: '', label: 'Unassigned' }, ...PORT_OPTIONS
 // from '' (role has no such state; port's '' already means Unassigned, a
 // real value, so it can't double as "leave it alone" too).
 const NO_CHANGE = '__no_change__';
+
+// List filters. 'ALL' can't collide with a real role or port value.
+const ALL = '__all__';
+const ROLE_FILTER_OPTIONS = [{ value: ALL, label: 'All roles' }, ...ROLE_OPTIONS];
+const PORT_FILTER_OPTIONS = [{ value: ALL, label: 'All portfolios' }, ...PORT_SELECT_OPTIONS];
 const BULK_ROLE_OPTIONS = [{ value: NO_CHANGE, label: '— No change —' }, ...ROLE_OPTIONS];
 const BULK_PORT_OPTIONS = [{ value: NO_CHANGE, label: '— No change —' }, ...PORT_SELECT_OPTIONS];
 
@@ -31,6 +36,12 @@ type PendingEdit = { role?: UserRole; port?: string | null };
 
    Zachary Abran and Winnie Moy were made admins directly in the database to
    bootstrap this panel — everyone after them gets promoted from here. */
+/* One set of column widths for the header and every row. Each row is its
+   own grid, so an `auto` column sized to its own content ("Never" vs
+   "11 days ago") shifted every column after it; fixed edge columns and
+   minmax(0, …) keep them lined up whatever's in them. */
+const COLUMNS = 'grid-cols-[1rem_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_7rem]';
+
 export default function AdminView() {
   const router = useRouter();
   const [checkingAccess, setCheckingAccess] = useState(true);
@@ -41,6 +52,8 @@ export default function AdminView() {
   const [loadError, setLoadError] = useState('');
 
   const [query, setQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState(ALL);
+  const [portFilter, setPortFilter] = useState(ALL);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkRole, setBulkRole] = useState(NO_CHANGE);
   const [bulkPort, setBulkPort] = useState(NO_CHANGE);
@@ -89,17 +102,25 @@ export default function AdminView() {
       .finally(() => setLoading(false));
   }, [authorized]);
 
+  /* Search, role and portfolio all apply together. Filters match what's
+     saved, not a staged edit, so a row doesn't vanish mid-change. */
   const filteredUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return users;
     return users.filter((u) => {
-      const haystack = `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase();
-      return haystack.includes(q);
+      if (roleFilter !== ALL && u.role !== roleFilter) return false;
+      if (portFilter !== ALL && (u.port ?? '') !== portFilter) return false;
+      if (!q) return true;
+      return `${u.firstName} ${u.lastName} ${u.email}`.toLowerCase().includes(q);
     });
-  }, [query, users]);
+  }, [query, roleFilter, portFilter, users]);
+  const filtersActive = query.trim() !== '' || roleFilter !== ALL || portFilter !== ALL;
 
   const allVisibleSelected = filteredUsers.length > 0 && filteredUsers.every((u) => selectedIds.has(u.id));
   const someVisibleSelected = filteredUsers.some((u) => selectedIds.has(u.id));
+  /* Selections survive a filter change, but bulk edits only reach selected
+     people who are showing — a filter hiding someone (it matches saved
+     values) would otherwise hide the edit staged on them too. */
+  const visibleSelectedIds = filteredUsers.filter((u) => selectedIds.has(u.id)).map((u) => u.id);
 
   function toggleSelectAll() {
     setSelectedIds((prev) => {
@@ -170,7 +191,7 @@ export default function AdminView() {
     if (bulkRole !== NO_CHANGE) patch.role = bulkRole as UserRole;
     if (bulkPort !== NO_CHANGE) patch.port = bulkPort === '' ? null : bulkPort;
 
-    selectedIds.forEach((id) => stage(id, patch));
+    visibleSelectedIds.forEach((id) => stage(id, patch));
 
     setSelectedIds(new Set());
     setBulkRole(NO_CHANGE);
@@ -266,13 +287,31 @@ export default function AdminView() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5">
-        <ShieldCheck className="h-7 w-7 text-gray-900" strokeWidth={2} />
-        <h1 className="text-3xl font-bold text-gray-900">Admin</h1>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <ShieldCheck className="h-7 w-7 text-gray-900" strokeWidth={2} />
+            <h1 className="text-3xl font-bold text-gray-900">Admin</h1>
+          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            Select one or more members, choose new values, then confirm to save — nothing changes until you do.
+          </p>
+        </div>
+
+        {/* A position, not a column: one person at a time, handed over here
+            and saved straight away. */}
+        {!loading && !loadError && (
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">Treasurer</span>
+              <div className={`w-52 ${treasurerSaving ? 'pointer-events-none opacity-50' : ''}`}>
+                <Select value={treasurer ? String(treasurer.id) : ''} options={treasurerOptions} onChange={changeTreasurer} />
+              </div>
+            </div>
+            {treasurerError && <span className="font-mono text-xs text-[#8B2E38]">{treasurerError}</span>}
+          </div>
+        )}
       </div>
-      <p className="mt-1 text-sm text-gray-500">
-        Select one or more members, choose new values, then confirm to save — nothing changes until you do.
-      </p>
 
       <div className="mt-4 flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-4">
@@ -287,20 +326,29 @@ export default function AdminView() {
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
         </div>
 
-          {!loading && !loadError && (
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">Treasurer</span>
-              <div className={`w-52 ${treasurerSaving ? 'pointer-events-none opacity-50' : ''}`}>
-                <Select value={treasurer ? String(treasurer.id) : ''} options={treasurerOptions} onChange={changeTreasurer} />
-              </div>
-              {treasurerError && <span className="font-mono text-xs text-[#8B2E38]">{treasurerError}</span>}
-            </div>
+          <div className="w-40">
+            <Select value={roleFilter} options={ROLE_FILTER_OPTIONS} onChange={setRoleFilter} />
+          </div>
+          <div className="w-44">
+            <Select value={portFilter} options={PORT_FILTER_OPTIONS} onChange={setPortFilter} />
+          </div>
+          {(roleFilter !== ALL || portFilter !== ALL) && (
+            <button
+              type="button"
+              onClick={() => {
+                setRoleFilter(ALL);
+                setPortFilter(ALL);
+              }}
+              className="text-xs font-bold text-gray-500 transition-colors hover:text-gray-800"
+            >
+              Clear filters
+            </button>
           )}
         </div>
 
-        {selectedIds.size > 0 && (
+        {visibleSelectedIds.length > 0 && (
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#B1C9DC] bg-[#B1C9DC]/10 px-4 py-3">
-            <span className="text-sm font-bold text-gray-900">{selectedIds.size} selected</span>
+            <span className="text-sm font-bold text-gray-900">{visibleSelectedIds.length} selected</span>
 
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">Role</span>
@@ -342,7 +390,7 @@ export default function AdminView() {
         ) : (
           <>
             <div className="flex-1 overflow-y-auto">
-              <div className="sticky top-0 z-10 grid grid-cols-[auto_2fr_1fr_1fr_1fr_auto] items-center gap-4 border-b border-gray-100 bg-gray-50 px-6 py-2.5 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
+              <div className={`sticky top-0 z-10 grid ${COLUMNS} items-center gap-4 border-b border-gray-100 bg-gray-50 px-6 py-2.5 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]`}>
                 <input
                   type="checkbox"
                   checked={allVisibleSelected}
@@ -361,7 +409,9 @@ export default function AdminView() {
               </div>
 
               {filteredUsers.length === 0 ? (
-                <p className="p-6 font-mono text-xs text-gray-400">No members match &ldquo;{query}&rdquo;.</p>
+                <p className="p-6 font-mono text-xs text-gray-400">
+                  {filtersActive ? 'No members match these filters.' : 'No members yet.'}
+                </p>
               ) : (
                 filteredUsers.map((user) => {
                   const edit = pending[user.id];
@@ -374,7 +424,7 @@ export default function AdminView() {
 
                   return (
                     <div key={user.id} className={`border-b border-gray-100 last:border-0 ${isPending ? 'bg-[#F4EFD3]/40' : ''}`}>
-                      <div className="grid grid-cols-[auto_2fr_1fr_1fr_1fr_auto] items-center gap-4 px-6 py-3">
+                      <div className={`grid ${COLUMNS} items-center gap-4 px-6 py-3`}>
                         <input
                           type="checkbox"
                           checked={selectedIds.has(user.id)}
@@ -388,24 +438,35 @@ export default function AdminView() {
                             {initials || '?'}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-bold text-gray-900">
-                              {user.firstName} {user.lastName}
+                            <p className="flex items-center gap-2 text-sm font-bold text-gray-900">
+                              <span className="truncate">
+                                {user.firstName} {user.lastName}
+                              </span>
+                              {user.isTreasurer && (
+                                <span className="shrink-0 rounded-full bg-[#F4EFD3] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide text-[#7A6A2E]">
+                                  Treasurer
+                                </span>
+                              )}
                             </p>
                             <p className="truncate font-mono text-xs text-gray-400">{user.email}</p>
                           </div>
                         </div>
 
+                        <div className="w-36">
                         <Select
                           value={roleValue}
                           options={ROLE_OPTIONS}
                           onChange={(role) => stage(user.id, { role: role as UserRole })}
                         />
+                        </div>
 
+                        <div className="w-36">
                         <Select
                           value={portValue}
                           options={PORT_SELECT_OPTIONS}
                           onChange={(port) => stage(user.id, { port: port === '' ? null : port })}
                         />
+                        </div>
 
                         <div>
                           {user.hasGoogleAccount ? (

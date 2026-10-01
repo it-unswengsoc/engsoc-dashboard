@@ -11,6 +11,7 @@ const MAX_WIDTHS = {
   md: 'max-w-md',
   lg: 'max-w-lg',
   '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
 } as const;
 
 interface DialogProps {
@@ -19,6 +20,10 @@ interface DialogProps {
   size?: keyof typeof MAX_WIDTHS;
   onClose: () => void;
   onBack?: () => void;
+  /* Just the card and its close button: no padding and no title row, for
+     content that lays out its own header edge to edge. `title` still names
+     the dialog for screen readers. */
+  bare?: boolean;
   children: ReactNode;
 }
 
@@ -28,6 +33,7 @@ export default function Dialog({
   size = 'md',
   onClose,
   onBack,
+  bare = false,
   children,
 }: DialogProps) {
   const [mounted, setMounted] = useState(false);
@@ -124,7 +130,8 @@ export default function Dialog({
       <div className="flex min-h-full items-center justify-center p-4">
         <div
           ref={cardRef}
-          className={`relative w-full rounded-2xl bg-white p-8 shadow-xl ${MAX_WIDTHS[size]}`}
+          className={`relative w-full rounded-2xl bg-white shadow-xl ${bare ? 'overflow-hidden' : 'p-8'} ${MAX_WIDTHS[size]}`}
+          aria-label={bare ? title : undefined}
         >
           <button
             onClick={onClose}
@@ -134,7 +141,7 @@ export default function Dialog({
             <X className="h-5 w-5" />
           </button>
 
-          <div className="flex items-center gap-2 pr-8">
+          <div className={bare ? 'hidden' : 'flex items-center gap-2 pr-8'}>
             {onBack && (
               <button
                 onClick={onBack}

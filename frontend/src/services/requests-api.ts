@@ -126,7 +126,11 @@ export async function completeRequest(token: string, requestId: number): Promise
 
 /* Downloads an attachment (a receipt). Fetched with the token rather than
    linked, since the route sits behind auth like the request itself. */
-export async function downloadRequestAttachment(token: string, requestId: number, attachment: RequestAttachment): Promise<void> {
+export async function downloadRequestAttachment(
+  token: string,
+  requestId: number,
+  attachment: Pick<RequestAttachment, 'id' | 'fileName'>
+): Promise<void> {
   if (USE_MOCK) throw new Error('Attachments are not available in mock mode');
 
   const res = await fetch(apiUrl(`/requests/${requestId}/attachments/${attachment.id}`), {

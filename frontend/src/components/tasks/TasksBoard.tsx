@@ -2,10 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { KanbanSquare, Link2 } from 'lucide-react';
 import { portLabel } from '@/lib/ports';
 import { updateTaskStatus } from '@/services/tasks-api';
 import type { BoardTask, TaskStatus } from '@/types/tasks';
+
+/* Loaded on first open, not with the board — see the same reasoning in
+   TaskRow (the dialog pulls in DriveFilePicker). */
+const TaskDetailDialog = dynamic(() => import('@/components/TaskDetailDialog'), { ssr: false });
 
 interface TasksBoardProps {
   tasks: BoardTask[];
@@ -66,7 +71,15 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
   const [board, setBoard] = useState(tasks);
   const [dragging, setDragging] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<TaskStatus | null>(null);
-  const [moveError, setMoveError] = useState('');
+  /* The last failed move, and which card it was — so a dialog only shows
+     the error for its own card, not one from a different drag. */
+  const [moveFailure, setMoveFailure] = useState<{ taskId: number; message: string } | null>(null);
+  /* The card whose details are showing, kept by id so a board refetch
+     shows its latest copy — and kept after closing, so the dialog still has
+     it to show while it animates out. */
+  const [openTaskId, setOpenTaskId] = useState<number | null>(null);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [hasOpenedTask, setHasOpenedTask] = useState(false);
   /* Cards whose move is still saving, and the column each was dropped in. A
      saving card can't be dragged again, so two saves never race; and a
      re-fetch that lands mid-save keeps the card where it was dropped, not
@@ -103,14 +116,19 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
       dueBadge(task.dueAt)?.label === 'Overdue',
   ).length;
 
-  /* Moves the card straight away, then saves it — putting it back where it
-     was if the save fails. Only an assignee can drag a card, matching the
-     backend's guard, and it moves for every assignee. */
-  async function moveTo(status: TaskStatus) {
+  /* A drop on a column. */
+  function moveTo(status: TaskStatus) {
     const taskId = dragging;
     setDragging(null);
     setDragOver(null);
+    if (taskId !== null) moveTask(taskId, status);
+  }
 
+  /* Moves the card straight away, then saves it — putting it back where it
+     was if the save fails. Only an assignee can move a card (by dragging, or
+     from its details dialog), matching the backend's guard, and it moves for
+     every assignee. */
+  async function moveTask(taskId: number, status: TaskStatus) {
     const task = board.find((t) => t.id === taskId);
     if (!task || task.status === status || saving.current.has(task.id)) return;
 
@@ -124,7 +142,7 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
     const setStatus = (next: TaskStatus) =>
       setBoard((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: next } : t)));
 
-    setMoveError('');
+    setMoveFailure(null);
     setStatus(status);
     setSaving(task.id, status);
     try {
@@ -134,9 +152,19 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
     } catch (err) {
       setSaving(task.id, null);
       setStatus(previous);
-      setMoveError(err instanceof Error ? err.message : 'Failed to move task');
+      setMoveFailure({ taskId: task.id, message: err instanceof Error ? err.message : 'Failed to move task' });
     }
   }
+
+  function openTask(taskId: number) {
+    // An error from an earlier move of this card is stale by the time it's reopened.
+    setMoveFailure((prev) => (prev?.taskId === taskId ? null : prev));
+    setOpenTaskId(taskId);
+    setTaskDialogOpen(true);
+    setHasOpenedTask(true);
+  }
+
+  const openedTask = board.find((t) => t.id === openTaskId);
 
   return (
     <div>
@@ -184,9 +212,9 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
         ))}
       </div>
 
-      {moveError && (
+      {moveFailure && (
         <p role="alert" className="mt-4 text-xs font-bold text-[#8B2E38]">
-          Couldn&apos;t move that task: {moveError}
+          Couldn&apos;t move that task: {moveFailure.message}
         </p>
       )}
 
@@ -241,13 +269,25 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
                         key={task.id}
                         draggable={canDrag}
                         aria-busy={savingIds.has(task.id)}
+                        // Click (or Enter) opens its details; a drag never
+                        // fires a click, so moving a card doesn't open it.
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Open ${task.title}`}
+                        onClick={() => openTask(task.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            openTask(task.id);
+                          }
+                        }}
                         onDragStart={() => setDragging(task.id)}
                         onDragEnd={() => {
                           setDragging(null);
                           setDragOver(null);
                         }}
                         className={`rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-[#B1C9DC] hover:shadow-md ${
-                          canDrag ? 'cursor-grab active:cursor-grabbing' : ''
+                          canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
                         } ${
                           dragging === task.id || savingIds.has(task.id) ? 'opacity-40' : ''
                         }`}
@@ -308,6 +348,23 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
           );
         })}
       </div>
+
+      {hasOpenedTask && (
+        <TaskDetailDialog
+          open={taskDialogOpen && openedTask !== undefined}
+          taskId={openTaskId}
+          boardTask={openedTask}
+          currentUserId={currentUserId}
+          onStatusChange={
+            openedTask && isAssignedTo(openedTask, currentUserId)
+              ? (status) => moveTask(openedTask.id, status)
+              : undefined
+          }
+          statusSaving={openedTask ? savingIds.has(openedTask.id) : false}
+          statusError={moveFailure && moveFailure.taskId === openedTask?.id ? moveFailure.message : undefined}
+          onClose={() => setTaskDialogOpen(false)}
+        />
+      )}
     </div>
   );
 }
