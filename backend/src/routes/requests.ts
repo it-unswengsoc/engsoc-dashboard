@@ -35,9 +35,9 @@ function parseId(value: string): number | null {
 
 /**
  * GET /requests
- * { incoming, mine }: the requests the viewer handles (their port's, for
- * its directors/executives — see functions/request-types.ts), and the ones
- * they submitted.
+ * { incoming, mine, handles }: the requests the viewer handles (their
+ * port's, for its directors/executives — see functions/request-types.ts),
+ * the ones they submitted, and which request types they handle.
  */
 router.get('/', verifyAuthToken, async (req: Request, res: Response) => {
   try {

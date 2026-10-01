@@ -49,6 +49,8 @@ export default function AdminView() {
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
   const [justSaved, setJustSaved] = useState<Set<number>>(new Set());
   const [confirming, setConfirming] = useState(false);
+  const [treasurerSaving, setTreasurerSaving] = useState(false);
+  const [treasurerError, setTreasurerError] = useState('');
 
   useEffect(() => {
     const token = sessionStorage.getItem('token');
@@ -220,6 +222,48 @@ export default function AdminView() {
 
   const pendingCount = Object.keys(pending).length;
 
+  /* The treasurer handles reimbursement requests. Saved straight away (not
+     staged with the table's edits): it's a single handover, and the backend
+     moves the flag off whoever had it in the same step. */
+  const treasurer = users.find((u) => u.isTreasurer) ?? null;
+  const treasurerOptions = [
+    { value: '', label: 'Nobody' },
+    ...users
+      .filter((u) => u.isActive)
+      .map((u) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` })),
+  ];
+
+  async function changeTreasurer(value: string) {
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    const next = value ? users.find((u) => u.id === Number(value)) : null;
+    if ((next?.id ?? null) === (treasurer?.id ?? null)) return;
+
+    const message = next
+      ? `Make ${next.firstName} ${next.lastName} treasurer?${treasurer ? ` This takes it off ${treasurer.firstName} ${treasurer.lastName}.` : ''}`
+      : `Remove ${treasurer?.firstName} ${treasurer?.lastName} as treasurer? Reimbursements will only reach admins until someone else is.`;
+    if (!window.confirm(message)) return;
+
+    setTreasurerSaving(true);
+    setTreasurerError('');
+    try {
+      if (next) {
+        const updated = await updateUser(token, next.id, { isTreasurer: true });
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : { ...u, isTreasurer: false })));
+      } else if (treasurer) {
+        const updated = await updateUser(token, treasurer.id, { isTreasurer: false });
+        setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+      }
+    } catch (err) {
+      setTreasurerError(err instanceof Error ? err.message : 'Failed to change treasurer');
+    } finally {
+      setTreasurerSaving(false);
+    }
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5">
@@ -231,7 +275,8 @@ export default function AdminView() {
       </p>
 
       <div className="mt-4 flex flex-col gap-3">
-        <div className="relative max-w-sm">
+        <div className="flex flex-wrap items-center gap-4">
+        <div className="relative w-full max-w-sm">
           <input
             type="text"
             value={query}
@@ -240,6 +285,17 @@ export default function AdminView() {
             className="w-full rounded-lg border border-transparent bg-gray-100 py-2 pl-9 pr-4 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]"
           />
           <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+        </div>
+
+          {!loading && !loadError && (
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">Treasurer</span>
+              <div className={`w-52 ${treasurerSaving ? 'pointer-events-none opacity-50' : ''}`}>
+                <Select value={treasurer ? String(treasurer.id) : ''} options={treasurerOptions} onChange={changeTreasurer} />
+              </div>
+              {treasurerError && <span className="font-mono text-xs text-[#8B2E38]">{treasurerError}</span>}
+            </div>
+          )}
         </div>
 
         {selectedIds.size > 0 && (

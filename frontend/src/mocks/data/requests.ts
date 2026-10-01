@@ -1,4 +1,4 @@
-import type { RequestDetail } from '@/types/requests';
+import type { Member, RequestAnswer, RequestStatus } from '@/types/requests';
 import { at } from '@/mocks/data/date-helpers';
 import { mockCurrentUser, mockMembers } from '@/mocks/data/members';
 
@@ -6,8 +6,28 @@ import { mockCurrentUser, mockMembers } from '@/mocks/data/members';
      target_port = 'publication'  → the port's queue ("To action")
      requester_id = current user  → what you sent elsewhere ("My requests")
 
-   Weighted towards pending so the accept and reject flows are clickable. */
-export const mockRequests: RequestDetail[] = [
+   Weighted towards pending so the accept and reject flows are clickable.
+   Kept in this simpler seed shape (answers already labelled, no formData);
+   mocks/functions/requests.ts turns them into what the API returns. */
+export interface MockRequestSeed {
+  id: number;
+  requestType: string;
+  typeLabel: string;
+  title: string;
+  targetPort: string;
+  requesterId: number;
+  requesterName: string;
+  requesterPort: string;
+  status: RequestStatus;
+  submittedAt: string;
+  neededBy?: string;
+  assignedTo: Member[];
+  answers: RequestAnswer[];
+  notes?: string;
+  rejectionReason?: string;
+}
+
+export const mockRequests: MockRequestSeed[] = [
   {
     id: 1,
     requestType: 'event_photos',
