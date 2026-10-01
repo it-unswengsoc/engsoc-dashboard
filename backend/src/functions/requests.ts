@@ -62,9 +62,13 @@ export interface RequestRecord {
 }
 
 /* What a viewer is sent. `canAction` is whether they can accept, reject,
-   reassign or complete it. */
+   reassign or complete it; `assignable` is whether accepting hands it to
+   port members of the approver's choosing; `approverTask` is whether,
+   otherwise, accepting puts it on the approver's own task list. */
 export interface Request extends RequestRecord {
   canAction: boolean;
+  assignable: boolean;
+  approverTask: boolean;
 }
 
 /** Thrown when there's no such request, or the viewer isn't allowed to know it exists. */
@@ -99,6 +103,8 @@ function toView(record: RequestRecord, viewer: Viewer, type: RequestTypeDef | nu
     ...record,
     ...(hideRequester ? { requesterId: null, requesterName: null, requesterPort: null } : {}),
     canAction: type ? canActOn(viewer, type) : false,
+    assignable: type?.assignable ?? false,
+    approverTask: type?.approverTask ?? false,
   };
 }
 
@@ -129,16 +135,18 @@ async function loadActionable(userId: number, requestId: number) {
 /**
  * The requests page's two lists: `incoming` is every request the viewer
  * handles (their port's, for its directors/executives; everything but
- * grievances, for an admin), `mine` is what they submitted.
+ * grievances, for an admin), `mine` is what they submitted. `handles` is the
+ * request types they handle, so the page knows to show an incoming list
+ * even while it's empty.
  */
-export async function listRequests(userId: number): Promise<{ incoming: Request[]; mine: Request[] }> {
+export async function listRequests(
+  userId: number
+): Promise<{ incoming: Request[]; mine: Request[]; handles: string[] }> {
   const viewer = await getViewer(userId);
-  const [incoming, mine] = await Promise.all([
-    dbGetRequestsOfTypes(actionableRequestTypes(viewer)),
-    dbGetRequestsByRequester(viewer.id),
-  ]);
+  const handles = actionableRequestTypes(viewer);
+  const [incoming, mine] = await Promise.all([dbGetRequestsOfTypes(handles), dbGetRequestsByRequester(viewer.id)]);
   const view = (record: RequestRecord) => toView(record, viewer, getRequestType(record.requestType));
-  return { incoming: incoming.map(view), mine: mine.map(view) };
+  return { incoming: incoming.map(view), mine: mine.map(view), handles };
 }
 
 export interface SubmitRequestInput {
@@ -281,8 +289,9 @@ function parseText(raw: unknown, what: string, required: boolean): string | null
 
 /**
  * Accepts a pending request. For an assignable type, the chosen port
- * members get one shared task for it (and a notification); a grievance
- * stays with the executive who accepted it. The requester is told either way.
+ * members get one shared task for it (and a notification); a reimbursement
+ * goes on the accepting treasurer's own task list; a grievance stays with
+ * the executive who accepted it, with no task. The requester is told either way.
  */
 export async function acceptRequest(
   userId: number,
@@ -292,9 +301,13 @@ export async function acceptRequest(
   const { viewer, record, type } = await loadActionable(userId, requestId);
   const notes = parseText(input.notes, 'Notes', false);
 
+  if (!type.assignable && Array.isArray(input.assigneeIds) && input.assigneeIds.length > 0) {
+    throw new RequestValidationError(`A ${type.label.toLowerCase()} can't be assigned to others`);
+  }
+
   let task = null;
-  if (type.assignable) {
-    const assigneeIds = await parseAssignees(input.assigneeIds, type);
+  if (type.assignable || type.approverTask) {
+    const assigneeIds = type.assignable ? await parseAssignees(input.assigneeIds, type) : [viewer.id];
     const from = toView(record, viewer, type).requesterName ?? 'Anonymous';
     task = {
       title: record.title,
@@ -302,8 +315,6 @@ export async function acceptRequest(
       dueDate: record.neededBy,
       assigneeIds,
     };
-  } else if (Array.isArray(input.assigneeIds) && input.assigneeIds.length > 0) {
-    throw new RequestValidationError(`A ${type.label.toLowerCase()} can't be assigned to others`);
   }
 
   const accepted = await dbAcceptRequest({ requestId, handledBy: viewer.id, notes, task });

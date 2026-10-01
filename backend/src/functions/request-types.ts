@@ -18,9 +18,13 @@ export interface RequestTypeDef {
   /* The port it's filed under, and whose members it can be assigned to. */
   targetPort: UserPortfolio;
   approvers: Approvers;
-  /* Whether accepting hands the work to port members as a task. When false,
-     the approver handles it themselves and nobody else sees it. */
+  /* Whether accepting hands the work to port members of the approver's
+     choosing, as a task. When false, the approver handles it themselves. */
   assignable: boolean;
+  /* For a type that isn't assignable: whether accepting still puts it on
+     the approver's own task list. Off for a grievance, whose task would
+     show on the HR board for the whole port to see. */
+  approverTask: boolean;
   /* Kept from admins, who otherwise see and can act on every request. */
   confidential: boolean;
   /* Whether the requester can hide their name from whoever handles it. */
@@ -40,6 +44,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
     targetPort: 'marketing',
     approvers: { kind: 'port', roles: ['director', 'executive'] },
     assignable: true,
+    approverTask: false,
     confidential: false,
     allowsAnonymous: false,
     titleField: 'eventName',
@@ -50,6 +55,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
     targetPort: 'IT',
     approvers: { kind: 'port', roles: ['director', 'executive'] },
     assignable: true,
+    approverTask: false,
     confidential: false,
     allowsAnonymous: false,
     neededByFields: ['releaseDate'],
@@ -59,6 +65,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
     targetPort: 'publication',
     approvers: { kind: 'port', roles: ['director', 'executive'] },
     assignable: true,
+    approverTask: false,
     confidential: false,
     allowsAnonymous: false,
     neededByFields: ['eventDate'],
@@ -68,6 +75,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
     targetPort: 'publication',
     approvers: { kind: 'port', roles: ['director', 'executive'] },
     assignable: true,
+    approverTask: false,
     confidential: false,
     allowsAnonymous: false,
     neededByFields: ['dueDate'],
@@ -79,6 +87,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
     targetPort: 'cabinet',
     approvers: { kind: 'treasurer' },
     assignable: false,
+    approverTask: true,
     confidential: false,
     allowsAnonymous: false,
     titleField: 'title',
@@ -90,6 +99,7 @@ export const REQUEST_TYPES: Record<string, RequestTypeDef> = {
     targetPort: 'HR',
     approvers: { kind: 'port', roles: ['executive'] },
     assignable: false,
+    approverTask: false,
     confidential: true,
     allowsAnonymous: true,
     titleField: 'title',
