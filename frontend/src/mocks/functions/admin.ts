@@ -16,6 +16,10 @@ export async function updateUser(userId: number, updates: UpdateUserInput): Prom
 
   if (updates.role !== undefined) user.role = updates.role;
   if (updates.port !== undefined) user.port = updates.port;
+  if (updates.isTreasurer !== undefined) {
+    if (updates.isTreasurer) mockUsers.forEach((u) => (u.isTreasurer = false));
+    user.isTreasurer = updates.isTreasurer;
+  }
 
   return user;
 }

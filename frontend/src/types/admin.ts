@@ -12,6 +12,8 @@ export interface AdminUser {
   // reliable Google signal for this exists via the app's current OAuth
   // scopes, so it starts unassigned and is set by hand here.
   port: string | null;
+  // The treasurer handles reimbursement requests. At most one at a time.
+  isTreasurer: boolean;
   isActive: boolean;
   createdAt: string;
   lastLogin: string | null;
@@ -21,4 +23,6 @@ export interface AdminUser {
 export interface UpdateUserInput {
   role?: UserRole;
   port?: string | null;
+  // true takes the flag off whoever had it (backend does the handover).
+  isTreasurer?: boolean;
 }

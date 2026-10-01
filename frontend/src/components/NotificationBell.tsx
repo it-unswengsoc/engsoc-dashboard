@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, Calendar, Megaphone, ClipboardList, AlertCircle } from 'lucide-react';
+import { Bell, Calendar, Megaphone, ClipboardList, AlertCircle, Inbox } from 'lucide-react';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '@/services/notifications-api';
 import type { NotificationItem, NotificationType } from '@/types/notifications';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
@@ -13,6 +13,7 @@ const TYPE_ICON: Record<NotificationType, typeof Bell> = {
   event: Calendar,
   announcement: Megaphone,
   task: ClipboardList,
+  request: Inbox,
   alert: AlertCircle,
 };
 

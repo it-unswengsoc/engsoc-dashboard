@@ -2,27 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Camera,
-  ChevronRight,
-  ClipboardList,
-  Calendar,
-  Mail,
-  Megaphone,
-  Inbox,
-  Palette,
-  Receipt,
-  ShieldAlert,
-  Video,
-  type LucideIcon,
-} from 'lucide-react';
+import { ChevronRight, ClipboardList, Calendar, Megaphone, Inbox, type LucideIcon } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
-import FormDialog, { type FieldDef } from '@/components/dialogs/FormDialog';
+import FormDialog, { type FieldPayload } from '@/components/dialogs/FormDialog';
 import { createAnnouncement } from '@/services/announcements-api';
+import { submitRequest } from '@/services/requests-api';
+import { REQUEST_FORMS } from '@/lib/request-forms';
 import { getProfile } from '@/services/auth-api';
 import { getDirectory } from '@/services/users-api';
 import type { DirectoryUser } from '@/types/directory';
-import { PORT_OPTIONS } from '@/lib/ports';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
 import AnnouncementComposer from '@/components/announcements/AnnouncementComposer';
 import EventComposer from '@/components/calendar/EventComposer';
@@ -43,199 +31,6 @@ const options: { view: Exclude<View, 'chooser'>; label: string; icon: LucideIcon
 ];
 
 
-/* Each request type swaps in its own fields below the type selector. `value`
-   is what the API will receive, so the labels stay free to be reworded. */
-const requestTypes: {
-  value: string;
-  label: string;
-  icon: LucideIcon;
-  fields: FieldDef[];
-}[] = [
-  {
-    value: 'marketing',
-    label: 'Marketing request',
-    icon: Palette,
-    fields: [
-      {
-        kind: 'notice',
-        name: 'noticePeriod',
-        text: '📝 Fill this form with at least 2 weeks notice (strict). For flagship events, at least 4 weeks notice please.',
-      },
-      { kind: 'text', name: 'eventName', label: 'Event Name', required: true, span: 'half' },
-      {
-        kind: 'select',
-        name: 'port',
-        label: 'Port',
-        placeholder: 'Select a port...',
-        options: PORT_OPTIONS,
-        span: 'half',
-      },
-      { kind: 'date', name: 'eventLaunchDate', label: 'Event Launch Date', span: 'half' },
-      { kind: 'date', name: 'eventDate', label: 'Event Date', span: 'half' },
-      { kind: 'textarea', name: 'eventTheme', label: 'Event Theme', required: true },
-      {
-        kind: 'checkboxes',
-        name: 'materials',
-        label: 'Marketing material(s) needed',
-        required: true,
-        options: [
-          { value: 'cover-photo', label: 'Cover Photo [IG & FB]' },
-          { value: 'countdowns', label: 'Countdowns [IG] (1 week, 5 days, 3 days, 1 day)' },
-          { value: 'infographics', label: 'Infographics (please specify in GC)' },
-          { value: 'form-banner', label: 'Google Form Banner' },
-          { value: 'flyers', label: 'Flyers/Posters' },
-        ],
-      },
-      { kind: 'text', name: 'otherMaterial', label: 'Other (please specify)' },
-    ],
-  },
-  {
-    value: 'mass_email',
-    label: 'Mass emailing',
-    icon: Mail,
-    fields: [
-      {
-        kind: 'notice',
-        name: 'massEmailNotice',
-        text: '📧 If your event requires mass emailing, please submit this at least 2 weeks in advance. Following these two things makes the process a lot easier:',
-        steps: [
-          'Provide a Google Sheet link with the categories you want repeated in each email. Emails always go in the first column — anything else (name, port, time, date, room) can follow in the columns after.',
-          'Provide the email template as a Google Doc link. Put anything that changes in square brackets, like "Dear [Name], … the event will be at [Time]."',
-        ],
-        footer: 'Thank you so much for your patience filling this out 🤠',
-      },
-      {
-        kind: 'textarea',
-        name: 'reason',
-        label: 'Reason for mass emailing',
-        required: true,
-      },
-      {
-        kind: 'date',
-        name: 'releaseDate',
-        label: 'Date for mass emailing to be released',
-        required: true,
-        span: 'half',
-      },
-      {
-        kind: 'select',
-        name: 'port',
-        label: 'Port',
-        placeholder: 'Select a port...',
-        options: PORT_OPTIONS,
-        span: 'half',
-      },
-      {
-        kind: 'text',
-        name: 'sheetUrl',
-        label: 'Link to Google Sheet',
-        placeholder: 'https://docs.google.com/spreadsheets/...',
-        required: true,
-      },
-      {
-        kind: 'text',
-        name: 'templateUrl',
-        label: 'Email template Google Doc link',
-        placeholder: 'https://docs.google.com/document/...',
-        required: true,
-      },
-    ],
-  },
-  {
-    value: 'event_photos',
-    label: 'Event photo request',
-    icon: Camera,
-    fields: [
-      {
-        kind: 'notice',
-        name: 'eventPhotoNotice',
-        text: '📸 Need photos at your event? Say no more. Please submit at least 2 weeks before the due date. The earlier the better.',
-      },
-      {
-        kind: 'select',
-        name: 'port',
-        label: 'Port',
-        placeholder: 'Select a port...',
-        options: PORT_OPTIONS,
-        required: true,
-        span: 'half',
-      },
-      { kind: 'date', name: 'eventDate', label: 'Date of event', required: true, span: 'half' },
-      {
-        kind: 'textarea',
-        name: 'eventDetails',
-        label: 'Event details (plus FB link if applicable)',
-        required: true,
-      },
-    ],
-  },
-  {
-    value: 'multimedia',
-    label: 'Multimedia request',
-    icon: Video,
-    fields: [
-      {
-        kind: 'notice',
-        name: 'multimediaNotice',
-        text: '🎬 Want a viral video to market your upcoming event? No worries, PUBS got you. Please submit at least 2 weeks before the due date; the earlier it comes in, the better.',
-      },
-      {
-        kind: 'select',
-        name: 'port',
-        label: 'Port',
-        placeholder: 'Select a port...',
-        options: PORT_OPTIONS,
-        required: true,
-        span: 'half',
-      },
-      { kind: 'date', name: 'dueDate', label: 'Due date', required: true, span: 'half' },
-      {
-        kind: 'textarea',
-        name: 'eventDetails',
-        label: 'Event details (plus FB link if applicable)',
-        required: true,
-      },
-      { kind: 'textarea', name: 'ideas', label: 'Any ideas you might have?' },
-    ],
-  },
-  {
-    value: 'reimbursement',
-    label: 'Reimbursement form',
-    icon: Receipt,
-    fields: [
-      { kind: 'text', name: 'title', label: 'Title', required: true },
-      { kind: 'textarea', name: 'description', label: 'Description', required: true },
-      {
-        kind: 'number',
-        name: 'amount',
-        label: 'Amount (AUD)',
-        placeholder: '0.00',
-        required: true,
-        span: 'half',
-      },
-      {
-        kind: 'date',
-        name: 'purchasedOn',
-        label: 'Date of purchase',
-        required: true,
-        span: 'half',
-      },
-      { kind: 'file', name: 'receipt', label: 'Receipt', accept: 'image/*,.pdf', required: true },
-    ],
-  },
-  {
-    value: 'grievance',
-    label: 'Grievance form',
-    icon: ShieldAlert,
-    fields: [
-      { kind: 'text', name: 'title', label: 'Subject', required: true },
-      { kind: 'textarea', name: 'description', label: 'What happened', required: true },
-      { kind: 'text', name: 'involved', label: 'Who was involved', span: 'half' },
-      { kind: 'boolean', name: 'anonymous', label: 'Submit anonymously', span: 'half' },
-      { kind: 'file', name: 'attachment', label: 'Attachment' },
-    ],
-  },
-];
 
 export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   const router = useRouter();
@@ -283,10 +78,22 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
   }
 
-  /* A chosen request type's own form. Which type it is lives in state rather
-     than in the payload now that the selector is gone — whoever wires the
-     submit will need to send `requestType` alongside it. */
-  const selectedRequest = requestTypes.find((type) => type.value === requestType);
+  /* Sent with the chosen type; the backend decides which port it goes to.
+     A thrown error stays in the form (FormDialog shows it), and the requests
+     page refetches on success. */
+  async function handleSubmitRequest(payload: FieldPayload) {
+    if (!requestType) return;
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    await submitRequest(token, requestType, payload);
+    window.dispatchEvent(new Event(DASHBOARD_DATA_CHANGED_EVENT));
+  }
+
+  /* A chosen request type's own form (lib/request-forms.ts). */
+  const selectedRequest = REQUEST_FORMS.find((form) => form.value === requestType);
 
   if (selectedRequest) {
     return (
@@ -295,6 +102,7 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
         title={selectedRequest.label}
         submitLabel="Submit request"
         fields={selectedRequest.fields}
+        onSubmit={handleSubmitRequest}
         onClose={onClose}
         onBack={() => setRequestType(null)}
       />
@@ -305,7 +113,7 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
     return (
       <Dialog open={open} title="New request" onClose={onClose} onBack={() => setView('chooser')}>
         <div className="mt-5 flex flex-col">
-          {requestTypes.map(({ value, label, icon: Icon }) => (
+          {REQUEST_FORMS.map(({ value, label, icon: Icon }) => (
             <button
               key={value}
               onClick={() => setRequestType(value)}
