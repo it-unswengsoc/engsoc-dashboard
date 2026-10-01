@@ -12,4 +12,5 @@ export interface EventItem {
   capacity: number | null;
   facebookUrl: string | null;
   instagramUrl: string | null;
+  imageUrl: string | null; // the event's photo, ready for an <img>; null if it has none
 }

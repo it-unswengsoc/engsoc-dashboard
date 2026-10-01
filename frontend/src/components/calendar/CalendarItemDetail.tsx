@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { itemColor, formatFullDate, formatTime, type CalendarItem } from '@/lib/calendar';
+import { useEffect, useState } from 'react';
+import { getEventById } from '@/services/events-api';
+import { itemColor, formatFullDate, formatTime, CALENDAR_EVENTS_CHANGED_EVENT, type CalendarItem } from '@/lib/calendar';
 import { useCalendarContext } from './CalendarContext';
 import EventDetailModal from './EventDetailModal';
 
@@ -12,6 +13,31 @@ interface CalendarItemDetailProps {
 export default function CalendarItemDetail({ item }: CalendarItemDetailProps) {
   const { openComposer } = useCalendarContext();
   const [detailOpen, setDetailOpen] = useState(false);
+  /* An official event's photo lives on its Postgres row, not on the Google
+     Calendar entry the calendar is drawn from. */
+  const [photo, setPhoto] = useState<{ eventId: number; url: string } | null>(null);
+  const officialEventId = item?.kind === 'event' && item.source === 'shared' ? item.officialEventId : null;
+  // Bumped when an event is edited, so a changed photo shows.
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setReloadKey((k) => k + 1);
+    window.addEventListener(CALENDAR_EVENTS_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(CALENDAR_EVENTS_CHANGED_EVENT, bump);
+  }, []);
+
+  useEffect(() => {
+    if (officialEventId === null) return;
+    let cancelled = false;
+    getEventById(officialEventId)
+      .then((event) => {
+        if (!cancelled) setPhoto(event.imageUrl ? { eventId: officialEventId, url: event.imageUrl } : null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [officialEventId, reloadKey]);
 
   if (!item) {
     return (
@@ -27,6 +53,11 @@ export default function CalendarItemDetail({ item }: CalendarItemDetailProps) {
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
       <div className="h-2" style={{ backgroundColor: bg }} />
+      {photo && photo.eventId === officialEventId && (
+        <div className="aspect-video w-full overflow-hidden bg-gray-100">
+          <img src={photo.url} alt="" className="h-full w-full object-cover" />
+        </div>
+      )}
       <div className="p-4">
         <h3 className="text-lg font-bold text-gray-900">{item.name}</h3>
         <span

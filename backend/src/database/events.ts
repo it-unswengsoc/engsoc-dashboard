@@ -1,9 +1,12 @@
 import { QueryResult } from 'pg';
 import { Event, CreateEventInput, UpdateEventInput } from '../functions/events';
 import pool from './pool';
+import { eventImagePath } from '../functions/event-images';
 
 
-const EVENT_COLUMNS = `id, title, description, image_url, event_type, start_date, end_date,
+/* The image itself (a data: URI) is left out of every list and row — it's
+   served on its own by GET /events/:id/image (see eventImagePath). */
+const EVENT_COLUMNS = `id, title, description, image_url IS NOT NULL AS has_image, event_type, start_date, end_date,
        location, organizer_id, status, capacity, google_calendar_event_id, facebook_url,
        instagram_url, created_at, updated_at`;
 
@@ -16,7 +19,7 @@ function rowToEvent(row: any): Event {
     id: row.id,
     title: row.title,
     description: row.description,
-    imageUrl: row.image_url,
+    imageUrl: row.has_image ? eventImagePath(row.id, row.updated_at) : null,
     eventType: row.event_type,
     startDate: row.start_date,
     endDate: row.end_date,
@@ -54,6 +57,15 @@ export async function dbGetEventById(eventId: number): Promise<Event | null> {
   );
   if (result.rows.length === 0) return null;
   return rowToEvent(result.rows[0]);
+}
+
+/**
+ * Fetches just an event's stored image (a data: URI), for
+ * GET /events/:id/image. Null if the event doesn't exist or has no image.
+ */
+export async function dbGetEventImage(eventId: number): Promise<string | null> {
+  const result: QueryResult = await pool.query(`SELECT image_url FROM events WHERE id = $1`, [eventId]);
+  return result.rows[0]?.image_url ?? null;
 }
 
 /**

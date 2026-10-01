@@ -53,6 +53,7 @@ export function toEventRow(event: EventItem): EventRowData {
     type: event.type,
     dateString: toSlashDate(d),
     time: toTime(d),
+    imageUrl: event.imageUrl,
   };
 }
 

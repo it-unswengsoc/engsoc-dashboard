@@ -1,4 +1,4 @@
-import type { EventType } from '@/types/events';
+import type { EventItem, EventType } from '@/types/events';
 import type { TaskItem } from '@/types/tasks';
 import type { UserCalendarEvent } from '@/services/user-calendar-api';
 
@@ -79,6 +79,27 @@ export function toGoogleCalendarItems(events: UserCalendarEvent[]): CalendarItem
     officialEventId: e.officialEventId,
     googleEventId: e.id,
   }));
+}
+
+/* An official event, straight from Postgres, as a calendar item — so its
+   details and edit dialogs can open outside the calendar (the dashboard).
+   canEdit is worked out by those dialogs from the event's organizer. */
+export function toOfficialCalendarItem(event: EventItem): Extract<CalendarItem, { kind: 'event' }> {
+  return {
+    kind: 'event',
+    id: `event-${event.id}`,
+    name: event.name,
+    start: new Date(event.startsAt),
+    end: event.endsAt ? new Date(event.endsAt) : null,
+    allDay: false,
+    type: event.type,
+    location: event.location,
+    description: event.description,
+    source: 'shared',
+    canEdit: false,
+    officialEventId: event.id,
+    googleEventId: null,
+  };
 }
 
 function daysBetween(from: Date, to: Date): number {

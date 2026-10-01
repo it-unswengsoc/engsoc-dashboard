@@ -22,6 +22,7 @@ export interface RawEvent {
   capacity: number | null;
   facebookUrl: string | null;
   instagramUrl: string | null;
+  imageUrl?: string | null; // relative to the API — GET /events/:id/image
 }
 
 export function toEventItem(raw: RawEvent): EventItem {
@@ -37,6 +38,7 @@ export function toEventItem(raw: RawEvent): EventItem {
     capacity: raw.capacity,
     facebookUrl: raw.facebookUrl,
     instagramUrl: raw.instagramUrl,
+    imageUrl: raw.imageUrl?.startsWith('/') ? apiUrl(raw.imageUrl) : (raw.imageUrl ?? null),
   };
 }
 
@@ -81,9 +83,11 @@ export interface CreateEventInput {
   description?: string;
   facebookUrl?: string;
   instagramUrl?: string;
+  imageUrl?: string; // a cropped photo as a data: URI
 }
 
-export type UpdateEventInput = Partial<CreateEventInput>;
+/* imageUrl: undefined leaves the photo as it is, null removes it. */
+export type UpdateEventInput = Partial<Omit<CreateEventInput, 'imageUrl'>> & { imageUrl?: string | null };
 
 /* Director/executive/admin only — the backend enforces this (403s
    otherwise); the frontend only offers event creation when it already knows

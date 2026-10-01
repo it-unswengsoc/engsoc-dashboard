@@ -6,7 +6,9 @@ import {
   dbUpdateEvent,
   dbDeleteEvent,
   dbSetGoogleCalendarEventId,
+  dbGetEventImage,
 } from '../database/events'
+import { validateImageDataUri } from './announcements';
 import { syncEventCreate, syncEventUpdate, syncEventDelete } from './calendar-sync';
 import pool from '../database/pool';
 
@@ -16,6 +18,8 @@ export interface Event {
   id: number;
   title: string;
   description: string | null;
+  /* A link to GET /events/:id/image, relative to the backend's origin —
+     never the stored image itself. Null if the event has no photo. */
   imageUrl: string | null;
   eventType: EventType;
   startDate: string;
@@ -48,7 +52,7 @@ export interface CreateEventInput {
 export interface UpdateEventInput {
   title?: string;
   description?: string;
-  imageUrl?: string;
+  imageUrl?: string | null; // a new image as a data: URI; null removes it
   eventType?: EventType;
   startDate?: string;
   endDate?: string;
@@ -57,6 +61,22 @@ export interface UpdateEventInput {
   capacity?: number;
   facebookUrl?: string;
   instagramUrl?: string;
+}
+
+/* Same rules as an announcement's image: an uploaded (cropped, compressed)
+   image as a data: URI, a few MB at most. Throws for the route to 400. */
+export function validateEventImage(imageUrl: string | null | undefined): void {
+  if (imageUrl) validateImageDataUri(imageUrl);
+}
+
+/** An event's stored image as a data: URI, or null. */
+export async function getEventImage(eventId: number): Promise<string | null> {
+  try {
+    return await dbGetEventImage(eventId);
+  } catch (error) {
+    console.error('Get event image error:', error);
+    return null;
+  }
 }
 
 /* Both are optional reference links, not validated against the real
@@ -133,6 +153,7 @@ export async function createEvent(input: CreateEventInput): Promise<Event | null
   }
   validateSocialUrl(input.facebookUrl, 'Facebook');
   validateSocialUrl(input.instagramUrl, 'Instagram');
+  validateEventImage(input.imageUrl);
   if (!input.startDate || isNaN(new Date(input.startDate).getTime())) {
     throw new Error('A valid start date is required');
   }

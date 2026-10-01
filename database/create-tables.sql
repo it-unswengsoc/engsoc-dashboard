@@ -57,12 +57,17 @@ CREATE TABLE users (
 -- way: a row appears in event_attendees the moment a user clicks "Going".
 -- organizer_id is nullable so ON DELETE SET NULL below is actually valid
 -- (it was NOT NULL in the original, which is incompatible with SET NULL).
+--
+-- image_url holds the event's photo as a base64 data URI, the same way
+-- announcements.image_url does (see there), so it's TEXT. To pick this up
+-- on an existing database without losing data:
+--   ALTER TABLE events ALTER COLUMN image_url TYPE TEXT;
 -- ============================================================
 CREATE TABLE events (
   id SERIAL PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   description TEXT,
-  image_url VARCHAR(500),
+  image_url TEXT,
   event_type event_type NOT NULL DEFAULT 'internal',
   start_date TIMESTAMP NOT NULL,
   end_date TIMESTAMP,

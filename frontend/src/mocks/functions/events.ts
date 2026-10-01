@@ -30,6 +30,7 @@ export async function createEvent(input: CreateEventInput): Promise<EventItem> {
     capacity: input.capacity ?? null,
     facebookUrl: input.facebookUrl ?? null,
     instagramUrl: input.instagramUrl ?? null,
+    imageUrl: input.imageUrl ?? null,
   };
   mockEvents.unshift(event);
   return event;
@@ -47,6 +48,7 @@ export async function updateEvent(eventId: number, input: UpdateEventInput): Pro
   if (input.capacity !== undefined) event.capacity = input.capacity ?? null;
   if (input.facebookUrl !== undefined) event.facebookUrl = input.facebookUrl ?? null;
   if (input.instagramUrl !== undefined) event.instagramUrl = input.instagramUrl ?? null;
+  if (input.imageUrl !== undefined) event.imageUrl = input.imageUrl;
   return event;
 }
 

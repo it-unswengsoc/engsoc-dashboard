@@ -5,7 +5,10 @@ import {
   createEvent,
   updateEvent,
   deleteEvent,
+  getEventImage,
+  validateEventImage,
 } from '../functions/events';
+import { decodeImageDataUri } from '../functions/announcement-images';
 import { verifyAuthToken, requireRole } from './auth';
 import { isUserAdmin } from '../functions/admin';
 import { setRsvp, getRsvpSummary } from '../functions/rsvp';
@@ -38,6 +41,39 @@ router.get('/', async (req: Request, res: Response) => {
       status: 'error',
       message: 'Internal server error',
     });
+  }
+});
+
+/**
+ * GET /events/:eventId/image?v=...
+ * Serves an event's photo as a real image response, so event lists link to
+ * it instead of inlining it. Public, like the event list itself.
+ */
+router.get('/:eventId/image', async (req: Request, res: Response) => {
+  try {
+    const eventId = parseInt(req.params.eventId, 10);
+    if (isNaN(eventId)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid event ID' });
+    }
+
+    const dataUri = await getEventImage(eventId);
+    const image = dataUri ? decodeImageDataUri(dataUri) : null;
+    if (!image) {
+      return res.status(404).json({ status: 'error', message: 'Image not found' });
+    }
+
+    res.set({
+      'Content-Type': image.contentType,
+      // The URL changes whenever the event does (v = updated_at).
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      // helmet defaults this to same-origin, which would stop the
+      // frontend's own domain from displaying it.
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
+    res.status(200).send(image.body);
+  } catch (error) {
+    console.error('Get event image error:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error' });
   }
 });
 
@@ -158,6 +194,12 @@ router.put('/:eventId', verifyAuthToken, async (req: Request, res: Response) => 
 
     const { title, description, imageUrl, eventType, startDate, endDate, location, status, capacity, facebookUrl, instagramUrl } =
       req.body;
+
+    try {
+      validateEventImage(imageUrl);
+    } catch (err) {
+      return res.status(400).json({ status: 'error', message: err instanceof Error ? err.message : 'Invalid image' });
+    }
 
     const event = await updateEvent(eventId, {
       title,

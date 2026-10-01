@@ -78,6 +78,7 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
   const [description, setDescription] = useState<string | null>(null);
   const [facebookUrl, setFacebookUrl] = useState<string | null>(null);
   const [instagramUrl, setInstagramUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [rsvp, setRsvpSummary] = useState<RsvpSummary | null>(null);
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -92,6 +93,7 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
     setDescription(item.description);
     setFacebookUrl(null);
     setInstagramUrl(null);
+    setImageUrl(null);
     setRsvpSummary(null);
 
     const token = sessionStorage.getItem('token');
@@ -105,6 +107,7 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
           setDescription(official.description);
           setFacebookUrl(official.facebookUrl);
           setInstagramUrl(official.instagramUrl);
+          setImageUrl(official.imageUrl);
           if (!token) return;
           const profile = await getProfile(token);
           setCanEdit(official.organizerId === profile.id || profile.role === 'admin');
@@ -168,6 +171,12 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
   return (
     <Dialog open={open} title="Event details" size="md" onClose={onClose}>
       <div className="mt-5 flex flex-col gap-4">
+        {imageUrl && !confirmingDelete && (
+          <div className="aspect-video w-full overflow-hidden rounded-xl bg-gray-100">
+            <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+          </div>
+        )}
+
         <div className="flex items-start justify-between gap-2">
           <div>
             <h3 className="text-lg font-bold text-gray-900">{item.name}</h3>

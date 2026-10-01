@@ -96,7 +96,7 @@ export async function getAllAnnouncements(currentUserId: number): Promise<Announ
  *     specifically tagged, not just "something new happened")
  * Returns the newly created announcement, or null if creation failed.
  */
-function validateImageDataUri(imageUrl: string): void {
+export function validateImageDataUri(imageUrl: string): void {
   if (!imageUrl.startsWith('data:image/')) {
     throw new Error('Image must be an uploaded image file');
   }

@@ -12,6 +12,7 @@ export interface EventRowData {
   type: EventType;
   dateString: string; // "21/08/26"
   time: string;       // "7:30pm"
+  imageUrl: string | null;
 }
 
 export interface TaskRowData {

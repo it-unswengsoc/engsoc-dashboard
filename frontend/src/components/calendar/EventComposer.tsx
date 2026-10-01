@@ -12,6 +12,7 @@ import {
 import { getProfile } from '@/services/auth-api';
 import { CALENDAR_EVENTS_CHANGED_EVENT } from '@/lib/calendar';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
+import PhotoField, { initialPhoto, resolvePhoto, type PhotoValue } from '@/components/PhotoField';
 
 export interface EventComposerProps {
   open: boolean;
@@ -59,6 +60,10 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
   const [facebookUrl, setFacebookUrl] = useState('');
   const [instagramUrl, setInstagramUrl] = useState('');
   const [target, setTarget] = useState<'personal' | 'shared'>('personal');
+  /* Shared events only — a personal event lives in the member's own Google
+     Calendar, which has nowhere to keep a photo. */
+  const [photo, setPhoto] = useState<PhotoValue>({ kind: 'none' });
+  const [hadPhoto, setHadPhoto] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
@@ -89,6 +94,8 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
       setFacebookUrl('');
       setInstagramUrl('');
       setTarget('personal');
+      setPhoto({ kind: 'none' });
+      setHadPhoto(false);
       setCanEdit(true);
       return;
     }
@@ -102,6 +109,8 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
     setEndTime(toTimeInput(end));
     setTarget(item.source);
     setEventType(item.type);
+    setPhoto({ kind: 'none' });
+    setHadPhoto(false);
 
     if (item.source === 'shared' && item.officialEventId !== null) {
       // Google Calendar has no "capacity" concept, and doesn't carry
@@ -119,6 +128,8 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
           setCapacity(official.capacity !== null ? String(official.capacity) : '');
           setFacebookUrl(official.facebookUrl ?? '');
           setInstagramUrl(official.instagramUrl ?? '');
+          setPhoto(initialPhoto(official.imageUrl));
+          setHadPhoto(official.imageUrl !== null);
 
           const token = sessionStorage.getItem('token');
           if (!token) return;
@@ -172,6 +183,14 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
     setError('');
     try {
       if (target === 'shared') {
+        let imageUrl: string | null | undefined;
+        try {
+          imageUrl = await resolvePhoto(photo, hadPhoto);
+        } catch (err) {
+          console.error('Photo crop failed:', err);
+          setError(err instanceof Error && err.message ? err.message : 'Failed to process that photo — try a different file.');
+          return;
+        }
         const shared = {
           title: trimmedTitle,
           startDate: start.toISOString(),
@@ -184,9 +203,9 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
           instagramUrl: instagramUrl.trim() || undefined,
         };
         if (mode === 'edit' && editItem?.officialEventId) {
-          await updateEvent(token, editItem.officialEventId, shared);
+          await updateEvent(token, editItem.officialEventId, { ...shared, imageUrl });
         } else {
-          await createEvent(token, shared);
+          await createEvent(token, { ...shared, imageUrl: imageUrl ?? undefined });
         }
         notifyChanged(true);
       } else {
@@ -412,6 +431,10 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
             disabled={!canEdit}
           />
         </label>
+
+        {target === 'shared' && (
+          <PhotoField label="Photo (optional)" value={photo} onChange={setPhoto} onError={setError} disabled={!canEdit} />
+        )}
 
         <label className="flex flex-col gap-1.5">
           <span className={labelStyles}>Description</span>

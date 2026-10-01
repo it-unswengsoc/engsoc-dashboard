@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import EventRow from "@/components/EventRow";
 import StatCard from "@/components/StatCard";
 import TaskRow from "@/components/TaskRow";
@@ -13,6 +14,15 @@ import { toUpcomingEventRows, toOpenTaskRows, toRecentAnnouncements, toDashboard
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
 import type { EventRowData } from "@/types/dashboard";
 import type { TaskStatus } from "@/types/tasks";
+import { toOfficialCalendarItem, type CalendarItem } from '@/lib/calendar';
+import type { ComposerPrefill } from '@/components/calendar/CalendarContext';
+
+/* Loaded on demand, only once an event is opened — same reasoning as
+   TaskRow's TaskDetailDialog. */
+const EventDetailModal = dynamic(() => import('@/components/calendar/EventDetailModal'), { ssr: false });
+const EventComposer = dynamic(() => import('@/components/calendar/EventComposer'), { ssr: false });
+
+type CalendarEvent = Extract<CalendarItem, { kind: 'event' }>;
 
 /* Events are already sorted by date/time ascending, so same-day events end
    up adjacent — collapsing them under one date chip, ordered by time. */
@@ -170,6 +180,20 @@ export default function HomePage() {
     setData((d) => d && { ...d, tasks: d.tasks.map((t) => (t.id === id ? { ...t, status, completed } : t)) });
   }
 
+  /* The event whose details are showing — kept after closing so the dialog
+     still has it while it animates out. Its Edit opens the same editor the
+     calendar uses, right here. */
+  const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
+  const [eventDetailOpen, setEventDetailOpen] = useState(false);
+  const [eventComposer, setEventComposer] = useState<ComposerPrefill | null>(null);
+
+  function handleOpenEvent(eventId: number) {
+    const event = data?.events.find((e) => e.id === eventId);
+    if (!event) return;
+    setOpenEvent(toOfficialCalendarItem(event));
+    setEventDetailOpen(true);
+  }
+
   function handleAnnouncementDeleted(id: number) {
     setData((d) => d && { ...d, announcements: d.announcements.filter((a) => a.id !== id) });
   }
@@ -263,7 +287,7 @@ export default function HomePage() {
             </p>
           ) : (
             <StaggerReveal
-              className="max-h-72 divide-y divide-gray-200 overflow-y-auto border-t border-gray-200"
+              className="max-h-[28rem] divide-y divide-gray-200 overflow-y-auto border-t border-gray-200"
               replayKey={upcomingEvents.length}
             >
               {groupEventsByDay(upcomingEvents).map((group) => (
@@ -272,6 +296,7 @@ export default function HomePage() {
                   month={group.month}
                   day={group.day}
                   events={group.events}
+                  onOpen={handleOpenEvent}
                 />
               ))}
             </StaggerReveal>
@@ -317,6 +342,26 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {openEvent && (
+        <EventDetailModal
+          open={eventDetailOpen}
+          item={openEvent}
+          onClose={() => setEventDetailOpen(false)}
+          onEdit={(item) => {
+            setEventDetailOpen(false);
+            setEventComposer({ mode: 'edit', item });
+          }}
+        />
+      )}
+      {eventComposer && (
+        <EventComposer
+          open={eventComposer !== null}
+          prefill={eventComposer}
+          canCreateSharedEvent={false}
+          onClose={() => setEventComposer(null)}
+        />
+      )}
     </div>
   );
 }
