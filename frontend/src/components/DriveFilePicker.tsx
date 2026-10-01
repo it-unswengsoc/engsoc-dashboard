@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Folder, FileText, ChevronRight } from 'lucide-react';
+import { Folder, FileText, ChevronRight, Upload, FolderOpen } from 'lucide-react';
 import { getDriveDepartments, getDriveEntries, getDriveAccessToken, uploadDriveFile } from '@/services/documents-api';
 import type { DriveDepartment, DriveEntry } from '@/types/documents';
 
@@ -102,26 +102,36 @@ export default function DriveFilePicker({ onAttach }: DriveFilePickerProps) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-gray-200 p-2.5">
-      <div className="flex items-center gap-2">
-        <div className="flex overflow-hidden rounded-lg border border-gray-200">
-          {(['upload', 'browse'] as const).map((opt) => (
+    <div className="flex flex-col gap-3 rounded-xl border-[1.5px] border-dashed border-gray-300 bg-[#FAFBFC] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-sm text-gray-500">Attach a file</span>
+        <div className="flex rounded-lg bg-gray-100 p-0.5">
+          {([
+            { value: 'upload' as const, label: 'Upload file', icon: Upload },
+            { value: 'browse' as const, label: 'Add from Drive', icon: FolderOpen },
+          ]).map(({ value, label, icon: Icon }) => (
             <button
-              key={opt}
+              key={value}
               type="button"
-              onClick={() => setMode(opt)}
-              className={`px-3 py-1 text-xs font-bold uppercase tracking-wide transition-colors ${
-                mode === opt ? 'bg-[#B1C9DC] text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+              onClick={() => setMode(value)}
+              aria-pressed={mode === value}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                mode === value ? 'bg-white text-[#3D6C94] shadow-sm' : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              {opt === 'upload' ? 'Upload new' : 'Choose from Drive'}
+              <Icon className="h-3.5 w-3.5" />
+              {label}
             </button>
           ))}
         </div>
+      </div>
+
+      <label className="flex items-center gap-2">
+        <span className="shrink-0 text-xs font-semibold text-gray-500">{mode === 'upload' ? 'Save to' : 'Drive'}</span>
         <select
           value={driveId}
           onChange={(e) => handleDriveChange(e.target.value)}
-          className="flex-1 rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs font-bold text-gray-700"
+          className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]"
         >
           {drives.map((d) => (
             <option key={d.id} value={d.id}>
@@ -129,10 +139,11 @@ export default function DriveFilePicker({ onAttach }: DriveFilePickerProps) {
             </option>
           ))}
         </select>
-      </div>
+      </label>
 
       {mode === 'upload' ? (
-        <label className="cursor-pointer self-start rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-bold text-[#3D6C94] transition-colors hover:bg-gray-50">
+        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#3D6C94] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#2A4A63]">
+          <Upload className="h-4 w-4" />
           {uploading ? 'Uploading…' : 'Choose a file from your computer'}
           <input type="file" className="hidden" disabled={uploading} onChange={(e) => handleFilePicked(e.target.files?.[0])} />
         </label>
@@ -152,7 +163,7 @@ export default function DriveFilePicker({ onAttach }: DriveFilePickerProps) {
             ))}
           </div>
 
-          <div className="max-h-48 overflow-y-auto rounded-lg bg-gray-50">
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-gray-200 bg-white">
             {loadingEntries && <p className="p-2 font-mono text-xs text-gray-400">Loading…</p>}
             {!loadingEntries && entries.length === 0 && <p className="p-2 font-mono text-xs text-gray-400">Empty.</p>}
             {!loadingEntries &&
@@ -160,7 +171,7 @@ export default function DriveFilePicker({ onAttach }: DriveFilePickerProps) {
                 <button
                   key={entry.id}
                   onClick={() => handleEntryClick(entry)}
-                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs font-bold text-gray-700 transition-colors hover:bg-white"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-50"
                 >
                   {entry.type === 'folder' ? (
                     <Folder className="h-3.5 w-3.5 shrink-0 text-[#B1C9DC]" />
