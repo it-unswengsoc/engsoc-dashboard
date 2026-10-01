@@ -37,7 +37,7 @@ function fromSeed(seed: MockRequestSeed): RequestDetail {
     handledByName: null,
     taskId: seed.assignedTo.length > 0 ? 1000 + seed.id : null,
     assignees: seed.assignedTo,
-    attachments: [],
+    attachments: seed.attachments ?? [],
     createdAt: seed.submittedAt,
     updatedAt: seed.submittedAt,
     resolvedAt: null,
@@ -62,6 +62,12 @@ function save(id: number, patch: Partial<RequestDetail>): RequestDetail {
   if (index === -1) throw new Error('Request not found');
   list[index] = { ...list[index], ...patch, updatedAt: new Date().toISOString() };
   return list[index];
+}
+
+export async function getRequest(requestId: number): Promise<RequestDetail> {
+  const found = requests().find((r) => r.id === requestId);
+  if (!found) throw new Error('Request not found');
+  return found;
 }
 
 export async function getRequests(): Promise<RequestsData> {

@@ -32,8 +32,10 @@ export interface BoardTask {
   assignedBy: { id: number; name: string } | null;
   dueAt: string | null; // ISO date string
   /* Set when the task came from accepting a request, so the board can point
-     back at it, with the files the requester attached. */
+     back at it (and its dialog can load the request). */
   requestId?: number;
   requestTitle?: string;
-  requestAttachments?: { id: number; fileName: string; mimeType: string; sizeBytes: number }[];
+  requestType?: string;
+  /* Who sent the request — absent for an anonymous one. */
+  requesterName?: string;
 }

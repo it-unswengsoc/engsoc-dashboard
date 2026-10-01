@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import {
   listRequests,
+  getRequest,
   submitRequest,
   acceptRequest,
   updateRequestAssignees,
@@ -45,6 +46,22 @@ router.get('/', verifyAuthToken, async (req: Request, res: Response) => {
     res.status(200).json({ status: 'success', data: await listRequests(user.userId) });
   } catch (error) {
     sendError(res, error, 'List requests');
+  }
+});
+
+/**
+ * GET /requests/:requestId
+ * One request, for its requester, whoever handles its type, or its task's
+ * assignees — 404 for anyone else.
+ */
+router.get('/:requestId', verifyAuthToken, async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const requestId = parseId(req.params.requestId);
+    if (requestId === null) return res.status(400).json({ status: 'error', message: 'Invalid request ID' });
+    res.status(200).json({ status: 'success', data: await getRequest(user.userId, requestId) });
+  } catch (error) {
+    sendError(res, error, 'Get request');
   }
 });
 

@@ -14,7 +14,10 @@ import {
   type TaskAttachment,
 } from '@/services/tasks-api';
 import DriveFilePicker, { type PickedAttachment } from '@/components/DriveFilePicker';
-import { downloadRequestAttachment } from '@/services/requests-api';
+import { downloadRequestAttachment, getRequest } from '@/services/requests-api';
+import RequestAnswers from '@/components/requests/RequestAnswers';
+import { requestForm } from '@/lib/request-forms';
+import type { RequestDetail } from '@/types/requests';
 import type { BoardTask, TaskStatus } from '@/types/tasks';
 
 export interface TaskDetailDialogProps {
@@ -46,7 +49,14 @@ const STATUS_STRIPS: Record<TaskStatus, string> = {
 /* "Sat 4 Oct, 6:00 pm", and how far off that is. */
 function formatDue(iso: string): { when: string; relative: string; overdue: boolean } {
   const due = new Date(iso);
-  const when = due.toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  // A date-only due date lands on midnight — show it without a time.
+  const dateOnly = due.getHours() === 0 && due.getMinutes() === 0;
+  const when = due.toLocaleString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    ...(dateOnly ? {} : { hour: 'numeric', minute: '2-digit' }),
+  });
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const days = Math.round((startOfDay(due) - startOfDay(new Date())) / 86_400_000);
   const relative =
@@ -109,6 +119,32 @@ export default function TaskDetailDialog({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fileError, setFileError] = useState('');
+  const [request, setRequest] = useState<RequestDetail | null>(null);
+  const [requestLoading, setRequestLoading] = useState(false);
+
+  // The task's request, when it came from one and the viewer may see it.
+  const requestId = boardTask?.requestId;
+  useEffect(() => {
+    setRequest(null);
+    setRequestLoading(false);
+    setFileError('');
+    if (!open || !requestId) return;
+    const token = sessionStorage.getItem('token');
+    if (!token) return;
+    let cancelled = false;
+    setRequestLoading(true);
+    getRequest(token, requestId)
+      .then((found) => {
+        if (!cancelled) setRequest(found);
+      })
+      .catch(() => {}) // can't see it: the section just doesn't show
+      .finally(() => {
+        if (!cancelled) setRequestLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, requestId]);
 
   async function downloadFile(requestId: number, file: { id: number; fileName: string }) {
     const token = sessionStorage.getItem('token');
@@ -190,11 +226,25 @@ export default function TaskDetailDialog({
     const due = boardTask.dueAt ? formatDue(boardTask.dueAt) : null;
     const isClosed = boardTask.status === 'completed' || boardTask.status === 'cancelled';
     const overdue = !isClosed && !!due?.overdue;
+    // A request's task names its type (as a pill) and who sent it, rather
+    // than the request's title — which is the task's own title anyway.
+    const requestTypeLabel = boardTask.requestType
+      ? (requestForm(boardTask.requestType)?.label ?? boardTask.requestType)
+      : null;
+    // Who sent a request shows in its section below, so only a task without
+    // a known request type keeps the "From <title>" line.
     const meta = [
-      boardTask.requestTitle && `From ${boardTask.requestTitle}`,
-      boardTask.assignedBy &&
+      !requestTypeLabel && boardTask.requestTitle && `From ${boardTask.requestTitle}`,
+      // With a note, the note's card names the assigner instead.
+      !boardTask.description &&
+        boardTask.assignedBy &&
         `assigned by ${boardTask.assignedBy.id === currentUserId ? 'you' : boardTask.assignedBy.name}`,
-    ].filter(Boolean);
+    ].filter(Boolean) as string[];
+    const assignerName = boardTask.assignedBy
+      ? boardTask.assignedBy.id === currentUserId
+        ? 'you'
+        : boardTask.assignedBy.name
+      : null;
     const others = boardTask.assignees.filter((a) => a.id !== currentUserId);
     const peopleLabel = [
       ...(isAssignee ? ['You'] : []),
@@ -207,13 +257,18 @@ export default function TaskDetailDialog({
 
         <div className="flex items-start justify-between gap-4 py-5 pl-7 pr-14">
           <div className="min-w-0">
-            <h2 className={`text-xl font-bold ${isClosed ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-              {boardTask.title}
-            </h2>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <h2 className={`text-xl font-bold ${isClosed ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                {boardTask.title}
+              </h2>
+              {requestTypeLabel && (
+                <span className="rounded-full bg-[#B1C9DC]/35 px-2.5 py-0.5 text-xs font-semibold text-[#2A4A63]">
+                  {requestTypeLabel}
+                </span>
+              )}
+            </div>
             {meta.length > 0 && (
-              <p className="mt-1.5 font-mono text-xs text-gray-500">
-                {meta.join(' · ').replace(/^assigned/, 'Assigned')}
-              </p>
+              <p className="mt-1.5 font-mono text-xs text-gray-500">{meta.join(' · ').replace(/^assigned/, 'Assigned')}</p>
             )}
           </div>
           {onStatusChange ? (
@@ -299,37 +354,63 @@ export default function TaskDetailDialog({
           </div>
         </div>
 
+        {/* The description is the assigner's note — when a request was
+            accepted, whatever the accepter wrote for whoever picks it up — so
+            it reads as a note from them. */}
         {boardTask.description && (
-          <div className="border-t border-gray-200 px-7 pb-6 pt-4">
-            <span className="text-[13px] font-semibold text-gray-500">Description</span>
-            <p className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-gray-800">{boardTask.description}</p>
+          <div className="px-7 pb-5">
+            <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+              <div className="flex items-center gap-2">
+                {boardTask.assignedBy && (
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#B1C9DC] font-mono text-[9px] font-bold text-[#1F3B52]">
+                    {initials(boardTask.assignedBy.name)}
+                  </span>
+                )}
+                <span className="text-[13px] font-semibold text-gray-500">
+                  {assignerName ? `Assigned by ${assignerName}` : 'Note'}
+                </span>
+              </div>
+              <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-gray-800">{boardTask.description}</p>
+            </div>
           </div>
         )}
 
-        {/* What the requester attached (a reimbursement's receipt), for the
-            people doing the work — the backend lets a request's task
-            assignees download its files. */}
-        {isAssignee && boardTask.requestId && (boardTask.requestAttachments?.length ?? 0) > 0 && (
+        {/* The request the task came from, in full — loaded on open under the
+            request's own access rules (its handlers and the task's assignees
+            can see it; a teammate who only sees the card gets nothing here). */}
+        {boardTask.requestId && (requestLoading || request) && (
           <div className="border-t border-gray-200 px-7 pb-6 pt-4">
-            <span className="text-[13px] font-semibold text-gray-500">Files from the request</span>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {boardTask.requestAttachments!.map((file) => (
-                <button
-                  key={file.id}
-                  type="button"
-                  onClick={() => downloadFile(boardTask.requestId!, file)}
-                  className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-[#B1C9DC] hover:text-[#3D6C94]"
-                >
-                  <Paperclip className="h-4 w-4 shrink-0 text-gray-400" />
-                  {file.fileName}
-                  <Download className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                </button>
-              ))}
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <span className="text-[13px] font-semibold text-gray-500">Request</span>
+              {request && (
+                <span className="font-mono text-xs text-gray-500">
+                  {request.typeLabel} · submitted {new Date(request.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}{' '}
+                  by {request.requesterId === currentUserId ? 'you' : (request.requesterName ?? 'Anonymous')}
+                </span>
+              )}
             </div>
-            {fileError && (
-              <p role="alert" className="mt-2 text-xs font-bold text-[#8B2E38]">
-                {fileError}
-              </p>
+
+            {requestLoading ? (
+              <div className="mt-3 flex flex-col gap-2" aria-busy="true">
+                <span className="h-3 w-40 animate-pulse rounded bg-gray-100" />
+                <span className="h-3 w-64 animate-pulse rounded bg-gray-100" />
+                <span className="h-3 w-52 animate-pulse rounded bg-gray-100" />
+              </div>
+            ) : (
+              request && (
+                <>
+                  <RequestAnswers
+                    answers={request.answers}
+                    files={request.attachments}
+                    onDownload={(file) => downloadFile(request.id, file)}
+                  />
+                  {fileError && (
+                    <p role="alert" className="mt-2 text-xs font-bold text-[#8B2E38]">
+                      {fileError}
+                    </p>
+                  )}
+                </>
+              )
             )}
           </div>
         )}

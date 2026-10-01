@@ -18,7 +18,8 @@ export interface RawTask {
   assignees: TaskAssignee[];
   requestId?: number | null;
   requestTitle?: string | null;
-  requestAttachments?: { id: number; fileName: string; mimeType: string; sizeBytes: number }[];
+  requestType?: string | null;
+  requesterName?: string | null;
 }
 
 export function toTaskItem(raw: RawTask): TaskItem {
@@ -31,18 +32,28 @@ export function toTaskItem(raw: RawTask): TaskItem {
   };
 }
 
+function stripRequestPrefix(description: string | null): string | null {
+  if (!description) return description;
+  const rest = description.replace(/^[^\n]* (request|Grievance) from [^\n]+\.(\n\n|$)/, '').trim();
+  return rest || null;
+}
+
 function toBoardTask(raw: RawTask): BoardTask {
   return {
     id: raw.id,
     title: raw.title,
-    description: raw.description,
     status: raw.status,
     assignees: raw.assignees,
     assignedBy: raw.assignedBy !== null && raw.assignedByName ? { id: raw.assignedBy, name: raw.assignedByName } : null,
     dueAt: raw.dueDate,
     requestId: raw.requestId ?? undefined,
     requestTitle: raw.requestTitle ?? undefined,
-    requestAttachments: raw.requestAttachments ?? [],
+    requestType: raw.requestType ?? undefined,
+    requesterName: raw.requesterName ?? undefined,
+    // Tasks accepted before the request's type and requester came with the
+    // task had them written as the description's first line ("Mass email
+    // request from Winnie Moy."); the dialog shows those as a pill now.
+    description: raw.requestId ? stripRequestPrefix(raw.description) : raw.description,
   };
 }
 

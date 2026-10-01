@@ -308,10 +308,11 @@ export async function acceptRequest(
   let task = null;
   if (type.assignable || type.approverTask) {
     const assigneeIds = type.assignable ? await parseAssignees(input.assigneeIds, type) : [viewer.id];
-    const from = toView(record, viewer, type).requesterName ?? 'Anonymous';
     task = {
       title: record.title,
-      description: [`${type.label} from ${from}.`, notes].filter(Boolean).join('\n\n'),
+      // Just the accepter's notes: the request's type and requester come
+      // with the task from its request (see database/tasks.ts).
+      description: notes,
       dueDate: record.neededBy,
       assigneeIds,
     };
@@ -389,6 +390,19 @@ export async function completeRequest(userId: number, requestId: number): Promis
   if (!completed) throw new RequestNotFoundError('Request not found');
   await notifyRequester(completed, viewer.id, type, 'is complete');
   return toView(completed, viewer, type);
+}
+
+/**
+ * One request, for anyone who can see it — its requester, the people who
+ * handle its type, and the assignees of its task (the tasks board's dialog
+ * shows a task's request from this). Anyone else gets RequestNotFoundError.
+ */
+export async function getRequest(userId: number, requestId: number): Promise<Request> {
+  const viewer = await getViewer(userId);
+  const record = await dbGetRequestById(requestId);
+  const type = record ? getRequestType(record.requestType) : null;
+  if (!record || !canView(viewer, record, type)) throw new RequestNotFoundError('Request not found');
+  return toView(record, viewer, type);
 }
 
 /** An attachment's file, for anyone who can see its request. */

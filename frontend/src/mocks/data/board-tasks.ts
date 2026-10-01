@@ -17,7 +17,7 @@ export const mockBoardTasks: BoardTask[] = [
   {
     id: 101,
     title: 'Shoot Careers Night',
-    description: 'Candids through the night plus group shots with sponsors before doors.',
+    description: 'Bring the 50mm. Sponsors arrive at 5:30 for the group shots.',
     status: 'pending',
     assignees: [riley, jordan],
     assignedBy: by(sam),
@@ -110,5 +110,26 @@ export const mockBoardTasks: BoardTask[] = [
     assignedBy: by(riley),
     dueAt: null,
     requestTitle: 'Handbook cover shoot',
+  },
+  // Request-linked, to show the task dialog's link buttons and Files row.
+  {
+    id: 111,
+    title: 'Newsletter blast for the handbook',
+    description: 'Send it on the 6th, once the print run lands.',
+    status: 'in_progress',
+    assignees: [riley],
+    assignedBy: by(sam),
+    dueAt: at(4, '09:00'),
+    requestTitle: 'Newsletter blast for the handbook',
+  },
+  {
+    id: 112,
+    title: 'Sponsor lunch reimbursement',
+    description: null,
+    status: 'pending',
+    assignees: [riley],
+    assignedBy: by(riley),
+    dueAt: null,
+    requestTitle: 'Sponsor lunch reimbursement',
   },
 ];

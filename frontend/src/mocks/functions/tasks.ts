@@ -103,8 +103,17 @@ export async function getTask(taskId: number): Promise<TaskItem> {
 
 /* Same rule as the real GET /tasks?port=…: any assignee in the port. A copy
    of each row, so the board's optimistic moves don't reach in here. */
+/* Links each request-made card to its mock request by title, the way the
+   real backend joins tasks.request_id — so the dialog shows the request's
+   type pill, who sent it, and the request itself. */
 export async function getBoardTasks(port: string): Promise<BoardTask[]> {
+  const { mockRequests } = await import('@/mocks/data/requests');
   return mockBoardTasks
     .filter((task) => task.assignees.some((a) => a.port === port))
-    .map((task) => ({ ...task }));
+    .map((task) => {
+      const request = task.requestTitle ? mockRequests.find((r) => r.title === task.requestTitle) : undefined;
+      return request
+        ? { ...task, requestId: request.id, requestType: request.requestType, requesterName: request.requesterName }
+        : { ...task };
+    });
 }

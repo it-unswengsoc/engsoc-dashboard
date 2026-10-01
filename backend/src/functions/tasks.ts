@@ -29,13 +29,14 @@ export interface Task {
   assignedByName: string | null;
   assignees: TaskAssignee[];
   eventId: number | null;
-  /* The request it was created from by accepting it, if any, its title for
-     the board, and the files the requester attached (names only — the bytes
-     come from GET /requests/:id/attachments/:attachmentId, which lets the
-     task's assignees download them). */
+  /* The request it was created from by accepting it, if any, and its title
+     for the board. The request itself (answers, files) comes from
+     GET /requests/:id, under the request's own access rules. */
   requestId: number | null;
   requestTitle: string | null;
-  requestAttachments: { id: number; fileName: string; mimeType: string; sizeBytes: number }[];
+  requestType: string | null;
+  /* Who sent the request — null for an anonymous one. */
+  requesterName: string | null;
   status: TaskStatus;
   dueDate: string | null;
   createdAt: string;

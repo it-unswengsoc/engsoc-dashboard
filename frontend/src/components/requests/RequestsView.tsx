@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Check, Clock, Download, ExternalLink, Inbox, Link2, Paperclip, Plus, Search, Send } from 'lucide-react';
+import { AlertTriangle, Check, Clock, Download, Inbox, Paperclip, Plus, Search, Send } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
 import Select from '@/components/dialogs/Select';
+import RequestAnswers from '@/components/requests/RequestAnswers';
 import { portLabel } from '@/lib/ports';
 import {
   acceptRequest,
@@ -554,55 +555,11 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
                 </div>
               )}
 
-              {/* Each question above its answer, full width — the form's
-                  questions run long ("Date for mass emailing to be
-                  released"), and squeezing them into a side column wrapped
-                  them into three lines of capitals. Link answers gather
-                  into buttons underneath. */}
-              {(() => {
-                const textAnswers = selected.answers.filter((answer) => !answer.link);
-                const linkAnswers = selected.answers.filter((answer) => answer.link);
-                return (
-                  (textAnswers.length > 0 || linkAnswers.length > 0) && (
-                    <div className="border-t border-gray-200 px-6 py-2">
-                      {textAnswers.length > 0 && (
-                        <dl className="divide-y divide-gray-100">
-                          {textAnswers.map((answer) => (
-                            <div key={answer.label} className="py-3">
-                              <dt className="text-[13px] font-semibold text-gray-500">{answer.label}</dt>
-                              <dd className="mt-1 whitespace-pre-line text-[15px] leading-relaxed text-gray-900">
-                                {answer.value}
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                      )}
-
-                      {linkAnswers.length > 0 && (
-                        <div className={`py-3 ${textAnswers.length > 0 ? 'border-t border-gray-100' : ''}`}>
-                          <span className="text-[13px] font-semibold text-gray-500">Links</span>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {linkAnswers.map((answer) => (
-                              <a
-                                key={answer.label}
-                                href={answer.link!.href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title={answer.link!.href}
-                                className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-[#3D6C94] transition-colors hover:border-[#B1C9DC] hover:bg-[#B1C9DC]/10"
-                              >
-                                <Link2 className="h-4 w-4 shrink-0" />
-                                {answer.link!.label}
-                                <ExternalLink className="h-3 w-3 shrink-0 text-gray-400" />
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                );
-              })()}
+              {selected.answers.length > 0 && (
+                <div className="border-t border-gray-200 px-6 py-2">
+                  <RequestAnswers answers={selected.answers} />
+                </div>
+              )}
 
               {selected.attachments.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 border-t border-gray-200 px-6 py-4">
