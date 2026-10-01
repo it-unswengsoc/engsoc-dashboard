@@ -29,6 +29,10 @@ export interface Task {
   assignedByName: string | null;
   assignees: TaskAssignee[];
   eventId: number | null;
+  /* The request it was created from by accepting it, if any, and its title
+     for the board. */
+  requestId: number | null;
+  requestTitle: string | null;
   status: TaskStatus;
   dueDate: string | null;
   createdAt: string;

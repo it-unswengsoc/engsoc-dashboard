@@ -16,6 +16,7 @@ export interface RawTask {
   assignedBy: number | null;
   assignedByName: string | null;
   assignees: TaskAssignee[];
+  requestTitle?: string | null;
 }
 
 export function toTaskItem(raw: RawTask): TaskItem {
@@ -37,6 +38,7 @@ function toBoardTask(raw: RawTask): BoardTask {
     assignees: raw.assignees,
     assignedBy: raw.assignedBy !== null && raw.assignedByName ? { id: raw.assignedBy, name: raw.assignedByName } : null,
     dueAt: raw.dueDate,
+    requestTitle: raw.requestTitle ?? undefined,
   };
 }
 

@@ -16,9 +16,11 @@ const TASK_SELECT = `
             WHERE ta.task_id = t.id),
            '[]'
          ) AS assignees,
-         t.event_id, t.status, t.due_date, t.created_at, t.updated_at, t.completed_at
+         t.event_id, t.request_id, rq.title AS request_title,
+         t.status, t.due_date, t.created_at, t.updated_at, t.completed_at
   FROM tasks t
   LEFT JOIN users ab ON ab.id = t.assigned_by
+  LEFT JOIN requests rq ON rq.id = t.request_id
 `;
 
 const TASK_ORDER = 'ORDER BY t.due_date ASC NULLS LAST, t.created_at ASC';
@@ -32,6 +34,8 @@ function rowToTask(row: any): Task {
     assignedByName: row.assigned_by_first_name ? `${row.assigned_by_first_name} ${row.assigned_by_last_name}` : null,
     assignees: row.assignees.map((a: any) => ({ id: a.id, name: `${a.firstName} ${a.lastName}`, port: a.port })),
     eventId: row.event_id,
+    requestId: row.request_id,
+    requestTitle: row.request_title,
     status: row.status,
     dueDate: row.due_date,
     createdAt: row.created_at,

@@ -31,7 +31,7 @@ export interface BoardTask {
   assignees: TaskAssignee[];
   assignedBy: { id: number; name: string } | null;
   dueAt: string | null; // ISO date string
-  /* Set when the task came from a request, so the board can point back at it.
-     Mock-only for now: needs tasks.request_id, which doesn't exist yet. */
+  /* Set when the task came from accepting a request, so the board can point
+     back at it. */
   requestTitle?: string;
 }
