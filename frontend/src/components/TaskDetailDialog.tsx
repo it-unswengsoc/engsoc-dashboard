@@ -49,8 +49,12 @@ const STATUS_STRIPS: Record<TaskStatus, string> = {
 /* "Sat 4 Oct, 6:00 pm", and how far off that is. */
 function formatDue(iso: string): { when: string; relative: string; overdue: boolean } {
   const due = new Date(iso);
-  // A date-only due date lands on midnight — show it without a time.
-  const dateOnly = due.getHours() === 0 && due.getMinutes() === 0;
+  // A date-only due date is stored as midnight in the backend's time zone —
+  // local midnight with a local server, UTC midnight on a UTC host (Vercel),
+  // which reads as 10 or 11 am in Sydney. Either shows without a time; a task
+  // genuinely due at that hour loses its time too, which is the trade-off.
+  const isMidnight = (hours: number, minutes: number) => hours === 0 && minutes === 0;
+  const dateOnly = isMidnight(due.getHours(), due.getMinutes()) || isMidnight(due.getUTCHours(), due.getUTCMinutes());
   const when = due.toLocaleString(undefined, {
     weekday: 'short',
     day: 'numeric',
@@ -231,10 +235,14 @@ export default function TaskDetailDialog({
     const requestTypeLabel = boardTask.requestType
       ? (requestForm(boardTask.requestType)?.label ?? boardTask.requestType)
       : null;
-    // Who sent a request shows in its section below, so only a task without
-    // a known request type keeps the "From <title>" line.
+    // Who sent a request shows in its section below. A viewer who can't open
+    // the request gets no section, so the header names the requester for
+    // them instead; a task without a known request type keeps "From <title>".
+    const requestShown = requestLoading || request !== null;
     const meta = [
-      !requestTypeLabel && boardTask.requestTitle && `From ${boardTask.requestTitle}`,
+      requestTypeLabel
+        ? !requestShown && boardTask.requesterName && `from ${boardTask.requesterName}`
+        : boardTask.requestTitle && `From ${boardTask.requestTitle}`,
       // With a note, the note's card names the assigner instead.
       !boardTask.description &&
         boardTask.assignedBy &&
@@ -268,7 +276,7 @@ export default function TaskDetailDialog({
               )}
             </div>
             {meta.length > 0 && (
-              <p className="mt-1.5 font-mono text-xs text-gray-500">{meta.join(' · ').replace(/^assigned/, 'Assigned')}</p>
+              <p className="mt-1.5 font-mono text-xs text-gray-500">{meta.join(' · ').replace(/^./, (c) => c.toUpperCase())}</p>
             )}
           </div>
           {onStatusChange ? (
