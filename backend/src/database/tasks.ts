@@ -16,19 +16,14 @@ const TASK_SELECT = `
             WHERE ta.task_id = t.id),
            '[]'
          ) AS assignees,
-         t.event_id, t.request_id, rq.title AS request_title,
-         COALESCE(
-           (SELECT json_agg(json_build_object('id', a.id, 'fileName', a.file_name, 'mimeType', a.mime_type,
-                                              'sizeBytes', a.size_bytes)
-                            ORDER BY a.id)
-            FROM request_attachments a
-            WHERE a.request_id = t.request_id),
-           '[]'
-         ) AS request_attachments,
+         t.event_id, t.request_id, rq.title AS request_title, rq.request_type,
+         CASE WHEN rq.is_anonymous THEN NULL ELSE rqu.first_name END AS requester_first_name,
+         CASE WHEN rq.is_anonymous THEN NULL ELSE rqu.last_name END AS requester_last_name,
          t.status, t.due_date, t.created_at, t.updated_at, t.completed_at
   FROM tasks t
   LEFT JOIN users ab ON ab.id = t.assigned_by
   LEFT JOIN requests rq ON rq.id = t.request_id
+  LEFT JOIN users rqu ON rqu.id = rq.requester_id
 `;
 
 const TASK_ORDER = 'ORDER BY t.due_date ASC NULLS LAST, t.created_at ASC';
@@ -44,7 +39,8 @@ function rowToTask(row: any): Task {
     eventId: row.event_id,
     requestId: row.request_id,
     requestTitle: row.request_title,
-    requestAttachments: row.request_attachments,
+    requestType: row.request_type,
+    requesterName: row.requester_first_name ? `${row.requester_first_name} ${row.requester_last_name}` : null,
     status: row.status,
     dueDate: row.due_date,
     createdAt: row.created_at,

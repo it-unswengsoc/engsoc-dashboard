@@ -47,6 +47,24 @@ export async function getRequests(token: string): Promise<RequestsData> {
   return { incoming: raw.incoming.map(toDetail), mine: raw.mine.map(toDetail), handles: raw.handles ?? [] };
 }
 
+/* One request — for its requester, whoever handles its type, or its task's
+   assignees (the tasks board's dialog shows a task's request with this).
+   Anyone else gets an error, which callers treat as "nothing to show". */
+export async function getRequest(token: string, requestId: number): Promise<RequestDetail> {
+  if (USE_MOCK) {
+    const { getRequest: mockGetRequest } = await import('@/mocks/functions/requests');
+    return mockGetRequest(requestId);
+  }
+
+  const res = await fetch(apiUrl(`/requests/${requestId}`), {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to load request');
+  return toDetail(data.data as RequestItem);
+}
+
 /* A file field's value arrives from FormDialog as a data: URI with no name
    attached, so the file is named after the field and its type. */
 function fileNameFor(field: string, dataUri: string): string {
