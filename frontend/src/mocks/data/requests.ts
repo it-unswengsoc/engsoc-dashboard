@@ -1,4 +1,4 @@
-import type { Member, RequestAnswer, RequestStatus } from '@/types/requests';
+import type { Member, RequestAnswer, RequestAttachment, RequestStatus } from '@/types/requests';
 import { at } from '@/mocks/data/date-helpers';
 import { mockCurrentUser, mockMembers } from '@/mocks/data/members';
 
@@ -25,6 +25,8 @@ export interface MockRequestSeed {
   answers: RequestAnswer[];
   notes?: string;
   rejectionReason?: string;
+  /* File names only — mock mode can't serve the files themselves. */
+  attachments?: RequestAttachment[];
 }
 
 export const mockRequests: MockRequestSeed[] = [
@@ -47,9 +49,15 @@ export const mockRequests: MockRequestSeed[] = [
       {
         label: 'Event details',
         value:
-          'Industry night in Hilmer 143, 6–9pm. Candids through the night plus a few group shots with sponsors before doors. FB event: fb.me/careersnight26',
+          'Industry night in Hilmer 143, 6–9pm. Candids through the night plus a few group shots with sponsors before doors.',
+      },
+      {
+        label: 'Facebook event',
+        value: 'https://fb.me/careersnight26',
+        link: { href: 'https://fb.me/careersnight26', label: 'Facebook event' },
       },
     ],
+    attachments: [{ id: 2, fieldName: 'attachment', fileName: 'careers-night-run-sheet.pdf', mimeType: 'application/pdf', sizeBytes: 96_000 }],
   },
   {
     id: 2,
@@ -76,7 +84,13 @@ export const mockRequests: MockRequestSeed[] = [
         value:
           'Fast cuts, no voiceover — it plays on mute. Sponsor logos need a clear 3 seconds each.',
       },
+      {
+        label: 'Last year’s footage',
+        value: 'https://drive.google.com/drive/folders/oweek2025',
+        link: { href: 'https://drive.google.com/drive/folders/oweek2025', label: 'Last year’s footage' },
+      },
     ],
+    attachments: [{ id: 3, fieldName: 'attachment', fileName: 'sponsor-logos.png', mimeType: 'image/png', sizeBytes: 240_000 }],
   },
   {
     id: 3,
@@ -246,8 +260,16 @@ export const mockRequests: MockRequestSeed[] = [
         value: 'Announce the handbook is live and where to grab a copy.',
       },
       { label: 'Port', value: 'Publications' },
-      { label: 'Link to Google Sheet', value: 'docs.google.com/spreadsheets/d/1a2b3c' },
-      { label: 'Email template Google Doc link', value: 'docs.google.com/document/d/4d5e6f' },
+      {
+        label: 'Link to Google Sheet',
+        value: 'docs.google.com/spreadsheets/d/1a2b3c',
+        link: { href: 'https://docs.google.com/spreadsheets/d/1a2b3c', label: 'Google Sheet' },
+      },
+      {
+        label: 'Email template Google Doc link',
+        value: 'docs.google.com/document/d/4d5e6f',
+        link: { href: 'https://docs.google.com/document/d/4d5e6f', label: 'Email template' },
+      },
     ],
   },
   {
@@ -268,5 +290,26 @@ export const mockRequests: MockRequestSeed[] = [
       { label: 'Date of event', value: '18 September 2026' },
       { label: 'Event details', value: 'Launch drinks in the EngSoc room.' },
     ],
+  },
+  /* A reimbursement with its receipt, so the task dialog's Files row has
+     something to show. */
+  {
+    id: 12,
+    requestType: 'reimbursement',
+    typeLabel: 'Reimbursement form',
+    title: 'Sponsor lunch reimbursement',
+    targetPort: 'cabinet',
+    requesterId: 20,
+    requesterName: 'Robin Shaw',
+    requesterPort: 'careers',
+    status: 'in_progress',
+    submittedAt: at(-1, '13:40'),
+    assignedTo: [mockCurrentUser],
+    answers: [
+      { label: 'Description', value: 'Lunch for the two Atlassian reps after the careers panel.' },
+      { label: 'Amount (AUD)', value: '$64.20' },
+      { label: 'Date of purchase', value: '29 September 2026' },
+    ],
+    attachments: [{ id: 1, fieldName: 'receipt', fileName: 'receipt.jpg', mimeType: 'image/jpeg', sizeBytes: 182_000 }],
   },
 ];
