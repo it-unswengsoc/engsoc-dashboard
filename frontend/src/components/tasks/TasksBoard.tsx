@@ -114,14 +114,19 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
       dueBadge(task.dueAt)?.label === 'Overdue',
   ).length;
 
-  /* Moves the card straight away, then saves it — putting it back where it
-     was if the save fails. Only an assignee can drag a card, matching the
-     backend's guard, and it moves for every assignee. */
-  async function moveTo(status: TaskStatus) {
+  /* A drop on a column. */
+  function moveTo(status: TaskStatus) {
     const taskId = dragging;
     setDragging(null);
     setDragOver(null);
+    if (taskId !== null) moveTask(taskId, status);
+  }
 
+  /* Moves the card straight away, then saves it — putting it back where it
+     was if the save fails. Only an assignee can move a card (by dragging, or
+     from its details dialog), matching the backend's guard, and it moves for
+     every assignee. */
+  async function moveTask(taskId: number, status: TaskStatus) {
     const task = board.find((t) => t.id === taskId);
     if (!task || task.status === status || saving.current.has(task.id)) return;
 
@@ -346,6 +351,13 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
           taskId={openTaskId}
           boardTask={openedTask}
           currentUserId={currentUserId}
+          onStatusChange={
+            openedTask && isAssignedTo(openedTask, currentUserId)
+              ? (status) => moveTask(openedTask.id, status)
+              : undefined
+          }
+          statusSaving={openedTask ? savingIds.has(openedTask.id) : false}
+          statusError={moveError}
           onClose={() => setTaskDialogOpen(false)}
         />
       )}

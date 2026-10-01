@@ -9,6 +9,19 @@ import { Check, ChevronDown } from 'lucide-react';
 export interface FieldOption {
   value: string;
   label: string;
+  /* A colour class (e.g. 'bg-[#3D6C94]') for a dot before the label — the
+     task status picker matches the board's column dots with it. */
+  dot?: string;
+}
+
+function OptionLabel({ option }: { option: FieldOption }) {
+  if (!option.dot) return <>{option.label}</>;
+  return (
+    <span className="flex items-center gap-2">
+      <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${option.dot}`} />
+      {option.label}
+    </span>
+  );
 }
 
 interface SelectProps {
@@ -145,7 +158,7 @@ export default function Select({
               option.value === value ? 'font-bold text-gray-900' : 'text-gray-700'
             }`}
           >
-            {option.label}
+            <OptionLabel option={option} />
             {option.value === value && <Check className="h-4 w-4 shrink-0 text-[#3D6C94]" />}
           </button>
         </li>
@@ -167,7 +180,7 @@ export default function Select({
           selected ? 'text-gray-900' : 'text-gray-400'
         } ${invalid ? 'ring-2 ring-[#ED6672]' : ''}`}
       >
-        {selected?.label ?? placeholder}
+        {selected ? <OptionLabel option={selected} /> : placeholder}
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
         />

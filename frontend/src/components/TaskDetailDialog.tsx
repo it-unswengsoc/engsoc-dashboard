@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Paperclip, Trash2, ExternalLink } from 'lucide-react';
+import { AlertTriangle, Paperclip, Trash2, ExternalLink } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
+import Select from '@/components/dialogs/Select';
 import {
   getTask,
   getTaskAttachments,
@@ -25,6 +26,11 @@ export interface TaskDetailDialogProps {
      status changes on the board itself, by dragging. */
   boardTask?: BoardTask;
   currentUserId?: number;
+  /* Given for someone who can move the card (an assignee): the status tag
+     becomes a dropdown that moves it to that column, same as dragging. */
+  onStatusChange?: (status: TaskStatus) => void;
+  statusSaving?: boolean;
+  statusError?: string;
 }
 
 /* The same colour language as the board's columns and the requests page's
@@ -54,6 +60,21 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+/* The board's columns, in order, with the same dots as their headings
+   (components/tasks/TasksBoard.tsx's COLUMNS). */
+const STATUS_DOTS: Record<TaskStatus, string> = {
+  pending: 'bg-[#E8C84A]',
+  in_progress: 'bg-[#3D6C94]',
+  completed: 'bg-[#8FBF9F]',
+  cancelled: 'bg-gray-300',
+};
+
+const STATUS_OPTIONS = (['pending', 'in_progress', 'completed', 'cancelled'] as TaskStatus[]).map((value) => ({
+  value,
+  label: STATUS_LABELS[value],
+  dot: STATUS_DOTS[value],
+}));
+
 const STATUS_STYLES: Record<TaskStatus, string> = {
   pending: 'bg-[#F4EFD3] text-gray-700',
   in_progress: 'bg-[#B1C9DC] text-gray-700',
@@ -77,6 +98,9 @@ export default function TaskDetailDialog({
   onCompletionChanged,
   boardTask,
   currentUserId,
+  onStatusChange,
+  statusSaving = false,
+  statusError,
 }: TaskDetailDialogProps) {
   const isAssignee = boardTask ? boardTask.assignees.some((a) => a.id === currentUserId) : true;
   const [task, setTask] = useState<TaskItem | null>(null);
@@ -152,6 +176,7 @@ export default function TaskDetailDialog({
   if (boardTask) {
     const due = boardTask.dueAt ? formatDue(boardTask.dueAt) : null;
     const isClosed = boardTask.status === 'completed' || boardTask.status === 'cancelled';
+    const overdue = !isClosed && !!due?.overdue;
     const meta = [
       boardTask.requestTitle && `From ${boardTask.requestTitle}`,
       boardTask.assignedBy &&
@@ -178,22 +203,57 @@ export default function TaskDetailDialog({
               </p>
             )}
           </div>
-          <span
-            className={`shrink-0 rounded px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide ${STATUS_STYLES[boardTask.status]}`}
-          >
-            {STATUS_LABELS[boardTask.status]}
-          </span>
+          {onStatusChange ? (
+            <div className={`w-40 shrink-0 ${statusSaving ? 'pointer-events-none opacity-60' : ''}`}>
+              <span className="sr-only">Move to column</span>
+              <Select
+                value={boardTask.status}
+                options={STATUS_OPTIONS}
+                onChange={(value) => onStatusChange(value as TaskStatus)}
+              />
+            </div>
+          ) : (
+            <span
+              className={`shrink-0 rounded px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide ${STATUS_STYLES[boardTask.status]}`}
+            >
+              {STATUS_LABELS[boardTask.status]}
+            </span>
+          )}
         </div>
 
+        {onStatusChange && statusError && (
+          <p role="alert" className="-mt-2 px-7 pb-3 text-xs font-bold text-[#8B2E38]">
+            Couldn&apos;t move it: {statusError}
+          </p>
+        )}
+
         <div className="grid gap-3 px-7 pb-5 sm:grid-cols-2">
-          <div className="rounded-xl bg-[#F3F6F9] px-4 py-3">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-[#5B6B7A]">Due</span>
+          {/* An open task past its due date turns this tile red, with a badge,
+              so it can't be missed. */}
+          <div
+            className={`rounded-xl px-4 py-3 ${
+              overdue ? 'bg-[#F1C4C9]/50 ring-1 ring-inset ring-[#ED6672]/50' : 'bg-[#F3F6F9]'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span
+                className={`font-mono text-[10px] font-bold uppercase tracking-wide ${
+                  overdue ? 'text-[#8B2E38]' : 'text-[#5B6B7A]'
+                }`}
+              >
+                Due
+              </span>
+              {overdue && (
+                <span className="flex items-center gap-1 rounded-full bg-[#ED6672] px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide text-white">
+                  <AlertTriangle className="h-3 w-3" />
+                  Overdue
+                </span>
+              )}
+            </div>
             {due ? (
               <>
-                <p className="mt-1 text-[15px] font-bold text-gray-900">{due.when}</p>
-                <p className={`text-xs font-semibold ${due.overdue ? 'text-[#8B2E38]' : 'text-gray-500'}`}>
-                  {isClosed ? '' : due.relative}
-                </p>
+                <p className={`mt-1 text-[15px] font-bold ${overdue ? 'text-[#8B2E38]' : 'text-gray-900'}`}>{due.when}</p>
+                {!isClosed && !overdue && <p className="text-xs font-semibold text-gray-500">{due.relative}</p>}
               </>
             ) : (
               <p className="mt-1 text-[15px] font-bold text-gray-400">No due date</p>
