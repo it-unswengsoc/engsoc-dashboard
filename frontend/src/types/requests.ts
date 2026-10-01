@@ -60,6 +60,9 @@ export interface RequestItem {
 export interface RequestAnswer {
   label: string;
   value: string;
+  /* Set when the answer is a web link: the URL (http/https only) and a short
+     name for its button. Such answers show as link buttons, not text. */
+  link?: { href: string; label: string };
 }
 
 export interface RequestDetail extends RequestItem {
