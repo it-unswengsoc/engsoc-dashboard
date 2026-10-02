@@ -216,7 +216,7 @@ function EditTaskForm({
   }
 
   return (
-    <div className="flex flex-col gap-4 px-7 pb-6 pt-5">
+    <div className="flex flex-col gap-4 px-5 sm:px-7 pb-6 pt-5">
       <h2 className="pr-8 text-xl font-bold text-gray-900">Edit task</h2>
 
       <label className="flex flex-col gap-1.5">
@@ -469,11 +469,11 @@ export default function TaskDetailDialog({
       <Dialog open={open} title="Task" size="3xl" bare onClose={onClose}>
         <div className="h-2 bg-gray-100" />
         {loadError ? (
-          <p role="alert" className="px-7 py-6 pr-14 text-sm font-bold text-[#8B2E38]">
+          <p role="alert" className="px-5 sm:px-7 py-6 pr-14 text-sm font-bold text-[#8B2E38]">
             {loadError}
           </p>
         ) : (
-          <div className="flex flex-col gap-3 px-7 py-6" aria-busy="true">
+          <div className="flex flex-col gap-3 px-5 sm:px-7 py-6" aria-busy="true">
             <span className="h-5 w-56 animate-pulse rounded bg-gray-100" />
             <div className="grid gap-3 sm:grid-cols-2">
               <span className="h-16 animate-pulse rounded-xl bg-gray-100" />
@@ -541,7 +541,7 @@ export default function TaskDetailDialog({
     <Dialog open={open} title={task.title} size="3xl" bare onClose={onClose}>
       <div className={`h-2 ${STATUS_STRIPS[task.status]}`} />
 
-      <div className="flex items-start justify-between gap-4 py-5 pl-7 pr-14">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 py-5 pl-5 pr-12 sm:pl-7 sm:pr-14">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <h2 className={`text-xl font-bold ${isClosed ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
@@ -579,12 +579,12 @@ export default function TaskDetailDialog({
       </div>
 
       {changeStatus && moveError && (
-        <p role="alert" className="-mt-2 px-7 pb-3 text-xs font-bold text-[#8B2E38]">
+        <p role="alert" className="-mt-2 px-5 sm:px-7 pb-3 text-xs font-bold text-[#8B2E38]">
           Couldn&apos;t move it: {moveError}
         </p>
       )}
 
-      <div className="grid gap-3 px-7 pb-5 sm:grid-cols-2">
+      <div className="grid gap-3 px-5 sm:px-7 pb-5 sm:grid-cols-2">
         {/* An open task past its due date turns this tile red, with a badge,
             so it can't be missed. */}
         <div
@@ -647,7 +647,7 @@ export default function TaskDetailDialog({
           accepted, whatever the accepter wrote for whoever picks it up — so
           it reads as a note from them. */}
       {task.description && (
-        <div className="px-7 pb-5">
+        <div className="px-5 sm:px-7 pb-5">
           <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
             <div className="flex items-center gap-2">
               {task.assignedBy && (
@@ -665,7 +665,7 @@ export default function TaskDetailDialog({
       )}
 
       {attachments && attachments.length > 0 && (
-        <div className="px-7 pb-5">
+        <div className="px-5 sm:px-7 pb-5">
           <span className="text-[13px] font-semibold text-gray-500">Attachments</span>
           <div className="mt-2 flex flex-col gap-2">
             {attachments.map((a) => {
@@ -700,7 +700,7 @@ export default function TaskDetailDialog({
           request's own access rules (its handlers and the task's assignees
           can see it; a teammate who only sees the card gets nothing here). */}
       {task.requestId && (requestLoading || request) && (
-        <div className="border-t border-gray-200 px-7 pb-6 pt-4">
+        <div className="border-t border-gray-200 px-5 sm:px-7 pb-6 pt-4">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <span className="text-[13px] font-semibold text-gray-500">Request</span>
             {request && (

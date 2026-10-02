@@ -130,7 +130,7 @@ export default function Dialog({
       <div className="flex min-h-full items-center justify-center p-4">
         <div
           ref={cardRef}
-          className={`relative w-full rounded-2xl bg-white shadow-xl ${bare ? 'overflow-hidden' : 'p-8'} ${MAX_WIDTHS[size]}`}
+          className={`relative w-full rounded-2xl bg-white shadow-xl ${bare ? 'overflow-hidden' : 'p-5 sm:p-8'} ${MAX_WIDTHS[size]}`}
           aria-label={bare ? title : undefined}
         >
           <button

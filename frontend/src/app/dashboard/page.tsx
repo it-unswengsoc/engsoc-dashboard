@@ -53,8 +53,8 @@ function StatCardSkeleton({ colour }: { colour: string }) {
   return (
     <div className="flex flex-1 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="w-1.5 shrink-0" style={{ backgroundColor: colour, opacity: 0.35 }} />
-      <div className="px-4 py-4">
-        <SkeletonBar className="mb-2.5 h-3 w-20" />
+      <div className="px-3 py-3 sm:px-4 sm:py-4">
+        <SkeletonBar className="mb-2.5 h-3 w-14 sm:w-20" />
         <SkeletonBar className="h-7 w-10" />
       </div>
     </div>
@@ -213,13 +213,16 @@ export default function HomePage() {
   const recentAnnouncements = toRecentAnnouncements(announcements);
 
   return (
-    <div className="flex justify-center items-start gap-20">
-      {/* LEFT COLUMN */}
-      <div className="max-w-2xl flex-1">
+    /* Side by side on a wide screen — greeting and feed on the left, events
+       and tasks pinned on the right. Stacked on a phone, with events and
+       tasks straight after the stats so they aren't below the whole feed. */
+    <div className="mx-auto grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,42rem)_20rem] lg:justify-center lg:gap-x-12 lg:gap-y-0 xl:gap-x-20">
+      {/* GREETING AND STATS */}
+      <div className="min-w-0 lg:col-start-1 lg:row-start-1">
         <WelcomeHeading />
 
         {/* UPPER BOX SECTION */}
-        <StaggerReveal className="mt-6 flex flex-wrap justify-evenly gap-5" y={18}>
+        <StaggerReveal className="mt-4 grid grid-cols-3 gap-2 sm:mt-6 sm:gap-5" y={18}>
           {loading ? (
             <StatCardSkeleton colour="#F4EFD3" />
           ) : (
@@ -236,34 +239,10 @@ export default function HomePage() {
             <StatCard label={"NEW ANNOUNCEMENTS"} value={stats.newAnnouncements} colour={"#ED6672"} />
           )}
         </StaggerReveal>
-
-        {/* ANNOUNCEMENTS SECTION */}
-        <div className="mt-6">
-          {loading ? (
-            <div className="flex flex-col gap-4">
-              <AnnouncementRowSkeleton />
-              <AnnouncementRowSkeleton />
-            </div>
-          ) : loadError ? (
-            <p className="rounded-2xl border border-dashed border-gray-200 py-10 text-center font-mono text-sm text-[#8B2E38]">
-              {loadError}
-            </p>
-          ) : recentAnnouncements.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-gray-200 py-10 text-center font-mono text-sm text-gray-400">
-              No announcements yet.
-            </p>
-          ) : (
-            <StaggerReveal className="flex flex-col gap-4" replayKey={recentAnnouncements.length}>
-              {recentAnnouncements.map((announcement) => (
-                <AnnouncementRow key={announcement.id} {...announcement} onDeleted={handleAnnouncementDeleted} />
-              ))}
-            </StaggerReveal>
-          )}
-        </div>
       </div>
 
       {/* RIGHT COLUMN */}
-      <div className="sticky top-0 -mt-8 flex w-80 shrink-0 flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-0 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:-mt-8 lg:self-start">
         {/* EVENT ROW */}
         <div className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="h-2 bg-[#B1C9DC]" />
@@ -341,6 +320,30 @@ export default function HomePage() {
             </StaggerReveal>
           )}
         </div>
+      </div>
+
+      {/* ANNOUNCEMENTS SECTION */}
+      <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:mt-6">
+        {loading ? (
+          <div className="flex flex-col gap-4">
+            <AnnouncementRowSkeleton />
+            <AnnouncementRowSkeleton />
+          </div>
+        ) : loadError ? (
+          <p className="rounded-2xl border border-dashed border-gray-200 py-10 text-center font-mono text-sm text-[#8B2E38]">
+            {loadError}
+          </p>
+        ) : recentAnnouncements.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-gray-200 py-10 text-center font-mono text-sm text-gray-400">
+            No announcements yet.
+          </p>
+        ) : (
+          <StaggerReveal className="flex flex-col gap-4" replayKey={recentAnnouncements.length}>
+            {recentAnnouncements.map((announcement) => (
+              <AnnouncementRow key={announcement.id} {...announcement} onDeleted={handleAnnouncementDeleted} />
+            ))}
+          </StaggerReveal>
+        )}
       </div>
 
       {openEvent && (

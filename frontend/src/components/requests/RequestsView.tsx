@@ -117,6 +117,12 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  /* Below the list on a phone, so picking a request scrolls down to it. */
+  const detailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selectedId === null || window.matchMedia('(min-width: 1024px)').matches) return;
+    detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selectedId]);
 
   /* Each action answers with the updated request, which replaces its copy
      here; a fresh load from the page replaces them all. */
@@ -288,9 +294,9 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
     <div>
       {/* HEADER */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Inbox className="h-7 w-7 text-gray-900" strokeWidth={2} />
-          <h1 className="text-3xl font-bold leading-none text-gray-900">Requests</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl leading-none text-gray-900">Requests</h1>
           {/* leading-none on both so items-center aligns the glyphs rather than
               the line boxes — a 3xl heading's half-leading throws it off. */}
           {port && (
@@ -315,7 +321,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
       </div>
 
       {/* STREAM TABS */}
-      <div className="mt-5 flex gap-1 border-b border-gray-200">
+      <div className="mt-5 flex gap-1 overflow-x-auto border-b border-gray-200">
         {([
           ...(handlesAny ? [{ value: 'inbox' as Tab, label: 'To action', icon: Inbox, count: streams.inbox.length }] : []),
           { value: 'mine' as Tab, label: 'My requests', icon: Send, count: streams.mine.length },
@@ -330,7 +336,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
               setQuery('');
               setActionError('');
             }}
-            className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold transition-colors ${
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-bold transition-colors sm:px-4 ${
               tab === value
                 ? 'border-[#3D6C94] text-[#3D6C94]'
                 : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -461,7 +467,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
 
           {/* DETAIL */}
           {selected && (
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div ref={detailRef} className="scroll-mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
               <div className={`h-2 ${STATUS_STRIPS[selected.status]}`} />
 
               <div className="flex flex-wrap items-start justify-between gap-3 px-6 py-5">
@@ -779,7 +785,7 @@ export function RequestsViewSkeleton() {
     <div aria-busy="true">
       <div className="flex items-center gap-2.5">
         <Inbox className="h-7 w-7 text-gray-900" strokeWidth={2} />
-        <h1 className="text-3xl font-bold leading-none text-gray-900">Requests</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl leading-none text-gray-900">Requests</h1>
       </div>
 
       <div className="mt-5 flex gap-2 border-b border-gray-200 pb-2.5">

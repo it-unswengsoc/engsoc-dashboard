@@ -172,7 +172,7 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <KanbanSquare className="h-7 w-7 text-gray-900" strokeWidth={2} />
-          <h1 className="text-3xl font-bold leading-none text-gray-900">Tasks</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl leading-none text-gray-900">Tasks</h1>
           <span className="rounded-full bg-[#B1C9DC]/30 px-3.5 py-1.5 font-mono text-xs font-bold uppercase leading-none tracking-wide text-[#3D6C94]">
             {portLabel(port)}
           </span>
@@ -219,7 +219,7 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
       )}
 
       {/* BOARD */}
-      <div className="mt-6 grid gap-4 lg:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {COLUMNS.map((column) => {
           const cards = visible.filter((task) => task.status === column.status);
           const isTarget = dragOver === column.status;
@@ -377,7 +377,7 @@ export function TasksBoardSkeleton({ port }: { port: string | null }) {
     <div aria-label="Loading" aria-busy="true">
       <div className="flex items-center gap-3">
         <KanbanSquare className="h-7 w-7 text-gray-900" strokeWidth={2} />
-        <h1 className="text-3xl font-bold leading-none text-gray-900">Tasks</h1>
+        <h1 className="text-2xl font-bold sm:text-3xl leading-none text-gray-900">Tasks</h1>
         {port ? (
           <span className="rounded-full bg-[#B1C9DC]/30 px-3.5 py-1.5 font-mono text-xs font-bold uppercase leading-none tracking-wide text-[#3D6C94]">
             {portLabel(port)}
@@ -392,7 +392,7 @@ export function TasksBoardSkeleton({ port }: { port: string | null }) {
         <span className="h-9 w-28 animate-pulse rounded-lg bg-gray-100" />
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {COLUMNS.map((column, i) => (
           <section key={column.status} className="flex min-h-[8rem] flex-col rounded-2xl border border-gray-200 bg-gray-50">
             <div className="flex items-center gap-2 px-3 py-2.5">

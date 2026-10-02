@@ -50,7 +50,7 @@ export default function Sidebar() {
       onMouseLeave={() => setCollapsed(true)}
       className={`${
         collapsed ? "w-20" : "w-56"
-      } h-screen sticky top-0 bg-[#B1C9DC] flex flex-col p-4 shrink-0 transition-all duration-200`}
+      } hidden md:flex h-screen sticky top-0 bg-[#B1C9DC] flex-col p-4 shrink-0 transition-all duration-200`}
     >
       <div className="flex items-center justify-center mb-4">
         <Image
@@ -81,6 +81,39 @@ export default function Sidebar() {
         {!collapsed && "Logout"}
       </button>
     </aside>
+  );
+}
+
+/* On a phone the sidebar gives way to a bar along the bottom: the same
+   links, with labels, in thumb's reach. Logout lives on the profile page
+   there. */
+export function MobileNav() {
+  const pathname = usePathname();
+  const { profile } = useProfile();
+  const links = profile?.role === "admin" ? [...dashboardLinks, adminLink] : dashboardLinks;
+
+  return (
+    <nav
+      aria-label="Main"
+      className="fixed inset-x-0 bottom-0 z-20 flex border-t border-[#9ab8cb] bg-[#B1C9DC] pb-[env(safe-area-inset-bottom)] md:hidden"
+    >
+      {links.map(({ label, href, icon: Icon }) => {
+        const active = href === "/dashboard" ? pathname === href : pathname.startsWith(href);
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active ? "page" : undefined}
+            className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${
+              active ? "bg-[#8fafc5] text-slate-900" : "text-slate-700"
+            }`}
+          >
+            <Icon className="h-5 w-5 text-white" />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 

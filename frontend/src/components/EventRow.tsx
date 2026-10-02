@@ -50,7 +50,7 @@ export default function EventRow({ month, day, events, onOpen }: EventRowProps) 
             {/* A short banner rather than the whole cover, so a photo
                 barely adds height and the panel below stays in view. */}
             {event.imageUrl && (
-              <span className="block aspect-[7/2] w-full overflow-hidden rounded-lg bg-gray-100">
+              <span className="block aspect-[7/2] max-h-28 w-full overflow-hidden rounded-lg bg-gray-100">
                 <img
                   src={event.imageUrl}
                   alt=""

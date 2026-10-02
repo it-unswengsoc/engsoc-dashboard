@@ -158,9 +158,11 @@ export default function CalendarShell({ children }: CalendarShellProps) {
         canCreateSharedEvent={canCreateSharedEvent}
         onClose={() => setComposerPrefill(null)}
       />
-      <div className="flex h-full justify-center gap-8">
+      {/* Side by side on a wide screen. Stacked on a smaller one, where the
+          page scrolls, so the calendar takes a fixed share of the screen. */}
+      <div className="flex flex-col gap-6 lg:h-full lg:flex-row lg:justify-center lg:gap-8">
         {/* MAIN CALENDAR */}
-        <div className="flex h-full max-w-4xl flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex h-[75dvh] min-h-[28rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm lg:h-full lg:min-h-0 lg:max-w-4xl lg:flex-1">
           <CalendarToolbar
             title={title}
             view={view}
@@ -183,7 +185,7 @@ export default function CalendarShell({ children }: CalendarShellProps) {
         </div>
 
         {/* RIGHT SIDEBAR */}
-        <div className="flex w-72 shrink-0 flex-col gap-6">
+        <div className="flex w-full shrink-0 flex-col gap-6 lg:w-72">
           <CalendarItemDetail item={selected} />
 
           <div className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">

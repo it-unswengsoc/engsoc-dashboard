@@ -116,8 +116,8 @@ export default function Header() {
   const showDropdown = resultsOpen && query.trim().length >= MIN_QUERY_LENGTH;
 
   return (
-    <header className="sticky top-0 z-10 flex items-center justify-between gap-4 px-8 py-2 bg-white border-b border-gray-200">
-      <div ref={searchBoxRef} className="relative flex-1 max-w-md ml-6">
+    <header className="sticky top-0 z-10 flex items-center justify-between gap-3 px-4 py-2 bg-white border-b border-gray-200 md:gap-4 md:px-8">
+      <div ref={searchBoxRef} className="relative min-w-0 flex-1 max-w-md md:ml-6">
         <input
           type="text"
           value={query}
@@ -157,14 +157,15 @@ export default function Header() {
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2 md:gap-3">
         {/* New button */}
         <button
           onClick={() => {
             setHasOpenedNewDialogOnce(true);
             setNewDialogOpen(true);
           }}
-          className="flex items-center gap-2 rounded-xl bg-[#B1C9DC] px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98]"
+          aria-label="New"
+          className="flex items-center gap-2 rounded-xl bg-[#B1C9DC] px-3 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98] sm:px-4"
         >
           <svg
             className="h-4 w-4"
@@ -179,7 +180,7 @@ export default function Header() {
               d="M12 4v16m8-8H4"
             />
           </svg>
-          New
+          <span className="hidden sm:inline">New</span>
         </button>
 
         <NotificationBell />

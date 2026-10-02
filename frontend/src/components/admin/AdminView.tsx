@@ -291,7 +291,7 @@ export default function AdminView() {
         <div>
           <div className="flex items-center gap-2.5">
             <ShieldCheck className="h-7 w-7 text-gray-900" strokeWidth={2} />
-            <h1 className="text-3xl font-bold text-gray-900">Admin</h1>
+            <h1 className="text-2xl font-bold sm:text-3xl text-gray-900">Admin</h1>
           </div>
           <p className="mt-1 text-sm text-gray-500">
             Select one or more members, choose new values, then confirm to save — nothing changes until you do.
@@ -389,8 +389,9 @@ export default function AdminView() {
           <p className="p-6 font-mono text-xs text-[#8B2E38]">{loadError}</p>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto">
-              <div className={`sticky top-0 z-10 grid ${COLUMNS} items-center gap-4 border-b border-gray-100 bg-gray-50 px-6 py-2.5 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]`}>
+            {/* Scrolls sideways on a phone rather than crushing the columns together. */}
+            <div className="flex-1 overflow-auto">
+              <div className={`sticky top-0 z-10 grid min-w-[44rem] ${COLUMNS} items-center gap-4 md:min-w-0 border-b border-gray-100 bg-gray-50 px-6 py-2.5 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]`}>
                 <input
                   type="checkbox"
                   checked={allVisibleSelected}
@@ -423,8 +424,8 @@ export default function AdminView() {
                   const portValue = edit && edit.port !== undefined ? (edit.port ?? '') : (user.port ?? '');
 
                   return (
-                    <div key={user.id} className={`border-b border-gray-100 last:border-0 ${isPending ? 'bg-[#F4EFD3]/40' : ''}`}>
-                      <div className={`grid ${COLUMNS} items-center gap-4 px-6 py-3`}>
+                    <div key={user.id} className={`min-w-[44rem] border-b border-gray-100 last:border-0 md:min-w-0 ${isPending ? 'bg-[#F4EFD3]/40' : ''}`}>
+                      <div className={`grid min-w-[44rem] ${COLUMNS} items-center gap-4 md:min-w-0 px-6 py-3`}>
                         <input
                           type="checkbox"
                           checked={selectedIds.has(user.id)}

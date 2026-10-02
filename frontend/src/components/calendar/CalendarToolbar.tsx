@@ -13,8 +13,8 @@ const VIEWS: CalendarView[] = ['day', 'week', 'month', 'year'];
 
 export default function CalendarToolbar({ title, view, onViewChange, onToday, onPrev, onNext }: CalendarToolbarProps) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-gray-200 px-4 py-3">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-200 px-3 py-3 sm:px-4">
+      <div className="flex items-center gap-2 sm:gap-3">
         <button
           onClick={onPrev}
           aria-label="Previous"
@@ -25,7 +25,7 @@ export default function CalendarToolbar({ title, view, onViewChange, onToday, on
           </svg>
         </button>
 
-        <h2 className="min-w-[10rem] text-lg font-bold text-gray-900">{title}</h2>
+        <h2 className="text-base font-bold text-gray-900 sm:min-w-[10rem] sm:text-lg">{title}</h2>
 
         <button
           onClick={onNext}

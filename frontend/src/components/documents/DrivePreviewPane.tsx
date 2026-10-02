@@ -43,7 +43,7 @@ const OPEN_BUTTON_STYLES =
 export default function DrivePreviewPane({ node, path, locationLabel, onRename, onDelete }: DrivePreviewPaneProps) {
   if (!node) {
     return (
-      <div className="flex w-80 shrink-0 flex-col items-center justify-center gap-2 border-l border-gray-100 px-6 text-center">
+      <div data-preview-pane className="flex w-[85vw] shrink-0 snap-start md:w-80 flex-col items-center justify-center gap-2 border-l border-gray-100 px-6 text-center">
         <p className="font-mono text-xs text-gray-400">Select a file or folder to preview.</p>
       </div>
     );
@@ -54,7 +54,7 @@ export default function DrivePreviewPane({ node, path, locationLabel, onRename, 
   const canDelete = node.kind === 'entry' && node.capabilities.canDelete;
 
   return (
-    <div className="flex w-80 shrink-0 flex-col border-l border-gray-100 px-6 py-6">
+    <div data-preview-pane className="flex w-[85vw] shrink-0 snap-start md:w-80 flex-col overflow-y-auto border-l border-gray-100 px-6 py-6">
       <div
         className="flex h-14 w-14 items-center justify-center rounded-xl"
         style={{ backgroundColor: isFile ? '#E5E7EB' : '#2A7D6F' }}

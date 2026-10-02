@@ -18,7 +18,7 @@ function SidebarHeading() {
 
 export default function DepartmentSidebar({ departments, activeDepartment, onSelect }: DepartmentSidebarProps) {
   return (
-    <div className="flex h-full w-56 shrink-0 flex-col overflow-y-auto border-r border-gray-200">
+    <div className="flex h-full w-[80vw] shrink-0 snap-start flex-col md:w-56 overflow-y-auto border-r border-gray-200">
       <SidebarHeading />
       <nav className="flex flex-col p-2">
         {departments.map((department) => {
@@ -56,7 +56,7 @@ export default function DepartmentSidebar({ departments, activeDepartment, onSel
 /* Stands in for the sidebar while departments are loading. */
 export function DepartmentSidebarSkeleton() {
   return (
-    <div className="flex h-full w-56 shrink-0 flex-col border-r border-gray-200" aria-busy="true">
+    <div className="flex h-full w-[80vw] shrink-0 snap-start flex-col md:w-56 border-r border-gray-200" aria-busy="true">
       <SidebarHeading />
       <div className="flex flex-col gap-1 p-2">
         {[0, 1, 2, 3].map((i) => (

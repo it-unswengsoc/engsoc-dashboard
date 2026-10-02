@@ -19,7 +19,7 @@ export default function WelcomeHeading() {
   }, []);
 
   return (
-    <h1 className="text-4xl font-bold text-gray-900">
+    <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">
       {greeting}{firstName ? `, ${firstName}` : ''}.
     </h1>
   );

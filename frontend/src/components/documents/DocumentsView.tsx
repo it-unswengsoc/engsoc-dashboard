@@ -411,6 +411,19 @@ export default function DocumentsView() {
   }, [category]);
 
   const previewNode = selected[selected.length - 1] ?? null;
+
+  /* On a phone the columns are near full-width and scroll sideways, so a
+     pick slides the next column into view — or the preview, for a file. */
+  const browserRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const browser = browserRef.current;
+    if (!browser || window.matchMedia('(min-width: 768px)').matches) return;
+    const target =
+      previewNode && !previewNode.navigable
+        ? browser.querySelector('[data-preview-pane]')
+        : Array.from(browser.querySelectorAll('[data-drive-column]')).pop();
+    target?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+  }, [previewNode, activeDepartment]);
   const previewPath = ['EngSoc Drive', ...selected.map((n) => n.name)];
   const previewLocation = selected.length <= 1 ? (activeDepartment?.name ?? '') : selected[selected.length - 2].name;
 
@@ -424,7 +437,7 @@ export default function DocumentsView() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2.5">
           <FolderIcon />
-          <h1 className="text-3xl font-bold text-gray-900">EngSoc Drive</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl text-gray-900">EngSoc Drive</h1>
         </div>
 
         <NewDriveItemMenu
@@ -480,11 +493,14 @@ export default function DocumentsView() {
       </div>
 
       {/* BROWSER */}
-      <div className="mt-4 flex min-w-0 flex-1 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div
+        ref={browserRef}
+        className="mt-4 flex h-[70dvh] min-w-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden rounded-2xl border border-gray-200 bg-white shadow-sm md:h-auto md:flex-1 md:snap-none md:overflow-hidden"
+      >
         {departmentsLoading ? (
           <>
             <DepartmentSidebarSkeleton />
-            <div className="flex min-w-0 flex-1">
+            <div className="flex flex-none md:min-w-0 md:flex-1">
               <DriveColumnSkeleton />
             </div>
             <DrivePreviewPane
@@ -511,7 +527,7 @@ export default function DocumentsView() {
                 whatever width is actually available (down to a readable
                 minimum) instead of forcing the page wider. Capped at
                 MAX_VISIBLE_COLUMNS, so this only ever has to fit that many. */}
-            <div className="flex min-w-0 flex-1">
+            <div className="flex flex-none md:min-w-0 md:flex-1">
               {visibleColumns.map((nodes, i) => {
                 const colIdx = visibleStart + i;
                 return (
@@ -526,7 +542,7 @@ export default function DocumentsView() {
                 );
               })}
               {uploading ? (
-                <div className="flex h-full min-w-[140px] flex-1 basis-0 flex-col border-r border-gray-100">
+                <div className="flex h-full w-[80vw] flex-none snap-start flex-col border-r border-gray-100 md:w-auto md:min-w-[140px] md:flex-1 md:basis-0">
                   <h3 className="shrink-0 border-b border-gray-100 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
                     &nbsp;
                   </h3>
