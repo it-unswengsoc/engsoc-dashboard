@@ -7,7 +7,9 @@ import {
   deleteEvent,
   getEventImage,
   validateEventImage,
+  validateEventCoordinates,
 } from '../functions/events';
+import { getStaticMap, PlacesError } from '../functions/places';
 import { decodeImageDataUri } from '../functions/announcement-images';
 import { verifyAuthToken, requireRole } from './auth';
 import { isUserAdmin } from '../functions/admin';
@@ -78,6 +80,37 @@ router.get('/:eventId/image', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /events/:eventId/map?v=lat,lng
+ * The event's location as a map image, drawn by Google Static Maps with the
+ * backend's key. Public, like the event itself.
+ */
+router.get('/:eventId/map', async (req: Request, res: Response) => {
+  try {
+    const eventId = parseInt(req.params.eventId, 10);
+    if (isNaN(eventId)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid event ID' });
+    }
+    const event = await getEventById(eventId);
+    if (!event || event.locationLat === null || event.locationLng === null) {
+      return res.status(404).json({ status: 'error', message: 'Map not found' });
+    }
+
+    const image = await getStaticMap(event.locationLat, event.locationLng);
+    res.set({
+      'Content-Type': 'image/png',
+      // The URL changes whenever the coordinates do (v = lat,lng).
+      'Cache-Control': 'public, max-age=604800',
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
+    res.status(200).send(image);
+  } catch (error) {
+    if (error instanceof PlacesError) return res.status(502).json({ status: 'error', message: error.message });
+    console.error('Get event map error:', error);
+    res.status(500).json({ status: 'error', message: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/event/:eventId
  * Retrieves a specific event by ID.
  */
@@ -121,7 +154,7 @@ router.get('/:eventId', async (req: Request, res: Response) => {
 router.post('/', verifyAuthToken, requireRole(['director', 'executive', 'admin']), async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const { title, description, imageUrl, eventType, startDate, endDate, location, capacity, facebookUrl, instagramUrl } =
+    const { title, description, imageUrl, eventType, startDate, endDate, location, locationLat, locationLng, capacity, facebookUrl, instagramUrl } =
       req.body;
 
     if (!title || !startDate) {
@@ -139,6 +172,8 @@ router.post('/', verifyAuthToken, requireRole(['director', 'executive', 'admin']
       startDate,
       endDate,
       location,
+      locationLat,
+      locationLng,
       organizerId: user.userId,
       capacity,
       facebookUrl,
@@ -192,11 +227,12 @@ router.put('/:eventId', verifyAuthToken, async (req: Request, res: Response) => 
       return res.status(403).json({ status: 'error', message: 'Only the organizer or an admin can edit this event' });
     }
 
-    const { title, description, imageUrl, eventType, startDate, endDate, location, status, capacity, facebookUrl, instagramUrl } =
+    const { title, description, imageUrl, eventType, startDate, endDate, location, locationLat, locationLng, status, capacity, facebookUrl, instagramUrl } =
       req.body;
 
     try {
       validateEventImage(imageUrl);
+      validateEventCoordinates(locationLat, locationLng);
     } catch (err) {
       return res.status(400).json({ status: 'error', message: err instanceof Error ? err.message : 'Invalid image' });
     }
@@ -209,6 +245,8 @@ router.put('/:eventId', verifyAuthToken, async (req: Request, res: Response) => 
       startDate,
       endDate,
       location,
+      locationLat,
+      locationLng,
       status,
       capacity,
       facebookUrl,

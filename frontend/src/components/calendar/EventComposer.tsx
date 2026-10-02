@@ -12,6 +12,7 @@ import {
 import { getProfile } from '@/services/auth-api';
 import { CALENDAR_EVENTS_CHANGED_EVENT } from '@/lib/calendar';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
+import LocationField, { type LocationValue } from '@/components/LocationField';
 import PhotoField, { initialPhoto, resolvePhoto, type PhotoValue } from '@/components/PhotoField';
 
 export interface EventComposerProps {
@@ -53,7 +54,7 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
   const [startTime, setStartTime] = useState('');
   const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('');
-  const [location, setLocation] = useState('');
+  const [location, setLocation] = useState<LocationValue>({ text: '', lat: null, lng: null });
   const [description, setDescription] = useState('');
   const [eventType, setEventType] = useState<'INTERNAL' | 'EXTERNAL'>('INTERNAL');
   const [capacity, setCapacity] = useState('');
@@ -87,7 +88,7 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
       setStartTime(toTimeInput(prefill.start));
       setEndDate(toDateInput(prefill.end));
       setEndTime(toTimeInput(prefill.end));
-      setLocation('');
+      setLocation({ text: '', lat: null, lng: null });
       setDescription('');
       setEventType('INTERNAL');
       setCapacity('');
@@ -123,7 +124,7 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
       getEventById(officialEventId)
         .then((official) => {
           setTitle(official.name);
-          setLocation(official.location ?? '');
+          setLocation({ text: official.location ?? '', lat: official.locationLat, lng: official.locationLng });
           setDescription(official.description ?? '');
           setCapacity(official.capacity !== null ? String(official.capacity) : '');
           setFacebookUrl(official.facebookUrl ?? '');
@@ -139,13 +140,13 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
         })
         .catch(() => {
           setTitle(item.name);
-          setLocation(item.location ?? '');
+          setLocation({ text: item.location ?? '', lat: null, lng: null });
           setDescription(item.description ?? '');
           setCanEdit(false);
         });
     } else {
       setTitle(item.name);
-      setLocation(item.location ?? '');
+      setLocation({ text: item.location ?? '', lat: null, lng: null });
       setDescription(item.description ?? '');
       setCapacity('');
       setFacebookUrl('');
@@ -196,7 +197,9 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
           startDate: start.toISOString(),
           endDate: end.toISOString(),
           eventType: eventType.toLowerCase() as 'internal' | 'external',
-          location: location.trim() || undefined,
+          location: location.text.trim() || undefined,
+          locationLat: location.text.trim() ? location.lat : null,
+          locationLng: location.text.trim() ? location.lng : null,
           description: description.trim() || undefined,
           capacity: capacity.trim() ? Number(capacity) : undefined,
           facebookUrl: facebookUrl.trim() || undefined,
@@ -219,7 +222,7 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
           startsAt: allDay ? toDateInput(start) : start.toISOString(),
           endsAt: allDay ? toDateInput(googleEnd) : end.toISOString(),
           allDay,
-          location: location.trim() || null,
+          location: location.text.trim() || null,
           description: description.trim() || null,
         };
         if (mode === 'edit' && editItem?.googleEventId) {
@@ -421,16 +424,14 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
           </div>
         )}
 
-        <label className="flex flex-col gap-1.5">
-          <span className={labelStyles}>Location</span>
-          <input
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            className={inputStyles}
-            disabled={!canEdit}
-          />
-        </label>
+        <LocationField
+          label="Location"
+          value={location}
+          onChange={setLocation}
+          inputClassName={inputStyles}
+          labelClassName={labelStyles}
+          disabled={!canEdit}
+        />
 
         {target === 'shared' && (
           <PhotoField label="Photo (optional)" value={photo} onChange={setPhoto} onError={setError} disabled={!canEdit} />

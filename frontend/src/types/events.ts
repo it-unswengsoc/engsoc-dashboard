@@ -13,4 +13,8 @@ export interface EventItem {
   facebookUrl: string | null;
   instagramUrl: string | null;
   imageUrl: string | null; // the event's photo, ready for an <img>; null if it has none
+  /* Set when the location was picked from a place search. */
+  locationLat: number | null;
+  locationLng: number | null;
+  mapUrl: string | null; // a map image of the location, ready for an <img>
 }

@@ -23,6 +23,9 @@ export interface RawEvent {
   facebookUrl: string | null;
   instagramUrl: string | null;
   imageUrl?: string | null; // relative to the API — GET /events/:id/image
+  locationLat?: number | null;
+  locationLng?: number | null;
+  mapUrl?: string | null; // relative to the API — GET /events/:id/map
 }
 
 export function toEventItem(raw: RawEvent): EventItem {
@@ -39,6 +42,9 @@ export function toEventItem(raw: RawEvent): EventItem {
     facebookUrl: raw.facebookUrl,
     instagramUrl: raw.instagramUrl,
     imageUrl: raw.imageUrl?.startsWith('/') ? apiUrl(raw.imageUrl) : (raw.imageUrl ?? null),
+    locationLat: raw.locationLat ?? null,
+    locationLng: raw.locationLng ?? null,
+    mapUrl: raw.mapUrl?.startsWith('/') ? apiUrl(raw.mapUrl) : (raw.mapUrl ?? null),
   };
 }
 
@@ -84,6 +90,8 @@ export interface CreateEventInput {
   facebookUrl?: string;
   instagramUrl?: string;
   imageUrl?: string; // a cropped photo as a data: URI
+  locationLat?: number | null; // from a picked place; null clears them
+  locationLng?: number | null;
 }
 
 /* imageUrl: undefined leaves the photo as it is, null removes it. */

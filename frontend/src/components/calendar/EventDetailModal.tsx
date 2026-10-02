@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MoreVertical, Pencil, Trash2, MapPin, Link as LinkIcon } from 'lucide-react';
+import { MoreVertical, Pencil, Trash2, MapPin, Link as LinkIcon, Navigation } from 'lucide-react';
 import Dialog from '@/components/dialogs/Dialog';
 import { getEventById, deleteEvent, getRsvpSummary, setRsvp, type RsvpSummary } from '@/services/events-api';
 import { deleteMyCalendarEvent } from '@/services/user-calendar-api';
@@ -79,6 +79,9 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
   const [facebookUrl, setFacebookUrl] = useState<string | null>(null);
   const [instagramUrl, setInstagramUrl] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [mapUrl, setMapUrl] = useState<string | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [mapFailed, setMapFailed] = useState(false);
   const [rsvp, setRsvpSummary] = useState<RsvpSummary | null>(null);
   const [rsvpBusy, setRsvpBusy] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -94,6 +97,9 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
     setFacebookUrl(null);
     setInstagramUrl(null);
     setImageUrl(null);
+    setMapUrl(null);
+    setCoords(null);
+    setMapFailed(false);
     setRsvpSummary(null);
 
     const token = sessionStorage.getItem('token');
@@ -108,6 +114,12 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
           setFacebookUrl(official.facebookUrl);
           setInstagramUrl(official.instagramUrl);
           setImageUrl(official.imageUrl);
+          setMapUrl(official.mapUrl);
+          setCoords(
+            official.locationLat !== null && official.locationLng !== null
+              ? { lat: official.locationLat, lng: official.locationLng }
+              : null
+          );
           if (!token) return;
           const profile = await getProfile(token);
           setCanEdit(official.organizerId === profile.id || profile.role === 'admin');
@@ -164,6 +176,14 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
   }
 
   if (!item) return null;
+
+  /* Opens Google Maps: directions to a pinned place, or a search for a
+     typed-in location. */
+  const directionsUrl = coords
+    ? `https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lng}`
+    : location
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
+      : null;
 
   const label = item.source === 'shared' ? `${item.type} EVENT` : 'PERSONAL EVENT';
   const myStatus = rsvp?.myStatus ?? null;
@@ -226,10 +246,39 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
               {location && (
                 <div className="flex items-center gap-1.5">
                   <MapPin className="h-3.5 w-3.5 shrink-0" />
-                  {location}
+                  <span className="min-w-0 flex-1">{location}</span>
+                  {directionsUrl && (
+                    <a
+                      href={directionsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex shrink-0 items-center gap-1 font-sans text-xs font-bold text-[#3D6C94] hover:underline"
+                    >
+                      <Navigation className="h-3 w-3" />
+                      {coords ? 'Directions' : 'Open in Maps'}
+                    </a>
+                  )}
                 </div>
               )}
             </div>
+
+            {mapUrl && !mapFailed && directionsUrl && (
+              <a
+                href={directionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${location ?? 'Location'} on Google Maps`}
+                className="block overflow-hidden rounded-xl border border-gray-200 transition-opacity hover:opacity-90"
+              >
+                <img
+                  src={mapUrl}
+                  alt=""
+                  loading="lazy"
+                  onError={() => setMapFailed(true)}
+                  className="aspect-[16/7] w-full bg-[#F3F6F9] object-cover"
+                />
+              </a>
+            )}
 
             {description && <p className="text-sm text-gray-700">{description}</p>}
 

@@ -59,9 +59,13 @@ CREATE TABLE users (
 -- (it was NOT NULL in the original, which is incompatible with SET NULL).
 --
 -- image_url holds the event's photo as a base64 data URI, the same way
--- announcements.image_url does (see there), so it's TEXT. To pick this up
--- on an existing database without losing data:
+-- announcements.image_url does (see there), so it's TEXT. location_lat /
+-- location_lng are set when the location was picked from a place search,
+-- and draw the event's map. To pick these up on an existing database
+-- without losing data:
 --   ALTER TABLE events ALTER COLUMN image_url TYPE TEXT;
+--   ALTER TABLE events ADD COLUMN location_lat DOUBLE PRECISION,
+--                      ADD COLUMN location_lng DOUBLE PRECISION;
 -- ============================================================
 CREATE TABLE events (
   id SERIAL PRIMARY KEY,
@@ -72,6 +76,8 @@ CREATE TABLE events (
   start_date TIMESTAMP NOT NULL,
   end_date TIMESTAMP,
   location VARCHAR(255),
+  location_lat DOUBLE PRECISION,
+  location_lng DOUBLE PRECISION,
   organizer_id INTEGER,
   status event_status DEFAULT 'upcoming',
   capacity INTEGER,

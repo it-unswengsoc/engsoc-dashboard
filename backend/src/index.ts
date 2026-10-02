@@ -34,6 +34,7 @@ import userRoutes from './routes/users';
 import taskRoutes from './routes/tasks';
 import dashboardRoutes from './routes/dashboard';
 import requestRoutes from './routes/requests';
+import placesRoutes from './routes/places';
 
 const app: Application = express();
 // Frontend owns port 3000 by Next.js convention; this backend now runs as
@@ -78,6 +79,7 @@ app.use('/users', userRoutes);
 app.use('/tasks', taskRoutes);
 app.use('/dashboard', dashboardRoutes);
 app.use('/requests', requestRoutes);
+app.use('/places', placesRoutes);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

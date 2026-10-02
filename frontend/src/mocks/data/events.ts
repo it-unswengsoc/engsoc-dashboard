@@ -15,6 +15,9 @@ export const mockEvents: EventItem[] = [
     facebookUrl: null,
     instagramUrl: null,
     imageUrl: null,
+    locationLat: null,
+    locationLng: null,
+    mapUrl: null,
   },
   {
     id: 2,
@@ -29,6 +32,9 @@ export const mockEvents: EventItem[] = [
     facebookUrl: null,
     instagramUrl: null,
     imageUrl: 'https://placehold.co/1600x900/F1C4C9/8B2E38?text=Love+Roulette',
+    locationLat: null,
+    locationLng: null,
+    mapUrl: null,
   },
   {
     id: 5,
@@ -43,6 +49,9 @@ export const mockEvents: EventItem[] = [
     facebookUrl: null,
     instagramUrl: null,
     imageUrl: null,
+    locationLat: null,
+    locationLng: null,
+    mapUrl: null,
   },
   {
     id: 3,
@@ -57,6 +66,9 @@ export const mockEvents: EventItem[] = [
     facebookUrl: null,
     instagramUrl: null,
     imageUrl: null,
+    locationLat: null,
+    locationLng: null,
+    mapUrl: null,
   },
   {
     id: 4,
@@ -71,6 +83,9 @@ export const mockEvents: EventItem[] = [
     facebookUrl: null,
     instagramUrl: null,
     imageUrl: null,
+    locationLat: null,
+    locationLng: null,
+    mapUrl: null,
   },
   {
     id: 6,
@@ -85,5 +100,8 @@ export const mockEvents: EventItem[] = [
     facebookUrl: null,
     instagramUrl: null,
     imageUrl: null,
+    locationLat: null,
+    locationLng: null,
+    mapUrl: null,
   },
 ];

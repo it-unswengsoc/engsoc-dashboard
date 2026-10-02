@@ -13,6 +13,12 @@ export async function getEvents(): Promise<EventItem[]> {
   return mockEvents.slice();
 }
 
+/* No Google key in mock mode — a placeholder stands in for the map. */
+function mockMapUrl(lat: number | null | undefined, lng: number | null | undefined): string | null {
+  if (lat == null || lng == null) return null;
+  return `https://placehold.co/1280x560/E5ECF2/3D6C94?text=Map+${lat.toFixed(4)},${lng.toFixed(4)}`;
+}
+
 function mockId(): number {
   return Math.max(0, ...mockEvents.map((e) => e.id)) + 1;
 }
@@ -31,6 +37,9 @@ export async function createEvent(input: CreateEventInput): Promise<EventItem> {
     facebookUrl: input.facebookUrl ?? null,
     instagramUrl: input.instagramUrl ?? null,
     imageUrl: input.imageUrl ?? null,
+    locationLat: input.locationLat ?? null,
+    locationLng: input.locationLng ?? null,
+    mapUrl: mockMapUrl(input.locationLat, input.locationLng),
   };
   mockEvents.unshift(event);
   return event;
@@ -49,6 +58,9 @@ export async function updateEvent(eventId: number, input: UpdateEventInput): Pro
   if (input.facebookUrl !== undefined) event.facebookUrl = input.facebookUrl ?? null;
   if (input.instagramUrl !== undefined) event.instagramUrl = input.instagramUrl ?? null;
   if (input.imageUrl !== undefined) event.imageUrl = input.imageUrl;
+  if (input.locationLat !== undefined) event.locationLat = input.locationLat;
+  if (input.locationLng !== undefined) event.locationLng = input.locationLng;
+  event.mapUrl = mockMapUrl(event.locationLat, event.locationLng);
   return event;
 }
 

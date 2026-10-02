@@ -1,13 +1,13 @@
 import { QueryResult } from 'pg';
 import { Event, CreateEventInput, UpdateEventInput } from '../functions/events';
 import pool from './pool';
-import { eventImagePath } from '../functions/event-images';
+import { eventImagePath, eventMapPath } from '../functions/event-images';
 
 
 /* The image itself (a data: URI) is left out of every list and row — it's
    served on its own by GET /events/:id/image (see eventImagePath). */
 const EVENT_COLUMNS = `id, title, description, image_url IS NOT NULL AS has_image, event_type, start_date, end_date,
-       location, organizer_id, status, capacity, google_calendar_event_id, facebook_url,
+       location, location_lat, location_lng, organizer_id, status, capacity, google_calendar_event_id, facebook_url,
        instagram_url, created_at, updated_at`;
 
 /**
@@ -24,6 +24,12 @@ function rowToEvent(row: any): Event {
     startDate: row.start_date,
     endDate: row.end_date,
     location: row.location,
+    locationLat: row.location_lat,
+    locationLng: row.location_lng,
+    mapUrl:
+      row.location_lat !== null && row.location_lng !== null
+        ? eventMapPath(row.id, row.location_lat, row.location_lng)
+        : null,
     organizerId: row.organizer_id,
     status: row.status,
     capacity: row.capacity,
@@ -75,8 +81,9 @@ export async function dbGetEventImage(eventId: number): Promise<string | null> {
 export async function dbCreateEvent(input: CreateEventInput): Promise<Event | null> {
   const result: QueryResult = await pool.query(
     `INSERT INTO events
-       (title, description, image_url, event_type, start_date, end_date, location, organizer_id, capacity, facebook_url, instagram_url, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+       (title, description, image_url, event_type, start_date, end_date, location, organizer_id, capacity, facebook_url, instagram_url,
+        location_lat, location_lng, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
      RETURNING ${EVENT_COLUMNS}`,
     [
       input.title,
@@ -90,6 +97,8 @@ export async function dbCreateEvent(input: CreateEventInput): Promise<Event | nu
       input.capacity ?? null,
       input.facebookUrl ?? null,
       input.instagramUrl ?? null,
+      input.locationLat ?? null,
+      input.locationLng ?? null,
     ]
   );
   if (result.rows.length === 0) return null;
@@ -136,6 +145,14 @@ export async function dbUpdateEvent(
   if (input.location !== undefined) {
     setClauses.push(`location = $${paramIndex++}`);
     values.push(input.location);
+  }
+  if (input.locationLat !== undefined) {
+    setClauses.push(`location_lat = $${paramIndex++}`);
+    values.push(input.locationLat);
+  }
+  if (input.locationLng !== undefined) {
+    setClauses.push(`location_lng = $${paramIndex++}`);
+    values.push(input.locationLng);
   }
   if (input.status !== undefined) {
     setClauses.push(`status = $${paramIndex++}`);

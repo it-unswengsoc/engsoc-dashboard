@@ -25,6 +25,12 @@ export interface Event {
   startDate: string;
   endDate: string | null;
   location: string | null;
+  /* Where `location` is on a map, when it was picked from a place search. */
+  locationLat: number | null;
+  locationLng: number | null;
+  /* A link to GET /events/:id/map, relative to the backend; null without
+     coordinates. */
+  mapUrl: string | null;
   organizerId: number | null; // nullable: ON DELETE SET NULL if the organizer's account is removed
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
   capacity: number | null;
@@ -43,6 +49,8 @@ export interface CreateEventInput {
   startDate: string;
   endDate?: string;
   location?: string;
+  locationLat?: number | null;
+  locationLng?: number | null;
   organizerId: number;
   capacity?: number;
   facebookUrl?: string;
@@ -57,10 +65,22 @@ export interface UpdateEventInput {
   startDate?: string;
   endDate?: string;
   location?: string;
+  locationLat?: number | null; // null clears them
+  locationLng?: number | null;
   status?: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
   capacity?: number;
   facebookUrl?: string;
   instagramUrl?: string;
+}
+
+/* Both or neither, and on the globe. Throws for the route to 400. */
+export function validateEventCoordinates(lat: unknown, lng: unknown): void {
+  if (lat === undefined && lng === undefined) return;
+  if (lat === null && lng === null) return;
+  const valid =
+    typeof lat === 'number' && typeof lng === 'number' &&
+    Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  if (!valid) throw new Error('Location coordinates are invalid');
 }
 
 /* Same rules as an announcement's image: an uploaded (cropped, compressed)
@@ -154,6 +174,7 @@ export async function createEvent(input: CreateEventInput): Promise<Event | null
   validateSocialUrl(input.facebookUrl, 'Facebook');
   validateSocialUrl(input.instagramUrl, 'Instagram');
   validateEventImage(input.imageUrl);
+  validateEventCoordinates(input.locationLat, input.locationLng);
   if (!input.startDate || isNaN(new Date(input.startDate).getTime())) {
     throw new Error('A valid start date is required');
   }
