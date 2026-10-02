@@ -38,46 +38,36 @@ export default function EventRow({ month, day, events, onOpen }: EventRowProps) 
       </div>
 
       {/* Event details — stacked when multiple events share this day. Each
-          opens its details; one with a photo shows it as a card. */}
+          opens its details. */}
       <div className="flex min-w-0 flex-1 flex-col gap-2.5">
-        {events.map((event) =>
-          event.imageUrl ? (
-            <button
-              key={event.id}
-              type="button"
-              onClick={() => onOpen(event.id)}
-              className="group relative block aspect-video w-full overflow-hidden rounded-xl bg-gray-100 text-left shadow-sm"
-            >
-              <img
-                src={event.imageUrl}
-                alt=""
-                loading="lazy"
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 p-3">
-                <p className="truncate text-sm font-bold text-white">{event.name}</p>
-                <div className="flex items-center gap-1.5">
-                  <TypeBadge type={event.type} />
-                  <span className="font-mono text-xs text-white/80">{event.time}</span>
-                </div>
-              </div>
-            </button>
-          ) : (
-            <button
-              key={event.id}
-              type="button"
-              onClick={() => onOpen(event.id)}
-              className="-mx-1.5 -my-1 flex flex-col gap-0.5 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-gray-50"
-            >
-              <p className="text-sm font-bold text-gray-900">{event.name}</p>
-              <div className="flex items-center gap-1.5">
+        {events.map((event) => (
+          <button
+            key={event.id}
+            type="button"
+            onClick={() => onOpen(event.id)}
+            className="group -mx-1.5 -my-1 flex flex-col gap-1.5 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-gray-50"
+          >
+            {/* A short banner rather than the whole cover, so a photo
+                barely adds height and the panel below stays in view. */}
+            {event.imageUrl && (
+              <span className="block aspect-[7/2] w-full overflow-hidden rounded-lg bg-gray-100">
+                <img
+                  src={event.imageUrl}
+                  alt=""
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                />
+              </span>
+            )}
+            <span className="flex flex-col gap-0.5">
+              <span className="text-sm font-bold text-gray-900">{event.name}</span>
+              <span className="flex items-center gap-1.5">
                 <TypeBadge type={event.type} />
                 <span className="font-mono text-xs text-gray-400">{event.time}</span>
-              </div>
-            </button>
-          ),
-        )}
+              </span>
+            </span>
+          </button>
+        ))}
       </div>
     </div>
   );

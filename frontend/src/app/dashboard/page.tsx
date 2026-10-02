@@ -287,7 +287,7 @@ export default function HomePage() {
             </p>
           ) : (
             <StaggerReveal
-              className="max-h-[28rem] divide-y divide-gray-200 overflow-y-auto border-t border-gray-200"
+              className="max-h-96 divide-y divide-gray-200 overflow-y-auto border-t border-gray-200"
               replayKey={upcomingEvents.length}
             >
               {groupEventsByDay(upcomingEvents).map((group) => (
