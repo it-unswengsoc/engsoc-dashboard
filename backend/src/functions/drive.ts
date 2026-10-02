@@ -92,13 +92,15 @@ interface DepartmentDef {
 
    Cabinet also absorbs Treasury and the Arc Delegate drives (they're run out
    of Cabinet, not standalone departments of their own) alongside the old
-   Governance-style drives (Executive, Chairperson, EngSoc Directors).
+   Governance-style drives (Executive, Chairperson). EngSoc Directors is
+   shared by every port's directors, so it's a department of its own.
 
    The trailing entry matches everything so a drive that fits no named
    department (Internal Photos, Key Resources, ...) still shows up under
    Resources instead of being silently dropped. */
 const DEPARTMENT_DEFS: DepartmentDef[] = [
-  { name: 'Cabinet', colour: '#8B2E38', match: (n) => /^(Cabinet|Executive|Chairperson|EngSoc Directors|Treasury|Arc Del)/.test(n) },
+  { name: 'Cabinet', colour: '#8B2E38', match: (n) => /^(Cabinet|Executive|Chairperson|Treasury|Arc Del)/.test(n) },
+  { name: 'EngSoc Directors', colour: '#4A5B8C', match: (n) => n.startsWith('EngSoc Directors') },
   { name: 'IT', colour: '#3D6C94', match: (n) => n.startsWith('IT') },
   { name: 'Careers', colour: '#2A7D6F', match: (n) => n.startsWith('Careers') },
   { name: 'Marketing', colour: '#C9862E', match: (n) => n.startsWith('Marketing') },
