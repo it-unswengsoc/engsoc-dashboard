@@ -10,7 +10,7 @@ import type { BoardTask, TaskStatus } from '@/types/tasks';
 
 /* Loaded on first open, not with the board — see the same reasoning in
    TaskRow (the dialog pulls in DriveFilePicker). */
-const TaskDetailDialog = dynamic(() => import('@/components/TaskDetailDialog'), { ssr: false });
+const TaskDetailDialog = dynamic(() => import('@/components/tasks/TaskDetailDialog'), { ssr: false });
 
 interface TasksBoardProps {
   tasks: BoardTask[];

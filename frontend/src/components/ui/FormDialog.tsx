@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import Dialog from '@/components/dialogs/Dialog';
-import Select, { type FieldOption } from '@/components/dialogs/Select';
+import Dialog from '@/components/ui/Dialog';
+import Select, { type FieldOption } from '@/components/ui/Select';
 
 export type { FieldOption };
 

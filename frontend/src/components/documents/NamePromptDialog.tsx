@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent } from 'react';
-import Dialog from '@/components/dialogs/Dialog';
+import Dialog from '@/components/ui/Dialog';
 
 interface NamePromptDialogProps {
   open: boolean;

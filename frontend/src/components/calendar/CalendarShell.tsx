@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import TaskRow from '@/components/TaskRow';
+import TaskRow from '@/components/tasks/TaskRow';
 import { CalendarContext, type ComposerPrefill } from './CalendarContext';
 import CalendarToolbar, { type CalendarView } from './CalendarToolbar';
 import CalendarItemDetail from './CalendarItemDetail';

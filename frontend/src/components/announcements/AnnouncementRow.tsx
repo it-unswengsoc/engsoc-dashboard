@@ -17,9 +17,9 @@ import { getDirectory } from '@/services/users-api';
 import { useProfile } from '@/lib/profile-context';
 import type { DirectoryUser } from '@/types/directory';
 import { roleLabel } from '@/lib/roles';
-import MentionText from '@/components/MentionText';
-import MentionTextarea from '@/components/MentionTextarea';
-import Dialog from '@/components/dialogs/Dialog';
+import MentionText from '@/components/announcements/MentionText';
+import MentionTextarea from '@/components/announcements/MentionTextarea';
+import Dialog from '@/components/ui/Dialog';
 
 /* Every announcement row in the feed used to eagerly pull in
    AnnouncementComposer's whole tree — including react-easy-crop, a real

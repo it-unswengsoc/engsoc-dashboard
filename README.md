@@ -11,7 +11,10 @@ engsoc-dashboard/
 ├── frontend/                 # Next.js React application
 │   └── src/
 │       ├── app/              # Next.js App Router pages
-│       ├── components/       # UI components
+│       ├── components/
+│       │   ├── ui/           # Generic building blocks (Dialog, Select, FormDialog…) — no EngSoc logic
+│       │   ├── layout/       # App shell: Header, Sidebar, NotificationBell
+│       │   └── <feature>/    # tasks, announcements, calendar, documents, requests, admin
 │       ├── services/         # Backend calls — all go through api-client.ts
 │       ├── mocks/            # Offline data used when NEXT_PUBLIC_USE_MOCK=true
 │       ├── lib/              # Shared helpers
@@ -23,7 +26,7 @@ engsoc-dashboard/
 │       ├── database/         # SQL queries only
 │       ├── middleware/       # Auth (verifyAuthToken, requireRole) and the error handler
 │       └── lib/              # errors.ts (AppError classes), http.ts (asyncHandler, ok, parseId)
-├── database/                 # Schema and migrations
+├── database/                 # SQL to create / drop the schema
 └── .github/workflows/        # CI: format, lint and typecheck on every PR
 ```
 
@@ -56,7 +59,79 @@ npm install
 
 ### Running the Application
 
-#### Development
+#### Development Mode
+
+1. Start the backend server (in terminal 1):
+```bash
+cd backend
+npm run dev
+```
+The backend will run on http://localhost:5001
+
+2. Start the frontend (in terminal 2):
+```bash
+cd frontend
+npm run dev
+```
+The frontend will run on http://localhost:3000
+
+#### Production Build
+
+1. Build the backend:
+```bash
+cd backend
+npm run build
+npm start
+```
+
+2. Build the frontend:
+```bash
+cd frontend
+npm run build
+npm start
+```
+
+## Technology Stack
+
+### Frontend
+- **Next.js 14** - React framework with App Router
+- **React 18** - UI library
+- **TypeScript** - Type-safe JavaScript
+- **Tailwind CSS** - Utility-first styling
+
+### Backend
+- **Express.js** - Web framework for Node.js
+- **TypeScript** - Type-safe JavaScript
+- **PostgreSQL** (`pg`) - Database
+- **Google APIs** - Sign-in, Drive, Calendar and Places
+- **AWS SES** - Notification emails
+- **CORS** - Cross-origin resource sharing
+- **Helmet** - Security middleware
+- **Morgan** - HTTP request logger
+
+## API Endpoints
+
+Routes are mounted without an `/api` prefix — see `backend/src/index.ts` for the full list (`/auth`, `/events`, `/announcements`, `/tasks`, `/requests`, `/drive`, `/calendar`, `/notifications`, `/users`, `/admin`, `/places`, `/dashboard`). `GET /health` is the health check.
+
+Every response is JSON in one of two shapes:
+
+```json
+{ "status": "success", "data": ..., "message": "optional" }
+{ "status": "error", "message": "Written for the member to read" }
+```
+
+## Environment Variables
+
+Copy the example files and fill in the blanks:
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+```
+
+`backend/.env.example` lists every variable the backend reads, with a note on each. To work on the UI without a backend, set `NEXT_PUBLIC_USE_MOCK=true` in `frontend/.env.local`. On Vercel, the same variables are set in each project's Environment Variables.
+
+## Development
 
 - Frontend hot-reload is enabled in development mode
 - Backend uses nodemon for automatic restart on file changes
@@ -98,6 +173,7 @@ router.get(
 
 ### Frontend conventions
 
+- **Where components go.** A component used by one feature lives in that feature's folder under `components/`. Only generic, reusable pieces go in `components/ui/`.
 - **Components never call `fetch` directly.** They call a function in `src/services/`.
 - **Services call the backend through `api<T>()` / `apiFetch()`** in `services/api-client.ts`. These handle the auth header, JSON encoding and errors. A failed request throws an `ApiError` carrying the backend's message and HTTP status. Use `isUnauthorized(err)` to detect an expired session.
 - **Mock mode.** Each service checks `USE_MOCK` (from `services/api-config.ts`) first and answers from `src/mocks/` when it's set.
@@ -112,10 +188,9 @@ export async function getTask(token: string, taskId: number): Promise<TaskItem> 
 }
 ```
 
-## Learn More
+## Notes
 
-- [Frontend Documentation](./frontend/README.md)
-- [Backend Documentation](./backend/README.md)
+- `frontend/public/google32c291afd453b80d.html` is Google's site-verification file for the domain. Don't delete it.
 
 ## License
 

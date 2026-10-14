@@ -1,5 +1,5 @@
 import type { Member, RequestAttachment, RequestDetail, RequestItem, RequestsData } from '@/types/requests';
-import type { FieldPayload } from '@/components/dialogs/FormDialog';
+import type { FieldPayload } from '@/components/ui/FormDialog';
 import { apiUrl, USE_MOCK } from '@/services/api-config';
 import { api, ApiError } from '@/services/api-client';
 import { getDirectory } from '@/services/users-api';

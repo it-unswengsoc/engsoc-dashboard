@@ -11,7 +11,7 @@ import {
   DAYS_SHORT,
   type CalendarItem,
 } from '@/lib/calendar';
-import StaggerReveal from '@/components/StaggerReveal';
+import StaggerReveal from '@/components/ui/StaggerReveal';
 
 interface MonthViewProps {
   anchor: Date;

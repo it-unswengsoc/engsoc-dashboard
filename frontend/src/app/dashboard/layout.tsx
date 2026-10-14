@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Sidebar, { MobileNav } from '@/components/Sidebar';
-import Header from '@/components/Header';
+import Sidebar, { MobileNav } from '@/components/layout/Sidebar';
+import Header from '@/components/layout/Header';
 import { ProfileProvider } from '@/lib/profile-context';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

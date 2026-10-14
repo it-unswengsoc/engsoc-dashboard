@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Dialog from '@/components/dialogs/Dialog';
+import Dialog from '@/components/ui/Dialog';
 import type { ComposerPrefill } from './CalendarContext';
 import { createEvent, updateEvent, deleteEvent, getEventById } from '@/services/events-api';
 import { createMyCalendarEvent, updateMyCalendarEvent, deleteMyCalendarEvent } from '@/services/user-calendar-api';
 import { getProfile } from '@/services/auth-api';
 import { CALENDAR_EVENTS_CHANGED_EVENT } from '@/lib/calendar';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
-import LocationField, { type LocationValue } from '@/components/LocationField';
-import PhotoField, { initialPhoto, resolvePhoto, type PhotoValue } from '@/components/PhotoField';
+import LocationField, { type LocationValue } from '@/components/calendar/LocationField';
+import PhotoField, { initialPhoto, resolvePhoto, type PhotoValue } from '@/components/ui/PhotoField';
 
 export interface EventComposerProps {
   open: boolean;

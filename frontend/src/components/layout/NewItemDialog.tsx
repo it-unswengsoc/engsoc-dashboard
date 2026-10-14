@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, ClipboardList, Calendar, Megaphone, Inbox, type LucideIcon } from 'lucide-react';
-import Dialog from '@/components/dialogs/Dialog';
-import FormDialog, { type FieldPayload } from '@/components/dialogs/FormDialog';
+import Dialog from '@/components/ui/Dialog';
+import FormDialog, { type FieldPayload } from '@/components/ui/FormDialog';
 import { createAnnouncement } from '@/services/announcements-api';
 import { submitRequest } from '@/services/requests-api';
 import { REQUEST_FORMS } from '@/lib/request-forms';
@@ -14,7 +14,7 @@ import type { DirectoryUser } from '@/types/directory';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
 import AnnouncementComposer from '@/components/announcements/AnnouncementComposer';
 import EventComposer from '@/components/calendar/EventComposer';
-import TaskComposer from '@/components/TaskComposer';
+import TaskComposer from '@/components/tasks/TaskComposer';
 
 interface NewItemDialogProps {
   open: boolean;

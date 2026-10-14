@@ -1,5 +1,5 @@
 import { Camera, Mail, Palette, Receipt, ShieldAlert, Video, type LucideIcon } from 'lucide-react';
-import type { FieldDef } from '@/components/dialogs/FormDialog';
+import type { FieldDef } from '@/components/ui/FormDialog';
 import { PORT_OPTIONS } from '@/lib/ports';
 import type { RequestAnswer } from '@/types/requests';
 

@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import EventRow from '@/components/EventRow';
-import StatCard from '@/components/StatCard';
-import TaskRow from '@/components/TaskRow';
-import AnnouncementRow from '@/components/AnnouncementRow';
-import WelcomeHeading from '@/components/WelcomeHeading';
-import StaggerReveal from '@/components/StaggerReveal';
+import EventRow from '@/components/calendar/EventRow';
+import StatCard from '@/components/ui/StatCard';
+import TaskRow from '@/components/tasks/TaskRow';
+import AnnouncementRow from '@/components/announcements/AnnouncementRow';
+import WelcomeHeading from '@/components/layout/WelcomeHeading';
+import StaggerReveal from '@/components/ui/StaggerReveal';
 import { getDashboard, readCachedDashboard, writeCachedDashboard, type DashboardData } from '@/services/dashboard-api';
 import { toUpcomingEventRows, toOpenTaskRows, toRecentAnnouncements, toDashboardStats } from '@/services/dashboard';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';

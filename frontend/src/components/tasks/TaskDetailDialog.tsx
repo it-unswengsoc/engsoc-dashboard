@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ExternalLink, MoreVertical, Paperclip, Pencil, X } from 'lucide-react';
-import Dialog from '@/components/dialogs/Dialog';
-import Select from '@/components/dialogs/Select';
+import Dialog from '@/components/ui/Dialog';
+import Select from '@/components/ui/Select';
 import {
   getBoardTask,
   updateTaskDetails,
@@ -13,7 +13,7 @@ import {
   deleteTaskAttachment,
   type TaskAttachment,
 } from '@/services/tasks-api';
-import DriveFilePicker, { type PickedAttachment } from '@/components/DriveFilePicker';
+import DriveFilePicker, { type PickedAttachment } from '@/components/documents/DriveFilePicker';
 import { useProfile } from '@/lib/profile-context';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
 import { downloadRequestAttachment, getRequest } from '@/services/requests-api';

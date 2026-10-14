@@ -8,7 +8,7 @@ import { getUsers, updateUser } from '@/services/admin-api';
 import type { AdminUser, UserRole } from '@/types/admin';
 import { ROLE_OPTIONS } from '@/lib/roles';
 import { PORT_OPTIONS } from '@/lib/ports';
-import Select from '@/components/dialogs/Select';
+import Select from '@/components/ui/Select';
 import { isUnauthorized } from '@/services/api-client';
 
 const PORT_SELECT_OPTIONS = [{ value: '', label: 'Unassigned' }, ...PORT_OPTIONS];

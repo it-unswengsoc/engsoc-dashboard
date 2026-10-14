@@ -11,7 +11,7 @@ import type { TaskStatus } from '@/types/tasks';
    clicked. Loaded on demand instead; see the identical fix on
    AnnouncementComposer. The dialog fetches the task itself and shows it
    the way the tasks board does. */
-const TaskDetailDialog = dynamic(() => import('@/components/TaskDetailDialog'), { ssr: false });
+const TaskDetailDialog = dynamic(() => import('@/components/tasks/TaskDetailDialog'), { ssr: false });
 
 interface TaskRowProps {
   id: number;

@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useProfile } from '@/lib/profile-context';
 import { search, type DriveSearchResultData } from '@/services/documents';
-import NotificationBell from '@/components/NotificationBell';
+import NotificationBell from '@/components/layout/NotificationBell';
 
 /* Header renders on every authenticated page, so a plain static import here
    put NewItemDialog's whole tree — TaskComposer, EventComposer,
@@ -15,7 +15,7 @@ import NotificationBell from '@/components/NotificationBell';
    safe (and required by next/dynamic for anything referencing
    window/sessionStorage at module scope) since the whole dialog only ever
    makes sense client-side, post-login. */
-const NewItemDialog = dynamic(() => import('@/components/dialogs/NewItemDialog'), { ssr: false });
+const NewItemDialog = dynamic(() => import('@/components/layout/NewItemDialog'), { ssr: false });
 
 const SEARCH_DEBOUNCE_MS = 350;
 const MIN_QUERY_LENGTH = 2;

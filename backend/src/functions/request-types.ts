@@ -1,7 +1,7 @@
 import type { UserPortfolio } from './admin';
 
 /* The one place that decides where each kind of request goes and who there
-   can act on it. The frontend's forms (components/dialogs/NewItemDialog.tsx)
+   can act on it. The frontend's forms (components/layout/NewItemDialog.tsx)
    send a requestType and their answers; everything below is decided here,
    so a request can't be steered to a different port or past its approvers
    by editing the submitted payload. */

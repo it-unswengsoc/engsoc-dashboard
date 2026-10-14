@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import Cropper, { type Area } from 'react-easy-crop';
 import { Image as ImageIcon } from 'lucide-react';
-import Dialog from '@/components/dialogs/Dialog';
-import MentionTextarea from '@/components/MentionTextarea';
-import MentionText from '@/components/MentionText';
+import Dialog from '@/components/ui/Dialog';
+import MentionTextarea from '@/components/announcements/MentionTextarea';
+import MentionText from '@/components/announcements/MentionText';
 import { getDirectory } from '@/services/users-api';
 import { getProfile } from '@/services/auth-api';
 import type { DirectoryUser } from '@/types/directory';

@@ -1,5 +1,5 @@
 import type { BrowserNode } from '@/types/documents';
-import StaggerReveal from '@/components/StaggerReveal';
+import StaggerReveal from '@/components/ui/StaggerReveal';
 
 interface DriveColumnProps {
   title: string;

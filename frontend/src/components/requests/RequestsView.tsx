@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Check, Clock, Download, Inbox, Paperclip, Plus, Search, Send } from 'lucide-react';
-import Dialog from '@/components/dialogs/Dialog';
-import Select from '@/components/dialogs/Select';
+import Dialog from '@/components/ui/Dialog';
+import Select from '@/components/ui/Select';
 import RequestAnswers from '@/components/requests/RequestAnswers';
 import { portLabel } from '@/lib/ports';
 import {

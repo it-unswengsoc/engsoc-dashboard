@@ -1,6 +1,6 @@
 import { getMonthGrid, itemsOnDay, isSameDay, MONTHS_LONG, DAYS_MIN } from '@/lib/calendar';
 import type { CalendarItem } from '@/lib/calendar';
-import StaggerReveal from '@/components/StaggerReveal';
+import StaggerReveal from '@/components/ui/StaggerReveal';
 
 interface YearViewProps {
   anchor: Date; // any date within the displayed year

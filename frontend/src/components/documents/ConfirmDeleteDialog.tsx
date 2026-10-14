@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Dialog from '@/components/dialogs/Dialog';
+import Dialog from '@/components/ui/Dialog';
 
 interface ConfirmDeleteDialogProps {
   open: boolean;

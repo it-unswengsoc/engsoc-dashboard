@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Paperclip, X } from 'lucide-react';
-import Dialog from '@/components/dialogs/Dialog';
+import Dialog from '@/components/ui/Dialog';
 import { createTask, addTaskAttachment } from '@/services/tasks-api';
-import DriveFilePicker, { type PickedAttachment } from '@/components/DriveFilePicker';
+import DriveFilePicker, { type PickedAttachment } from '@/components/documents/DriveFilePicker';
 import type { DirectoryUser } from '@/types/directory';
 import { PORT_OPTIONS } from '@/lib/ports';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';

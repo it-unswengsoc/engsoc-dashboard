@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { MoreVertical, Pencil, Trash2, MapPin, Link as LinkIcon, Navigation } from 'lucide-react';
-import Dialog from '@/components/dialogs/Dialog';
+import Dialog from '@/components/ui/Dialog';
 import { getEventById, deleteEvent, getRsvpSummary, setRsvp, type RsvpSummary } from '@/services/events-api';
 import { deleteMyCalendarEvent } from '@/services/user-calendar-api';
 import { getProfile } from '@/services/auth-api';
