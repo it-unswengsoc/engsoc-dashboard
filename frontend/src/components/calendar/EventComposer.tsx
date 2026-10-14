@@ -4,11 +4,7 @@ import { useEffect, useState } from 'react';
 import Dialog from '@/components/dialogs/Dialog';
 import type { ComposerPrefill } from './CalendarContext';
 import { createEvent, updateEvent, deleteEvent, getEventById } from '@/services/events-api';
-import {
-  createMyCalendarEvent,
-  updateMyCalendarEvent,
-  deleteMyCalendarEvent,
-} from '@/services/user-calendar-api';
+import { createMyCalendarEvent, updateMyCalendarEvent, deleteMyCalendarEvent } from '@/services/user-calendar-api';
 import { getProfile } from '@/services/auth-api';
 import { CALENDAR_EVENTS_CHANGED_EVENT } from '@/lib/calendar';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
@@ -189,7 +185,9 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
           imageUrl = await resolvePhoto(photo, hadPhoto);
         } catch (err) {
           console.error('Photo crop failed:', err);
-          setError(err instanceof Error && err.message ? err.message : 'Failed to process that photo — try a different file.');
+          setError(
+            err instanceof Error && err.message ? err.message : 'Failed to process that photo — try a different file.',
+          );
           return;
         }
         const shared = {
@@ -434,7 +432,13 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
         />
 
         {target === 'shared' && (
-          <PhotoField label="Photo (optional)" value={photo} onChange={setPhoto} onError={setError} disabled={!canEdit} />
+          <PhotoField
+            label="Photo (optional)"
+            value={photo}
+            onChange={setPhoto}
+            onError={setError}
+            disabled={!canEdit}
+          />
         )}
 
         <label className="flex flex-col gap-1.5">
@@ -455,7 +459,7 @@ export default function EventComposer({ open, prefill, canCreateSharedEvent, onC
         )}
 
         {!canEdit ? (
-          <p className="font-mono text-xs text-gray-400">You don't have permission to edit this event.</p>
+          <p className="font-mono text-xs text-gray-400">You don&apos;t have permission to edit this event.</p>
         ) : (
           <div className="mt-2 flex gap-3">
             {mode === 'edit' && (

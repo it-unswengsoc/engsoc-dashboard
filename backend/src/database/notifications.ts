@@ -1,13 +1,12 @@
-import { QueryResult } from 'pg';
-import { Notification, CreateNotificationInput } from '../functions/notifications';
+import { type QueryResult, type QueryResultRow } from 'pg';
+import { type Notification, type CreateNotificationInput } from '../functions/notifications';
 import pool from './pool';
-
 
 /**
  * Maps a raw database row to the Notification interface,
  * converting snake_case column names to camelCase.
  */
-function rowToNotification(row: any): Notification {
+function rowToNotification(row: QueryResultRow): Notification {
   return {
     id: row.id,
     userId: row.user_id,
@@ -32,7 +31,7 @@ export async function dbGetNotificationsForUser(userId: number): Promise<Notific
      FROM notifications
      WHERE user_id = $1
      ORDER BY created_at DESC`,
-    [userId]
+    [userId],
   );
   return result.rows.map(rowToNotification);
 }
@@ -41,14 +40,12 @@ export async function dbGetNotificationsForUser(userId: number): Promise<Notific
  * Fetches a single notification by its ID.
  * Returns the Notification if found, or null if no row matches.
  */
-export async function dbGetNotificationById(
-  notificationId: number
-): Promise<Notification | null> {
+export async function dbGetNotificationById(notificationId: number): Promise<Notification | null> {
   const result: QueryResult = await pool.query(
     `SELECT id, user_id, event_id, task_id, request_id, type, title, message, is_read, created_at
      FROM notifications
      WHERE id = $1`,
-    [notificationId]
+    [notificationId],
   );
   if (result.rows.length === 0) return null;
   return rowToNotification(result.rows[0]);
@@ -58,9 +55,7 @@ export async function dbGetNotificationById(
  * Inserts a new notification row and returns the created Notification.
  * Returns null if the insert did not produce a row.
  */
-export async function dbCreateNotification(
-  input: CreateNotificationInput
-): Promise<Notification | null> {
+export async function dbCreateNotification(input: CreateNotificationInput): Promise<Notification | null> {
   const result: QueryResult = await pool.query(
     `INSERT INTO notifications
        (user_id, event_id, task_id, request_id, type, title, message, created_at)
@@ -74,7 +69,7 @@ export async function dbCreateNotification(
       input.type,
       input.title,
       input.message ?? null,
-    ]
+    ],
   );
   if (result.rows.length === 0) return null;
   return rowToNotification(result.rows[0]);
@@ -87,9 +82,7 @@ export async function dbCreateNotification(
  * so the returned rows aren't matched back up to specific inputs; callers
  * that only care "did this succeed" can ignore the return value.
  */
-export async function dbCreateNotificationsBulk(
-  inputs: CreateNotificationInput[]
-): Promise<Notification[]> {
+export async function dbCreateNotificationsBulk(inputs: CreateNotificationInput[]): Promise<Notification[]> {
   if (inputs.length === 0) return [];
 
   const values: string[] = [];
@@ -97,7 +90,7 @@ export async function dbCreateNotificationsBulk(
   inputs.forEach((input, i) => {
     const base = i * 7;
     values.push(
-      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, NOW())`
+      `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7}, NOW())`,
     );
     params.push(
       input.userId,
@@ -106,7 +99,7 @@ export async function dbCreateNotificationsBulk(
       input.requestId ?? null,
       input.type,
       input.title,
-      input.message ?? null
+      input.message ?? null,
     );
   });
 
@@ -114,7 +107,7 @@ export async function dbCreateNotificationsBulk(
     `INSERT INTO notifications (user_id, event_id, task_id, request_id, type, title, message, created_at)
      VALUES ${values.join(', ')}
      RETURNING id, user_id, event_id, task_id, request_id, type, title, message, is_read, created_at`,
-    params
+    params,
   );
   return result.rows.map(rowToNotification);
 }
@@ -123,15 +116,13 @@ export async function dbCreateNotificationsBulk(
  * Sets is_read to true on a single notification by its ID.
  * Returns the updated Notification, or null if no notification with that ID exists.
  */
-export async function dbMarkNotificationRead(
-  notificationId: number
-): Promise<Notification | null> {
+export async function dbMarkNotificationRead(notificationId: number): Promise<Notification | null> {
   const result: QueryResult = await pool.query(
     `UPDATE notifications
      SET is_read = true
      WHERE id = $1
      RETURNING id, user_id, event_id, task_id, request_id, type, title, message, is_read, created_at`,
-    [notificationId]
+    [notificationId],
   );
   if (result.rows.length === 0) return null;
   return rowToNotification(result.rows[0]);
@@ -146,7 +137,7 @@ export async function dbMarkAllNotificationsRead(userId: number): Promise<number
     `UPDATE notifications
      SET is_read = true
      WHERE user_id = $1 AND is_read = false`,
-    [userId]
+    [userId],
   );
   return result.rowCount ?? 0;
 }
@@ -156,9 +147,8 @@ export async function dbMarkAllNotificationsRead(userId: number): Promise<number
  * Returns true if a row was deleted, false if no notification with that ID existed.
  */
 export async function dbDeleteNotification(notificationId: number): Promise<boolean> {
-  const result: QueryResult = await pool.query(
-    `DELETE FROM notifications WHERE id = $1 RETURNING id`,
-    [notificationId]
-  );
+  const result: QueryResult = await pool.query(`DELETE FROM notifications WHERE id = $1 RETURNING id`, [
+    notificationId,
+  ]);
   return (result.rowCount ?? 0) > 0;
 }

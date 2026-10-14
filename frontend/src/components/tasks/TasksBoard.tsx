@@ -110,10 +110,7 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
 
   const mineCount = board.filter((task) => isAssignedTo(task, currentUserId)).length;
   const overdueCount = visible.filter(
-    (task) =>
-      task.status !== 'completed' &&
-      task.status !== 'cancelled' &&
-      dueBadge(task.dueAt)?.label === 'Overdue',
+    (task) => task.status !== 'completed' && task.status !== 'cancelled' && dueBadge(task.dueAt)?.label === 'Overdue',
   ).length;
 
   /* A drop on a column. */
@@ -239,10 +236,7 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
             >
               <div className="flex items-center justify-between gap-2 px-3 py-2.5">
                 <span className="flex items-center gap-2">
-                  <span
-                    aria-hidden="true"
-                    className={`h-2 w-2 shrink-0 rounded-full ${column.accent}`}
-                  />
+                  <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${column.accent}`} />
                   <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-gray-500">
                     {column.label}
                   </span>
@@ -252,9 +246,7 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
 
               <div className="flex flex-1 flex-col gap-2 px-2 pb-2">
                 {cards.length === 0 ? (
-                  <p className="px-1 py-6 text-center font-mono text-[11px] text-gray-300">
-                    Nothing here
-                  </p>
+                  <p className="px-1 py-6 text-center font-mono text-[11px] text-gray-300">Nothing here</p>
                 ) : (
                   cards.map((task) => {
                     const due = dueBadge(task.dueAt);
@@ -288,15 +280,9 @@ export default function TasksBoard({ tasks, currentUserId, port, onMoved }: Task
                         }}
                         className={`rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-[#B1C9DC] hover:shadow-md ${
                           canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
-                        } ${
-                          dragging === task.id || savingIds.has(task.id) ? 'opacity-40' : ''
-                        }`}
+                        } ${dragging === task.id || savingIds.has(task.id) ? 'opacity-40' : ''}`}
                       >
-                        <p
-                          className={`text-sm font-bold ${
-                            isDone ? 'text-gray-400 line-through' : 'text-gray-900'
-                          }`}
-                        >
+                        <p className={`text-sm font-bold ${isDone ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
                           {task.title}
                         </p>
 
@@ -394,7 +380,10 @@ export function TasksBoardSkeleton({ port }: { port: string | null }) {
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {COLUMNS.map((column, i) => (
-          <section key={column.status} className="flex min-h-[8rem] flex-col rounded-2xl border border-gray-200 bg-gray-50">
+          <section
+            key={column.status}
+            className="flex min-h-[8rem] flex-col rounded-2xl border border-gray-200 bg-gray-50"
+          >
             <div className="flex items-center gap-2 px-3 py-2.5">
               <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${column.accent}`} />
               <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-gray-500">

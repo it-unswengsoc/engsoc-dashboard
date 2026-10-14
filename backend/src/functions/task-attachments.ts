@@ -27,7 +27,7 @@ async function canAccessTask(taskId: number, userId: number): Promise<boolean> {
 export async function addTaskAttachment(
   taskId: number,
   userId: number,
-  input: { driveFileId: string; name: string; webViewLink: string | null; mimeType: string | null }
+  input: { driveFileId: string; name: string; webViewLink: string | null; mimeType: string | null },
 ): Promise<TaskAttachment> {
   if (!(await canAccessTask(taskId, userId))) {
     throw new ForbiddenTaskError('You can only attach files to your own tasks');

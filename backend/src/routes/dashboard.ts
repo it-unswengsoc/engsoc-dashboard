@@ -1,8 +1,9 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
 import { getAllEvents } from '../functions/events';
 import { getTasksForUser } from '../functions/tasks';
 import { getAllAnnouncements } from '../functions/announcements';
-import { verifyAuthToken } from './auth';
+import { verifyAuthToken, type AuthedRequest } from '../middleware/auth';
+import { asyncHandler, ok } from '../lib/http';
 
 const router = Router();
 
@@ -19,28 +20,23 @@ const router = Router();
  * are left out (the dashboard only counts and lists upcoming events, and
  * shows a task as just done or not done).
  */
-router.get('/', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
+router.get(
+  '/',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
     const [events, tasks, announcements] = await Promise.all([
       getAllEvents(),
-      getTasksForUser(user.userId),
-      getAllAnnouncements(user.userId),
+      getTasksForUser(req.user.userId),
+      getAllAnnouncements(req.user.userId),
     ]);
 
     const now = Date.now();
-    res.status(200).json({
-      status: 'success',
-      data: {
-        events: events.filter((e) => new Date(e.startDate).getTime() >= now),
-        tasks: tasks.filter((t) => t.status !== 'cancelled'),
-        announcements,
-      },
+    ok(res, {
+      events: events.filter((e) => new Date(e.startDate).getTime() >= now),
+      tasks: tasks.filter((t) => t.status !== 'cancelled'),
+      announcements,
     });
-  } catch (error) {
-    console.error('Get dashboard error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+  }),
+);
 
 export default router;

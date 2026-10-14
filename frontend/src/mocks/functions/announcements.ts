@@ -40,7 +40,7 @@ export async function createAnnouncement(input: { content: string; imageUrl?: st
 
 export async function updateAnnouncement(
   announcementId: number,
-  input: { content?: string; imageUrl?: string | null }
+  input: { content?: string; imageUrl?: string | null },
 ): Promise<AnnouncementItem> {
   const announcement = mockAnnouncements.find((a) => a.id === announcementId);
   if (!announcement) throw new Error('Announcement not found');

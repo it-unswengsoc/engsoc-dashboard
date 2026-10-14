@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
 import {
   getNotificationsForUser,
   getNotificationById,
@@ -7,210 +7,93 @@ import {
   markAllNotificationsRead,
   deleteNotification,
 } from '../functions/notifications';
-import { verifyAuthToken } from './auth';
+import { verifyAuthToken, type AuthedRequest } from '../middleware/auth';
+import { ForbiddenError, NotFoundError, ValidationError } from '../lib/errors';
+import { asyncHandler, created, ok, parseId } from '../lib/http';
 
 const router = Router();
 
+router.use(verifyAuthToken);
+
 /**
- * GET /api/notification
+ * GET /notifications
  * Retrieves all notifications for the authenticated user.
  */
-router.get('/', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const notifications = await getNotificationsForUser(user.userId);
-
-    res.status(200).json({
-      status: 'success',
-      data: notifications,
-    });
-  } catch (error) {
-    console.error('Get notifications error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+router.get(
+  '/',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    ok(res, await getNotificationsForUser(req.user.userId));
+  }),
+);
 
 /**
- * GET /api/notification/:notificationId
+ * GET /notifications/:notificationId
  * Retrieves a specific notification by ID.
  */
-router.get('/:notificationId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const notificationId = parseInt(req.params.notificationId);
-
-    if (isNaN(notificationId)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid notification ID',
-      });
-    }
-
-    const notification = await getNotificationById(notificationId);
-
-    if (!notification) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Notification not found',
-      });
-    }
-
-    const user = (req as any).user;
-    if (notification.userId !== user.userId) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Forbidden',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      data: notification,
-    });
-  } catch (error) {
-    console.error('Get notification error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+router.get(
+  '/:notificationId',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const notification = await getNotificationById(parseId(req.params.notificationId, 'notification'));
+    if (!notification) throw new NotFoundError('Notification not found');
+    if (notification.userId !== req.user.userId) throw new ForbiddenError('Forbidden');
+    ok(res, notification);
+  }),
+);
 
 /**
- * POST /api/notification
+ * POST /notifications
  * Creates a new notification. Requires authentication.
  */
-router.post('/', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
+router.post(
+  '/',
+  asyncHandler(async (req, res) => {
     const { userId, eventId, type, title, message } = req.body;
-
-    if (!userId || !type || !title) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required fields: userId, type, title',
-      });
-    }
+    if (!userId || !type || !title) throw new ValidationError('Missing required fields: userId, type, title');
 
     const notification = await createNotification({ userId, eventId, type, title, message });
+    if (!notification) throw new ValidationError('Failed to create notification');
 
-    if (!notification) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Failed to create notification',
-      });
-    }
-
-    res.status(201).json({
-      status: 'success',
-      message: 'Notification created successfully',
-      data: notification,
-    });
-  } catch (error) {
-    console.error('Create notification error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+    created(res, notification, { message: 'Notification created successfully' });
+  }),
+);
 
 /**
- * PUT /api/notification/read-all
+ * PUT /notifications/read-all
  * Marks all notifications for the authenticated user as read.
  */
-router.put('/read-all', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const count = await markAllNotificationsRead(user.userId);
-
-    res.status(200).json({
-      status: 'success',
-      message: `${count} notification(s) marked as read`,
-    });
-  } catch (error) {
-    console.error('Mark all notifications read error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+router.put(
+  '/read-all',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const count = await markAllNotificationsRead(req.user.userId);
+    ok(res, undefined, { message: `${count} notification(s) marked as read` });
+  }),
+);
 
 /**
- * PUT /api/notification/:notificationId/read
+ * PUT /notifications/:notificationId/read
  * Marks a specific notification as read.
  */
-router.put('/:notificationId/read', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const notificationId = parseInt(req.params.notificationId);
-
-    if (isNaN(notificationId)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid notification ID',
-      });
-    }
-
-    const notification = await markNotificationRead(notificationId);
-
-    if (!notification) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Notification not found',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Notification marked as read',
-      data: notification,
-    });
-  } catch (error) {
-    console.error('Mark notification read error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+router.put(
+  '/:notificationId/read',
+  asyncHandler(async (req, res) => {
+    const notification = await markNotificationRead(parseId(req.params.notificationId, 'notification'));
+    if (!notification) throw new NotFoundError('Notification not found');
+    ok(res, notification, { message: 'Notification marked as read' });
+  }),
+);
 
 /**
- * DELETE /api/notification/:notificationId
+ * DELETE /notifications/:notificationId
  * Deletes a notification. Requires authentication.
  */
-router.delete('/:notificationId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const notificationId = parseInt(req.params.notificationId);
-
-    if (isNaN(notificationId)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid notification ID',
-      });
+router.delete(
+  '/:notificationId',
+  asyncHandler(async (req, res) => {
+    if (!(await deleteNotification(parseId(req.params.notificationId, 'notification')))) {
+      throw new NotFoundError('Notification not found');
     }
-
-    const deleted = await deleteNotification(notificationId);
-
-    if (!deleted) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Notification not found',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Notification deleted successfully',
-    });
-  } catch (error) {
-    console.error('Delete notification error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+    ok(res, undefined, { message: 'Notification deleted successfully' });
+  }),
+);
 
 export default router;

@@ -36,17 +36,19 @@ export type CalendarItem =
   | { kind: 'task'; id: string; name: string; start: Date; daysTillDue: number };
 
 export function toTaskCalendarItems(tasks: TaskItem[]): CalendarItem[] {
-  return tasks
-    // A task with no due date has no date to place it on — leave it off
-    // the grid (it still shows in the "Due tasks" list, just undated there).
-    .filter((t): t is TaskItem & { dueAt: string } => !t.completed && t.dueAt !== null)
-    .map((t) => ({
-      kind: 'task',
-      id: `task-${t.id}`,
-      name: t.name,
-      start: new Date(t.dueAt),
-      daysTillDue: daysBetween(new Date(), new Date(t.dueAt)),
-    }));
+  return (
+    tasks
+      // A task with no due date has no date to place it on — leave it off
+      // the grid (it still shows in the "Due tasks" list, just undated there).
+      .filter((t): t is TaskItem & { dueAt: string } => !t.completed && t.dueAt !== null)
+      .map((t) => ({
+        kind: 'task',
+        id: `task-${t.id}`,
+        name: t.name,
+        start: new Date(t.dueAt),
+        daysTillDue: daysBetween(new Date(), new Date(t.dueAt)),
+      }))
+  );
 }
 
 /* Google's all-day event end date is exclusive (the day AFTER the last day
@@ -113,9 +115,7 @@ function daysBetween(from: Date, to: Date): number {
 export function itemColor(item: CalendarItem): { bg: string; text: string } {
   if (item.kind === 'event') {
     if (item.source === 'personal' && item.canEdit) return { bg: '#DCD3EF', text: '#4A3A7A' };
-    return item.type === 'EXTERNAL'
-      ? { bg: '#F1C4C9', text: '#8B2E38' }
-      : { bg: '#E5E7EB', text: '#374151' };
+    return item.type === 'EXTERNAL' ? { bg: '#F1C4C9', text: '#8B2E38' } : { bg: '#E5E7EB', text: '#374151' };
   }
   if (item.daysTillDue <= 0) return { bg: '#F1C4C9', text: '#8B2E38' };
   if (item.daysTillDue < 7) return { bg: '#F4EFD3', text: '#7A6A2E' };
@@ -123,8 +123,18 @@ export function itemColor(item: CalendarItem): { bg: string; text: string } {
 }
 
 export const MONTHS_LONG = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 export const DAYS_LONG = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 export const DAYS_SHORT = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -232,7 +242,9 @@ export function weekSpans(items: CalendarItem[], weekDays: Date[]): WeekSpan[] {
     const startCol = startIdx - weekStart;
     const span = endIdx - startIdx + 1;
 
-    let row = rows.findIndex((r) => r.every((occupied) => startCol >= occupied.startCol + occupied.span || startCol + span <= occupied.startCol));
+    let row = rows.findIndex((r) =>
+      r.every((occupied) => startCol >= occupied.startCol + occupied.span || startCol + span <= occupied.startCol),
+    );
     if (row === -1) {
       row = rows.length;
       rows.push([]);

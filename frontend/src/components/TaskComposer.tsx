@@ -89,7 +89,7 @@ export default function TaskComposer({ open, directory, onClose }: TaskComposerP
 
       if (pendingAttachments.length > 0) {
         await Promise.all(
-          created.flatMap((task) => pendingAttachments.map((a) => addTaskAttachment(token, task.id, a)))
+          created.flatMap((task) => pendingAttachments.map((a) => addTaskAttachment(token, task.id, a))),
         );
       }
 

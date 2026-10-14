@@ -85,7 +85,10 @@ export default function TimeGridView({ days, items, onSelectItem, onCreateRange 
 
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
-      <div className="sticky top-0 z-10 grid border-b border-gray-200 bg-white" style={{ gridTemplateColumns: gridCols }}>
+      <div
+        className="sticky top-0 z-10 grid border-b border-gray-200 bg-white"
+        style={{ gridTemplateColumns: gridCols }}
+      >
         <div />
         {days.map((day) => (
           <div key={day.toISOString()} className="border-l border-gray-100 px-2 py-2 text-center">
@@ -160,9 +163,11 @@ export default function TimeGridView({ days, items, onSelectItem, onCreateRange 
             : 0;
           const dragHeight = isDragCol
             ? Math.max(
-                ((Math.max(drag!.startMinutes, drag!.currentMinutes) - Math.min(drag!.startMinutes, drag!.currentMinutes)) / 60) *
+                ((Math.max(drag!.startMinutes, drag!.currentMinutes) -
+                  Math.min(drag!.startMinutes, drag!.currentMinutes)) /
+                  60) *
                   ROW_HEIGHT,
-                4
+                4,
               )
             : 0;
 
@@ -192,7 +197,9 @@ export default function TimeGridView({ days, items, onSelectItem, onCreateRange 
                 const minutesFromStart = (item.start.getHours() - START_HOUR) * 60 + item.start.getMinutes();
                 const top = (minutesFromStart / 60) * ROW_HEIGHT;
                 const durationMinutes =
-                  item.kind === 'event' && item.end ? (item.end.getTime() - item.start.getTime()) / 60_000 : DEFAULT_BLOCK_MINUTES;
+                  item.kind === 'event' && item.end
+                    ? (item.end.getTime() - item.start.getTime()) / 60_000
+                    : DEFAULT_BLOCK_MINUTES;
                 const height = Math.max((Math.max(durationMinutes, 15) / 60) * ROW_HEIGHT - 4, 18);
 
                 return (

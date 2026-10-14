@@ -1,7 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { getMonthGrid, itemsOnDay, weekSpans, itemColor, isSameDay, isBarItem, DAYS_SHORT, type CalendarItem } from '@/lib/calendar';
+import {
+  getMonthGrid,
+  itemsOnDay,
+  weekSpans,
+  itemColor,
+  isSameDay,
+  isBarItem,
+  DAYS_SHORT,
+  type CalendarItem,
+} from '@/lib/calendar';
 import StaggerReveal from '@/components/StaggerReveal';
 
 interface MonthViewProps {
@@ -67,7 +76,11 @@ export default function MonthView({ anchor, items, onSelectItem, onSelectDay, on
             const dayItems = itemsOnDay(items, day).filter((item) => !isBarItem(item));
             const weekIdx = Math.floor(index / 7);
             const barSpace = barRowsByWeek[weekIdx] * (BAR_HEIGHT + BAR_GAP);
-            const isDragging = dragStart && dragEnd && day >= (dragStart < dragEnd ? dragStart : dragEnd) && day <= (dragStart < dragEnd ? dragEnd : dragStart);
+            const isDragging =
+              dragStart &&
+              dragEnd &&
+              day >= (dragStart < dragEnd ? dragStart : dragEnd) &&
+              day <= (dragStart < dragEnd ? dragEnd : dragStart);
 
             return (
               <div
@@ -97,24 +110,22 @@ export default function MonthView({ anchor, items, onSelectItem, onSelectDay, on
                 {barSpace > 0 && <div style={{ height: barSpace }} />}
 
                 <div className="flex w-full flex-col gap-0.5">
-                  {dayItems
-                    .slice(0, 3)
-                    .map((item) => {
-                      const { bg, text } = itemColor(item);
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectItem(item);
-                          }}
-                          style={{ backgroundColor: bg, color: text }}
-                          className="w-full truncate rounded px-1 py-0.5 text-left font-mono text-[9px] font-bold"
-                        >
-                          {item.name}
-                        </button>
-                      );
-                    })}
+                  {dayItems.slice(0, 3).map((item) => {
+                    const { bg, text } = itemColor(item);
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectItem(item);
+                        }}
+                        style={{ backgroundColor: bg, color: text }}
+                        className="w-full truncate rounded px-1 py-0.5 text-left font-mono text-[9px] font-bold"
+                      >
+                        {item.name}
+                      </button>
+                    );
+                  })}
                   {dayItems.length > 3 && (
                     <span className="font-mono text-[9px] text-gray-400">+{dayItems.length - 3} more</span>
                   )}
@@ -150,7 +161,7 @@ export default function MonthView({ anchor, items, onSelectItem, onSelectDay, on
                   {span.item.name}
                 </button>
               );
-            })
+            }),
           )}
         </div>
       </div>

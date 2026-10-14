@@ -1,8 +1,12 @@
-import { QueryResult } from 'pg';
-import { Announcement, AnnouncementComment, CreateAnnouncementInput, UpdateAnnouncementInput } from '../functions/announcements';
+import { type QueryResult, type QueryResultRow } from 'pg';
+import {
+  type Announcement,
+  type AnnouncementComment,
+  type CreateAnnouncementInput,
+  type UpdateAnnouncementInput,
+} from '../functions/announcements';
 import pool from './pool';
 import { announcementImagePath } from '../functions/announcement-images';
-
 
 const ANNOUNCEMENT_SELECT = `
   SELECT a.id, a.author_id, u.first_name, u.last_name, u.role,
@@ -20,7 +24,7 @@ const ANNOUNCEMENT_SELECT = `
  * Maps a raw database row (joined with users) to the Announcement interface,
  * converting snake_case column names to camelCase.
  */
-function rowToAnnouncement(row: any): Announcement {
+function rowToAnnouncement(row: QueryResultRow): Announcement {
   return {
     id: row.id,
     authorId: row.author_id,
@@ -42,10 +46,7 @@ function rowToAnnouncement(row: any): Announcement {
  * none exist).
  */
 export async function dbGetAllAnnouncements(currentUserId: number): Promise<Announcement[]> {
-  const result: QueryResult = await pool.query(
-    `${ANNOUNCEMENT_SELECT} ORDER BY a.created_at DESC`,
-    [currentUserId]
-  );
+  const result: QueryResult = await pool.query(`${ANNOUNCEMENT_SELECT} ORDER BY a.created_at DESC`, [currentUserId]);
   return result.rows.map(rowToAnnouncement);
 }
 
@@ -56,12 +57,12 @@ export async function dbGetAllAnnouncements(currentUserId: number): Promise<Anno
  */
 export async function dbGetAnnouncementById(
   announcementId: number,
-  currentUserId: number
+  currentUserId: number,
 ): Promise<Announcement | null> {
-  const result: QueryResult = await pool.query(
-    `${ANNOUNCEMENT_SELECT} WHERE a.id = $2`,
-    [currentUserId, announcementId]
-  );
+  const result: QueryResult = await pool.query(`${ANNOUNCEMENT_SELECT} WHERE a.id = $2`, [
+    currentUserId,
+    announcementId,
+  ]);
   if (result.rows.length === 0) return null;
   return rowToAnnouncement(result.rows[0]);
 }
@@ -72,10 +73,7 @@ export async function dbGetAnnouncementById(
  * exist or has no image.
  */
 export async function dbGetAnnouncementImage(announcementId: number): Promise<string | null> {
-  const result: QueryResult = await pool.query(
-    `SELECT image_url FROM announcements WHERE id = $1`,
-    [announcementId]
-  );
+  const result: QueryResult = await pool.query(`SELECT image_url FROM announcements WHERE id = $1`, [announcementId]);
   return result.rows[0]?.image_url ?? null;
 }
 
@@ -88,7 +86,7 @@ export async function dbCreateAnnouncement(input: CreateAnnouncementInput): Prom
     `INSERT INTO announcements (author_id, content, image_url, created_at, updated_at)
      VALUES ($1, $2, $3, NOW(), NOW())
      RETURNING id`,
-    [input.authorId, input.content, input.imageUrl ?? null]
+    [input.authorId, input.content, input.imageUrl ?? null],
   );
   if (insertResult.rows.length === 0) return null;
   return dbGetAnnouncementById(insertResult.rows[0].id, input.authorId);
@@ -106,7 +104,7 @@ export async function dbCreateAnnouncement(input: CreateAnnouncementInput): Prom
 export async function dbUpdateAnnouncement(
   announcementId: number,
   input: UpdateAnnouncementInput,
-  currentUserId: number
+  currentUserId: number,
 ): Promise<Announcement | null> {
   const sets: string[] = [];
   const values: (string | null)[] = [];
@@ -124,7 +122,7 @@ export async function dbUpdateAnnouncement(
   values.push(String(announcementId));
   const result: QueryResult = await pool.query(
     `UPDATE announcements SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${values.length} RETURNING id`,
-    values
+    values,
   );
   if (result.rows.length === 0) return null;
   return dbGetAnnouncementById(announcementId, currentUserId);
@@ -135,10 +133,7 @@ export async function dbUpdateAnnouncement(
  * before allowing a delete.
  */
 export async function dbGetAnnouncementAuthorId(announcementId: number): Promise<number | null> {
-  const result: QueryResult = await pool.query(
-    `SELECT author_id FROM announcements WHERE id = $1`,
-    [announcementId]
-  );
+  const result: QueryResult = await pool.query(`SELECT author_id FROM announcements WHERE id = $1`, [announcementId]);
   return result.rows[0]?.author_id ?? null;
 }
 
@@ -148,10 +143,9 @@ export async function dbGetAnnouncementAuthorId(announcementId: number): Promise
  * existed.
  */
 export async function dbDeleteAnnouncement(announcementId: number): Promise<boolean> {
-  const result: QueryResult = await pool.query(
-    `DELETE FROM announcements WHERE id = $1 RETURNING id`,
-    [announcementId]
-  );
+  const result: QueryResult = await pool.query(`DELETE FROM announcements WHERE id = $1 RETURNING id`, [
+    announcementId,
+  ]);
   return (result.rowCount ?? 0) > 0;
 }
 
@@ -171,13 +165,10 @@ export async function dbLikeAnnouncement(announcementId: number, userId: number)
        VALUES ($1, $2)
        ON CONFLICT (announcement_id, user_id) DO NOTHING
        RETURNING id`,
-      [announcementId, userId]
+      [announcementId, userId],
     );
     if ((insertResult.rowCount ?? 0) > 0) {
-      await client.query(
-        `UPDATE announcements SET like_count = like_count + 1 WHERE id = $1`,
-        [announcementId]
-      );
+      await client.query(`UPDATE announcements SET like_count = like_count + 1 WHERE id = $1`, [announcementId]);
     }
     await client.query('COMMIT');
   } catch (error) {
@@ -200,13 +191,12 @@ export async function dbUnlikeAnnouncement(announcementId: number, userId: numbe
     await client.query('BEGIN');
     const deleteResult = await client.query(
       `DELETE FROM announcement_likes WHERE announcement_id = $1 AND user_id = $2 RETURNING id`,
-      [announcementId, userId]
+      [announcementId, userId],
     );
     if ((deleteResult.rowCount ?? 0) > 0) {
-      await client.query(
-        `UPDATE announcements SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`,
-        [announcementId]
-      );
+      await client.query(`UPDATE announcements SET like_count = GREATEST(like_count - 1, 0) WHERE id = $1`, [
+        announcementId,
+      ]);
     }
     await client.query('COMMIT');
   } catch (error) {
@@ -224,7 +214,7 @@ const COMMENT_SELECT = `
   LEFT JOIN users u ON u.id = c.author_id
 `;
 
-function rowToComment(row: any): AnnouncementComment {
+function rowToComment(row: QueryResultRow): AnnouncementComment {
   return {
     id: row.id,
     announcementId: row.announcement_id,
@@ -243,7 +233,7 @@ function rowToComment(row: any): AnnouncementComment {
 export async function dbGetCommentsForAnnouncement(announcementId: number): Promise<AnnouncementComment[]> {
   const result: QueryResult = await pool.query(
     `${COMMENT_SELECT} WHERE c.announcement_id = $1 ORDER BY c.created_at ASC`,
-    [announcementId]
+    [announcementId],
   );
   return result.rows.map(rowToComment);
 }
@@ -256,7 +246,7 @@ export async function dbGetCommentsForAnnouncement(announcementId: number): Prom
 export async function dbCreateComment(
   announcementId: number,
   authorId: number,
-  content: string
+  content: string,
 ): Promise<AnnouncementComment | null> {
   const client = await pool.connect();
   try {
@@ -265,12 +255,9 @@ export async function dbCreateComment(
       `INSERT INTO announcement_comments (announcement_id, author_id, content, created_at, updated_at)
        VALUES ($1, $2, $3, NOW(), NOW())
        RETURNING id`,
-      [announcementId, authorId, content]
+      [announcementId, authorId, content],
     );
-    await client.query(
-      `UPDATE announcements SET comment_count = comment_count + 1 WHERE id = $1`,
-      [announcementId]
-    );
+    await client.query(`UPDATE announcements SET comment_count = comment_count + 1 WHERE id = $1`, [announcementId]);
     await client.query('COMMIT');
 
     const commentId = insertResult.rows[0].id;
@@ -295,13 +282,12 @@ export async function dbDeleteComment(commentId: number): Promise<boolean> {
     await client.query('BEGIN');
     const deleteResult = await client.query(
       `DELETE FROM announcement_comments WHERE id = $1 RETURNING announcement_id`,
-      [commentId]
+      [commentId],
     );
     if ((deleteResult.rowCount ?? 0) > 0) {
-      await client.query(
-        `UPDATE announcements SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = $1`,
-        [deleteResult.rows[0].announcement_id]
-      );
+      await client.query(`UPDATE announcements SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = $1`, [
+        deleteResult.rows[0].announcement_id,
+      ]);
     }
     await client.query('COMMIT');
     return (deleteResult.rowCount ?? 0) > 0;
@@ -318,9 +304,8 @@ export async function dbDeleteComment(commentId: number): Promise<boolean> {
  * allowing a delete.
  */
 export async function dbGetCommentAuthorId(commentId: number): Promise<number | null> {
-  const result: QueryResult = await pool.query(
-    `SELECT author_id FROM announcement_comments WHERE id = $1`,
-    [commentId]
-  );
+  const result: QueryResult = await pool.query(`SELECT author_id FROM announcement_comments WHERE id = $1`, [
+    commentId,
+  ]);
   return result.rows[0]?.author_id ?? null;
 }

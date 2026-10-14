@@ -62,7 +62,10 @@ export function toDriveDepartment(department: DriveDepartment): DriveDepartmentD
 /* ---------- Entry (folder or file row) mapper ---------- */
 
 const EXTENSION_ALIASES: Record<string, string> = {
-  DOCX: 'DOC', XLSX: 'XLS', PPTX: 'PPT', JPEG: 'JPG',
+  DOCX: 'DOC',
+  XLSX: 'XLS',
+  PPTX: 'PPT',
+  JPEG: 'JPG',
 };
 
 const GOOGLE_MIME_LABELS: Record<string, string> = {
@@ -193,7 +196,7 @@ export async function getDepartments(token: string, includeFileCounts = true): P
 export async function getDirectoryContents(
   token: string,
   driveId: string,
-  folderId?: string
+  folderId?: string,
 ): Promise<DirectoryContentsResult> {
   const { entries, connected } = await getDriveEntries(token, driveId, folderId);
   return { entries: entries.map(toDriveEntryRow), connected };
@@ -208,7 +211,7 @@ export async function createFolder(
   token: string,
   driveId: string,
   parentId: string | undefined,
-  name: string
+  name: string,
 ): Promise<DriveEntryRowData> {
   const entry = await createDriveFolder(token, driveId, parentId, name);
   return toDriveEntryRow(entry);
@@ -227,7 +230,7 @@ export async function createFile(
   driveId: string,
   parentId: string | undefined,
   name: string,
-  mimeType: string
+  mimeType: string,
 ): Promise<DriveEntryRowData> {
   const entry = await createDriveFile(token, driveId, parentId, name, mimeType);
   return toDriveEntryRow(entry);
@@ -242,7 +245,7 @@ export async function uploadFile(
   token: string,
   driveId: string,
   parentId: string | undefined,
-  file: File
+  file: File,
 ): Promise<DriveEntryRowData> {
   const { accessToken } = await getDriveAccessToken(token);
   const entry = await uploadDriveFile(accessToken, driveId, parentId, file);

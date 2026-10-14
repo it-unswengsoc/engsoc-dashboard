@@ -95,8 +95,12 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
 
     const token = sessionStorage.getItem('token');
     if (token) {
-      getDirectory(token).then(setDirectory).catch(() => {});
-      getProfile(token).then(setProfile).catch(() => {});
+      getDirectory(token)
+        .then(setDirectory)
+        .catch(() => {});
+      getProfile(token)
+        .then(setProfile)
+        .catch(() => {});
     }
     // Only reset when the dialog opens, not on every prop identity change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -156,9 +160,7 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
         // indistinguishable from each other in the field.
         console.error('Image crop failed:', err);
         setError(
-          err instanceof Error && err.message
-            ? err.message
-            : 'Failed to process that image — try a different file.'
+          err instanceof Error && err.message ? err.message : 'Failed to process that image — try a different file.',
         );
         return;
       }
@@ -307,7 +309,7 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
       ) : (
         <div className="mt-5 flex flex-col gap-4">
           <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-gray-400">
-            This is exactly how it'll look
+            This is exactly how it&apos;ll look
           </p>
 
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
@@ -317,8 +319,8 @@ export default function AnnouncementComposer({ open, mode, initial, onSubmit, on
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold text-gray-900">
-                  {profile ? `${profile.firstName} ${profile.lastName}` : '…'}{' '}
-                  <span className="text-gray-400">|</span> {profile ? roleLabel(profile.role) : ''}
+                  {profile ? `${profile.firstName} ${profile.lastName}` : '…'} <span className="text-gray-400">|</span>{' '}
+                  {profile ? roleLabel(profile.role) : ''}
                 </p>
                 <p className="font-mono text-[10px] text-gray-400">just now</p>
               </div>

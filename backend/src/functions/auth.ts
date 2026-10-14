@@ -1,12 +1,11 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { QueryResult } from 'pg';
+import { type QueryResult } from 'pg';
 import pool from '../database/pool';
 
 const SALT_ROUNDS = 10;
 export const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 const JWT_EXPIRY = '7d';
-
 
 /**
  * Hash a password using bcrypt
@@ -18,10 +17,7 @@ export async function hashPassword(password: string): Promise<string> {
 /**
  * Compare a password with its hash
  */
-export async function comparePassword(
-  password: string,
-  hash: string
-): Promise<boolean> {
+export async function comparePassword(password: string, hash: string): Promise<boolean> {
   return await bcrypt.compare(password, hash);
 }
 
@@ -54,7 +50,7 @@ export async function registerUser(
   email: string,
   password: string,
   firstName: string,
-  lastName: string
+  lastName: string,
 ): Promise<{ userId: number; email: string } | null> {
   try {
     // Validate inputs
@@ -63,10 +59,7 @@ export async function registerUser(
     }
 
     // Check if user already exists
-    const userExists = await pool.query(
-      'SELECT id FROM users WHERE email = $1',
-      [email]
-    );
+    const userExists = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
 
     if (userExists.rows.length > 0) {
       throw new Error('User already exists');
@@ -78,7 +71,7 @@ export async function registerUser(
     // Insert user
     const result: QueryResult = await pool.query(
       'INSERT INTO users (email, password_hash, first_name, last_name, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING id, email',
-      [email, hashedPassword, firstName, lastName]
+      [email, hashedPassword, firstName, lastName],
     );
 
     return {
@@ -96,7 +89,7 @@ export async function registerUser(
  */
 export async function loginUser(
   email: string,
-  password: string
+  password: string,
 ): Promise<{ token: string; userId: number; email: string } | null> {
   try {
     // Validate inputs
@@ -105,10 +98,9 @@ export async function loginUser(
     }
 
     // Find user
-    const result: QueryResult = await pool.query(
-      'SELECT id, email, password_hash FROM users WHERE email = $1',
-      [email]
-    );
+    const result: QueryResult = await pool.query('SELECT id, email, password_hash FROM users WHERE email = $1', [
+      email,
+    ]);
 
     if (result.rows.length === 0) {
       return null;
@@ -127,9 +119,7 @@ export async function loginUser(
     const token = generateToken(user.id, user.email);
 
     // Update last login
-    await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [
-      user.id,
-    ]);
+    await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
 
     return {
       token,
@@ -158,31 +148,25 @@ export async function findOrCreateGoogleUser(
   email: string,
   firstName: string,
   lastName: string,
-  refreshToken?: string
+  refreshToken?: string,
 ): Promise<{ userId: number; email: string } | null> {
   try {
-    const byGoogleId: QueryResult = await pool.query(
-      'SELECT id, email FROM users WHERE google_id = $1',
-      [googleId]
-    );
+    const byGoogleId: QueryResult = await pool.query('SELECT id, email FROM users WHERE google_id = $1', [googleId]);
 
     if (byGoogleId.rows.length > 0) {
       const user = byGoogleId.rows[0];
       if (refreshToken) {
-        await pool.query(
-          'UPDATE users SET last_login = NOW(), google_refresh_token = $2 WHERE id = $1',
-          [user.id, refreshToken]
-        );
+        await pool.query('UPDATE users SET last_login = NOW(), google_refresh_token = $2 WHERE id = $1', [
+          user.id,
+          refreshToken,
+        ]);
       } else {
         await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
       }
       return { userId: user.id, email: user.email };
     }
 
-    const byEmail: QueryResult = await pool.query(
-      'SELECT id, email FROM users WHERE email = $1',
-      [email]
-    );
+    const byEmail: QueryResult = await pool.query('SELECT id, email FROM users WHERE email = $1', [email]);
 
     if (byEmail.rows.length > 0) {
       const user = byEmail.rows[0];
@@ -190,7 +174,7 @@ export async function findOrCreateGoogleUser(
         `UPDATE users
          SET google_id = $1, last_login = NOW()${refreshToken ? ', google_refresh_token = $3' : ''}
          WHERE id = $2`,
-        refreshToken ? [googleId, user.id, refreshToken] : [googleId, user.id]
+        refreshToken ? [googleId, user.id, refreshToken] : [googleId, user.id],
       );
       return { userId: user.id, email: user.email };
     }
@@ -198,7 +182,7 @@ export async function findOrCreateGoogleUser(
     const result: QueryResult = await pool.query(
       `INSERT INTO users (email, google_id, first_name, last_name, google_refresh_token, created_at, last_login)
        VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) RETURNING id, email`,
-      [email, googleId, firstName || 'Google', lastName || 'User', refreshToken ?? null]
+      [email, googleId, firstName || 'Google', lastName || 'User', refreshToken ?? null],
     );
 
     return { userId: result.rows[0].id, email: result.rows[0].email };
@@ -215,10 +199,7 @@ export async function findOrCreateGoogleUser(
  */
 export async function getUserGoogleRefreshToken(userId: number): Promise<string | null> {
   try {
-    const result: QueryResult = await pool.query(
-      'SELECT google_refresh_token FROM users WHERE id = $1',
-      [userId]
-    );
+    const result: QueryResult = await pool.query('SELECT google_refresh_token FROM users WHERE id = $1', [userId]);
     if (result.rows.length === 0) return null;
     return result.rows[0].google_refresh_token ?? null;
   } catch (error) {
@@ -242,7 +223,7 @@ export async function getUserProfile(userId: number): Promise<{
   try {
     const result: QueryResult = await pool.query(
       'SELECT id, email, first_name, last_name, role, port, created_at FROM users WHERE id = $1',
-      [userId]
+      [userId],
     );
 
     if (result.rows.length === 0) {
@@ -268,16 +249,13 @@ export async function getUserProfile(userId: number): Promise<{
 /**
  * Update user profile
  */
-export async function updateUserProfile(
-  userId: number,
-  firstName: string,
-  lastName: string
-): Promise<boolean> {
+export async function updateUserProfile(userId: number, firstName: string, lastName: string): Promise<boolean> {
   try {
-    const result: QueryResult = await pool.query(
-      'UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3',
-      [firstName, lastName, userId]
-    );
+    const result: QueryResult = await pool.query('UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3', [
+      firstName,
+      lastName,
+      userId,
+    ]);
 
     return result.rowCount !== null && result.rowCount > 0;
   } catch (error) {

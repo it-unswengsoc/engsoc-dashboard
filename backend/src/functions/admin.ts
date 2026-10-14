@@ -1,7 +1,7 @@
-import { QueryResult } from 'pg';
+import { ValidationError } from '../lib/errors';
+import { type QueryResult, type QueryResultRow } from 'pg';
 import type { AuthorRole } from './announcements';
 import pool from '../database/pool';
-
 
 // Same four-level role the users.role column (a Postgres `user_role` enum)
 // already enforces — reusing announcements.ts's AuthorRole rather than
@@ -60,7 +60,7 @@ export interface AdminUser {
   hasGoogleAccount: boolean;
 }
 
-function rowToAdminUser(row: any): AdminUser {
+function rowToAdminUser(row: QueryResultRow): AdminUser {
   return {
     id: row.id,
     email: row.email,
@@ -97,13 +97,13 @@ export async function listUsers(): Promise<AdminUser[]> {
   const result: QueryResult = await pool.query(
     `SELECT id, email, first_name, last_name, role, port, is_treasurer, is_active, created_at, last_login, google_id
      FROM users
-     ORDER BY first_name, last_name`
+     ORDER BY first_name, last_name`,
   );
   return result.rows.map(rowToAdminUser);
 }
 
 /** Thrown when an inactive user is made treasurer — the route answers 400. */
-export class InactiveTreasurerError extends Error {}
+export class InactiveTreasurerError extends ValidationError {}
 
 /**
  * Updates a user's role, portfolio and/or treasurer flag. Each is
@@ -117,7 +117,7 @@ export async function updateUserRoleAndPortfolio(
   userId: number,
   role: UserRole | undefined,
   port: UserPortfolio | null | undefined,
-  isTreasurer?: boolean
+  isTreasurer?: boolean,
 ): Promise<AdminUser | null> {
   const sets: string[] = [];
   const values: (string | number | boolean | null)[] = [];
@@ -150,16 +150,15 @@ export async function updateUserRoleAndPortfolio(
         return null;
       }
       if (!target.rows[0].is_active) throw new InactiveTreasurerError('An inactive user cannot be made treasurer');
-      await client.query(
-        `UPDATE users SET is_treasurer = false, updated_at = NOW() WHERE is_treasurer AND id <> $1`,
-        [userId]
-      );
+      await client.query(`UPDATE users SET is_treasurer = false, updated_at = NOW() WHERE is_treasurer AND id <> $1`, [
+        userId,
+      ]);
     }
     const result: QueryResult = await client.query(
       `UPDATE users SET ${sets.join(', ')}, updated_at = NOW()
        WHERE id = $${values.length}
        RETURNING id, email, first_name, last_name, role, port, is_treasurer, is_active, created_at, last_login, google_id`,
-      values
+      values,
     );
     await client.query('COMMIT');
     return result.rows.length > 0 ? rowToAdminUser(result.rows[0]) : null;

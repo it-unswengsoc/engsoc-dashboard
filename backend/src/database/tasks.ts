@@ -1,7 +1,6 @@
-import { QueryResult } from 'pg';
-import { Task, TaskStatus } from '../functions/tasks';
+import { type QueryResult, type QueryResultRow } from 'pg';
+import { type Task, type TaskStatus } from '../functions/tasks';
 import pool from './pool';
-
 
 /* Assignees come back as one JSON array per task (rather than one row per
    assignee) so a task stays a single row whatever its assignee count. */
@@ -28,14 +27,18 @@ const TASK_SELECT = `
 
 const TASK_ORDER = 'ORDER BY t.due_date ASC NULLS LAST, t.created_at ASC';
 
-function rowToTask(row: any): Task {
+function rowToTask(row: QueryResultRow): Task {
   return {
     id: row.id,
     title: row.title,
     description: row.description,
     assignedBy: row.assigned_by,
     assignedByName: row.assigned_by_first_name ? `${row.assigned_by_first_name} ${row.assigned_by_last_name}` : null,
-    assignees: row.assignees.map((a: any) => ({ id: a.id, name: `${a.firstName} ${a.lastName}`, port: a.port })),
+    assignees: row.assignees.map((a: { id: number; firstName: string; lastName: string; port: string | null }) => ({
+      id: a.id,
+      name: `${a.firstName} ${a.lastName}`,
+      port: a.port,
+    })),
     eventId: row.event_id,
     requestId: row.request_id,
     requestTitle: row.request_title,
@@ -58,7 +61,7 @@ export async function dbGetTasksForUser(userId: number): Promise<Task[]> {
     `${TASK_SELECT}
      WHERE EXISTS (SELECT 1 FROM task_assignees ta WHERE ta.task_id = t.id AND ta.user_id = $1)
      ${TASK_ORDER}`,
-    [userId]
+    [userId],
   );
   return result.rows.map(rowToTask);
 }
@@ -77,7 +80,7 @@ export async function dbGetTasksForPort(port: string): Promise<Task[]> {
        WHERE ta.task_id = t.id AND u.port = $1
      )
      ${TASK_ORDER}`,
-    [port]
+    [port],
   );
   return result.rows.map(rowToTask);
 }
@@ -88,10 +91,10 @@ export async function dbGetTaskById(taskId: number): Promise<Task | null> {
 }
 
 export async function dbIsTaskAssignee(taskId: number, userId: number): Promise<boolean> {
-  const result: QueryResult = await pool.query(
-    'SELECT 1 FROM task_assignees WHERE task_id = $1 AND user_id = $2',
-    [taskId, userId]
-  );
+  const result: QueryResult = await pool.query('SELECT 1 FROM task_assignees WHERE task_id = $1 AND user_id = $2', [
+    taskId,
+    userId,
+  ]);
   return result.rows.length > 0;
 }
 
@@ -114,13 +117,13 @@ export async function dbCreateTask(input: {
       `INSERT INTO tasks (title, description, assigned_by, due_date, created_at, updated_at)
        VALUES ($1, $2, $3, $4, NOW(), NOW())
        RETURNING id`,
-      [input.title, input.description, input.assignedBy, input.dueDate]
+      [input.title, input.description, input.assignedBy, input.dueDate],
     );
     taskId = result.rows[0].id;
     await client.query(
       `INSERT INTO task_assignees (task_id, user_id)
        SELECT $1, unnest($2::int[])`,
-      [taskId, input.assigneeIds]
+      [taskId, input.assigneeIds],
     );
     await client.query('COMMIT');
   } catch (error) {
@@ -151,7 +154,7 @@ export async function dbUpdateTaskStatus(taskId: number, status: TaskStatus): Pr
          updated_at = NOW()
      WHERE id = $1
      RETURNING id`,
-    [taskId, status, completedAt]
+    [taskId, status, completedAt],
   );
   if (result.rows.length === 0) return null;
   return dbGetTaskById(result.rows[0].id);
@@ -163,7 +166,7 @@ export async function dbUpdateTaskStatus(taskId: number, status: TaskStatus): Pr
  */
 export async function dbUpdateTaskDetails(
   taskId: number,
-  fields: { title?: string; description?: string | null; dueDate?: string | null }
+  fields: { title?: string; description?: string | null; dueDate?: string | null },
 ): Promise<Task | null> {
   const sets: string[] = [];
   const values: unknown[] = [taskId];
@@ -186,7 +189,7 @@ export async function dbUpdateTaskDetails(
      SET ${sets.join(', ')}, updated_at = NOW()
      WHERE id = $1
      RETURNING id`,
-    values
+    values,
   );
   if (result.rows.length === 0) return null;
   return dbGetTaskById(result.rows[0].id);

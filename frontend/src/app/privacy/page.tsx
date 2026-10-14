@@ -54,32 +54,34 @@ export default function PrivacyPolicyPage() {
         </div>
 
         <div className="mt-8 flex gap-3 rounded-lg border border-gray-100 bg-[#B1C9DC]/10 px-4 py-4">
-          <span className="whitespace-nowrap font-mono text-[11px] font-bold uppercase tracking-wide text-[#3D6C94]">TL;DR</span>
+          <span className="whitespace-nowrap font-mono text-[11px] font-bold uppercase tracking-wide text-[#3D6C94]">
+            TL;DR
+          </span>
           <p className="text-sm text-gray-600">
-            The Dashboard is an internal tool for UNSW Engineering Society members. It reads your Google account
-            profile and, where a feature needs it, your Calendar and Drive — never for advertising, never sold,
-            never shared outside running the Society.
+            The Dashboard is an internal tool for UNSW Engineering Society members. It reads your Google account profile
+            and, where a feature needs it, your Calendar and Drive — never for advertising, never sold, never shared
+            outside running the Society.
           </p>
         </div>
 
         <div className="mt-4 rounded-xl border border-gray-200 bg-white px-6">
           <Clause num="01" title="Who this covers">
             <p>
-              This policy covers the <strong className="text-gray-900">EngSoc Dashboard</strong>, the internal
-              platform UNSW Engineering Society uses for tasks, announcements, events, documents and member
-              notifications. Access is restricted to holders of a{' '}
+              This policy covers the <strong className="text-gray-900">EngSoc Dashboard</strong>, the internal platform
+              UNSW Engineering Society uses for tasks, announcements, events, documents and member notifications. Access
+              is restricted to holders of a{' '}
               <code className="rounded bg-[#B1C9DC]/20 px-1.5 py-0.5 font-mono text-[13px] text-[#3D6C94]">
                 @unswengsoc.com
               </code>{' '}
-              Google Workspace account — sign-in is Google&rsquo;s own, gated to that domain, and the Dashboard
-              never sees or stores your password.
+              Google Workspace account — sign-in is Google&rsquo;s own, gated to that domain, and the Dashboard never
+              sees or stores your password.
             </p>
           </Clause>
 
           <Clause num="02" title="What we collect">
             <p>
-              Signing in with Google shares your name, @unswengsoc.com email address and profile photo. Beyond
-              that, only the specific Google data a feature you actually use needs:
+              Signing in with Google shares your name, @unswengsoc.com email address and profile photo. Beyond that,
+              only the specific Google data a feature you actually use needs:
             </p>
             <ul className="my-3 list-disc space-y-1.5 pl-5 marker:text-[#3D6C94]">
               <li>
@@ -88,8 +90,8 @@ export default function PrivacyPolicyPage() {
                 Dashboard itself.
               </li>
               <li>
-                <strong className="text-gray-900">Drive</strong> — read and write access to the Society&rsquo;s
-                Shared Drives, used for the Documents page and for files you attach to a task.
+                <strong className="text-gray-900">Drive</strong> — read and write access to the Society&rsquo;s Shared
+                Drives, used for the Documents page and for files you attach to a task.
               </li>
             </ul>
             <p>
@@ -101,45 +103,45 @@ export default function PrivacyPolicyPage() {
                 Scope
               </span>
               <span>
-                Calendar and Drive access is read/write on the scopes the feature needs — never your Gmail, never
-                files outside the Society&rsquo;s own Shared Drives.
+                Calendar and Drive access is read/write on the scopes the feature needs — never your Gmail, never files
+                outside the Society&rsquo;s own Shared Drives.
               </span>
             </div>
           </Clause>
 
           <Clause num="03" title="How it's used">
             <p>
-              Solely to run the features you&rsquo;re using: showing your tasks and calendar, posting and notifying
-              on announcements, tracking event RSVPs, and — where a notification is generated — sending you an
-              email about it. Nothing here is used to profile members, build advertising audiences, or for any
-              purpose outside operating the Dashboard for the Society.
+              Solely to run the features you&rsquo;re using: showing your tasks and calendar, posting and notifying on
+              announcements, tracking event RSVPs, and — where a notification is generated — sending you an email about
+              it. Nothing here is used to profile members, build advertising audiences, or for any purpose outside
+              operating the Dashboard for the Society.
             </p>
           </Clause>
 
           <Clause num="04" title="Where it's stored">
             <p>
-              Application data lives in a Postgres database on Amazon RDS (ap-southeast-2). Notification emails
-              are sent through Amazon SES. Google Calendar and Drive data is read live from Google&rsquo;s own
-              APIs, not duplicated into our database beyond what a feature needs to display. No data is sold,
-              rented, or shared with any third party beyond the infrastructure providers above, who process it
-              solely to keep the Dashboard running.
+              Application data lives in a Postgres database on Amazon RDS (ap-southeast-2). Notification emails are sent
+              through Amazon SES. Google Calendar and Drive data is read live from Google&rsquo;s own APIs, not
+              duplicated into our database beyond what a feature needs to display. No data is sold, rented, or shared
+              with any third party beyond the infrastructure providers above, who process it solely to keep the
+              Dashboard running.
             </p>
           </Clause>
 
           <Clause num="05" title="Who can see it">
             <p>
-              Your data is visible to other Society members only where a feature is inherently shared — an
-              announcement you post, a task assigned to a port, your RSVP on an event. Director, executive and
-              admin accounts have the additional access their role requires to run the Society (posting official
-              announcements, managing members and tasks). Nobody outside @unswengsoc.com can sign in at all.
+              Your data is visible to other Society members only where a feature is inherently shared — an announcement
+              you post, a task assigned to a port, your RSVP on an event. Director, executive and admin accounts have
+              the additional access their role requires to run the Society (posting official announcements, managing
+              members and tasks). Nobody outside @unswengsoc.com can sign in at all.
             </p>
           </Clause>
 
           <Clause num="06" title="Retention & deletion">
             <p>
-              Your data is kept for as long as your account is active. When you leave the Society or want your
-              data removed sooner, contact IT below and it will be deleted from our database; Google access can be
-              revoked independently at any time from your{' '}
+              Your data is kept for as long as your account is active. When you leave the Society or want your data
+              removed sooner, contact IT below and it will be deleted from our database; Google access can be revoked
+              independently at any time from your{' '}
               <a
                 href="https://myaccount.google.com/permissions"
                 target="_blank"

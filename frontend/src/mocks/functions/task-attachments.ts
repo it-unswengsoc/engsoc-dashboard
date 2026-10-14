@@ -7,7 +7,7 @@ export async function getTaskAttachments(taskId: number): Promise<TaskAttachment
 
 export async function addTaskAttachment(
   taskId: number,
-  input: { driveFileId: string; name: string; webViewLink: string | null; mimeType: string | null }
+  input: { driveFileId: string; name: string; webViewLink: string | null; mimeType: string | null },
 ): Promise<TaskAttachment> {
   const attachment: TaskAttachment = {
     id: Date.now(),

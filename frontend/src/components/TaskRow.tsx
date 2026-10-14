@@ -17,9 +17,9 @@ interface TaskRowProps {
   id: number;
   status: TaskStatus;
   daysTillDue: number | null; // null if no due date was set
-  name: string;      // e.g. "Edit cover photo"
+  name: string; // e.g. "Edit cover photo"
   dateString: string; // e.g. "Mon, 1 June"; "" if no due date
-  time: string;      // e.g. "9:30PM"; "" if no due date
+  time: string; // e.g. "9:30PM"; "" if no due date
   /* Lets the page keep its own task list (and the OPEN TASKS stat derived
      from it) in sync after a move in the dialog — this row doesn't own the
      source of truth, the page does. */
@@ -48,7 +48,14 @@ function StatusIcon({ status }: { status: TaskStatus }) {
     return (
       <svg viewBox="0 0 20 20" className="h-5 w-5 shrink-0" aria-hidden="true">
         <circle cx="10" cy="10" r="9" fill="#8FBF9F" />
-        <path d="M6 10.5l2.5 2.5L14 7.5" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        <path
+          d="M6 10.5l2.5 2.5L14 7.5"
+          fill="none"
+          stroke="white"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     );
   }

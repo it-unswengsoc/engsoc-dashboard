@@ -13,7 +13,7 @@ export default function MentionText({ content }: { content: string }) {
           </span>
         ) : (
           <span key={i}>{segment.text}</span>
-        )
+        ),
       )}
     </>
   );

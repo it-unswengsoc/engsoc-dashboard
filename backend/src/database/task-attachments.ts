@@ -1,6 +1,5 @@
-import { QueryResult } from 'pg';
+import { type QueryResult, type QueryResultRow } from 'pg';
 import pool from './pool';
-
 
 export interface TaskAttachment {
   id: number;
@@ -13,7 +12,7 @@ export interface TaskAttachment {
   createdAt: string;
 }
 
-function rowToAttachment(row: any): TaskAttachment {
+function rowToAttachment(row: QueryResultRow): TaskAttachment {
   return {
     id: row.id,
     taskId: row.task_id,
@@ -29,7 +28,7 @@ function rowToAttachment(row: any): TaskAttachment {
 export async function dbGetTaskAttachments(taskId: number): Promise<TaskAttachment[]> {
   const result: QueryResult = await pool.query(
     `SELECT * FROM task_attachments WHERE task_id = $1 ORDER BY created_at ASC`,
-    [taskId]
+    [taskId],
   );
   return result.rows.map(rowToAttachment);
 }
@@ -46,7 +45,7 @@ export async function dbAddTaskAttachment(input: {
     `INSERT INTO task_attachments (task_id, drive_file_id, name, web_view_link, mime_type, added_by, created_at)
      VALUES ($1, $2, $3, $4, $5, $6, NOW())
      RETURNING *`,
-    [input.taskId, input.driveFileId, input.name, input.webViewLink, input.mimeType, input.addedBy]
+    [input.taskId, input.driveFileId, input.name, input.webViewLink, input.mimeType, input.addedBy],
   );
   return rowToAttachment(result.rows[0]);
 }

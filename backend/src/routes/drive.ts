@@ -1,5 +1,4 @@
-import { Router, Request, Response } from 'express';
-import { verifyAuthToken } from './auth';
+import { Router } from 'express';
 import { getUserGoogleRefreshToken } from '../functions/auth';
 import { getGoogleAccessToken } from '../functions/google';
 import {
@@ -11,8 +10,21 @@ import {
   renameDriveEntry,
   deleteDriveEntry,
 } from '../functions/drive';
+import { verifyAuthToken, type AuthedRequest } from '../middleware/auth';
+import { ConflictError, ValidationError } from '../lib/errors';
+import { asyncHandler, created, ok } from '../lib/http';
 
 const router = Router();
+
+router.use(verifyAuthToken);
+
+/* For writes: the member's own refresh token, or a 409 if they haven't
+   connected Google. Reads answer `connected: false` with no data instead. */
+async function requireRefreshToken(req: AuthedRequest): Promise<string> {
+  const refreshToken = await getUserGoogleRefreshToken(req.user.userId);
+  if (!refreshToken) throw new ConflictError('Google Drive is not connected for this account');
+  return refreshToken;
+}
 
 /**
  * GET /drive/folders?counts=0
@@ -28,23 +40,16 @@ const router = Router();
  * needs drive names (e.g. a destination picker), not the Documents page's
  * own folder cards, which is the one place that actually shows counts.
  */
-router.get('/folders', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-
-    if (!refreshToken) {
-      return res.status(200).json({ status: 'success', data: [], connected: false });
-    }
+router.get(
+  '/folders',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const refreshToken = await getUserGoogleRefreshToken(req.user.userId);
+    if (!refreshToken) return ok(res, [], { connected: false });
 
     const includeFileCounts = req.query.counts !== '0';
-    const departments = await listDepartments(refreshToken, includeFileCounts);
-    res.status(200).json({ status: 'success', data: departments, connected: true });
-  } catch (error) {
-    console.error('List drive folders error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to load Drive folders' });
-  }
-});
+    ok(res, await listDepartments(refreshToken, includeFileCounts), { connected: true });
+  }, 'Failed to load Drive folders'),
+);
 
 /**
  * GET /drive/entries?driveId=...&folderId=...
@@ -52,28 +57,19 @@ router.get('/folders', verifyAuthToken, async (req: Request, res: Response) => {
  * its root if folderId is omitted, a specific folder within it otherwise —
  * as visible to the signed-in member's own Google account.
  */
-router.get('/entries', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
+router.get(
+  '/entries',
+  asyncHandler(async (req: AuthedRequest, res) => {
     const driveId = typeof req.query.driveId === 'string' ? req.query.driveId : undefined;
     const folderId = typeof req.query.folderId === 'string' ? req.query.folderId : undefined;
+    if (!driveId) throw new ValidationError('Missing required query param: driveId');
 
-    if (!driveId) {
-      return res.status(400).json({ status: 'error', message: 'Missing required query param: driveId' });
-    }
+    const refreshToken = await getUserGoogleRefreshToken(req.user.userId);
+    if (!refreshToken) return ok(res, [], { connected: false });
 
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-    if (!refreshToken) {
-      return res.status(200).json({ status: 'success', data: [], connected: false });
-    }
-
-    const entries = await listDriveEntries(refreshToken, driveId, folderId);
-    res.status(200).json({ status: 'success', data: entries, connected: true });
-  } catch (error) {
-    console.error('List drive entries error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to load Drive contents' });
-  }
-});
+    ok(res, await listDriveEntries(refreshToken, driveId, folderId), { connected: true });
+  }, 'Failed to load Drive contents'),
+);
 
 /**
  * GET /drive/search?q=...
@@ -82,26 +78,18 @@ router.get('/entries', verifyAuthToken, async (req: Request, res: Response) => {
  * header search, deliberately not scoped to whatever's currently open in
  * the column browser.
  */
-router.get('/search', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
+router.get(
+  '/search',
+  asyncHandler(async (req: AuthedRequest, res) => {
     const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
-    if (!query) {
-      return res.status(200).json({ status: 'success', data: [], connected: true });
-    }
+    if (!query) return ok(res, [], { connected: true });
 
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-    if (!refreshToken) {
-      return res.status(200).json({ status: 'success', data: [], connected: false });
-    }
+    const refreshToken = await getUserGoogleRefreshToken(req.user.userId);
+    if (!refreshToken) return ok(res, [], { connected: false });
 
-    const results = await searchDriveFiles(refreshToken, query);
-    res.status(200).json({ status: 'success', data: results, connected: true });
-  } catch (error) {
-    console.error('Search drive error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to search Drive' });
-  }
-});
+    ok(res, await searchDriveFiles(refreshToken, query), { connected: true });
+  }, 'Failed to search Drive'),
+);
 
 /**
  * POST /drive/folders/create
@@ -110,35 +98,25 @@ router.get('/search', verifyAuthToken, async (req: Request, res: Response) => {
  * the target drive/folder) — the frontend only offers this when it already
  * knows that's true, but the real check is Google's, not ours.
  */
-router.post('/folders/create', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
+router.post(
+  '/folders/create',
+  asyncHandler(async (req: AuthedRequest, res) => {
     const { driveId, parentId, name } = req.body as { driveId?: string; parentId?: string; name?: string };
-    if (!driveId || !name?.trim()) {
-      return res.status(400).json({ status: 'error', message: 'Missing required fields: driveId, name' });
-    }
+    if (!driveId || !name?.trim()) throw new ValidationError('Missing required fields: driveId, name');
 
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-    if (!refreshToken) {
-      return res.status(409).json({ status: 'error', message: 'Google Drive is not connected for this account' });
-    }
-
-    const folder = await createDriveFolder(refreshToken, driveId, parentId, name.trim());
-    res.status(201).json({ status: 'success', data: folder });
-  } catch (error) {
-    console.error('Create drive folder error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to create folder' });
-  }
-});
+    const refreshToken = await requireRefreshToken(req);
+    created(res, await createDriveFolder(refreshToken, driveId, parentId, name.trim()));
+  }, 'Failed to create folder'),
+);
 
 /**
  * POST /drive/files/create
  * Creates a new blank Google Workspace file (Doc/Sheet/...). Body:
  * { driveId, parentId?, name, mimeType }.
  */
-router.post('/files/create', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
+router.post(
+  '/files/create',
+  asyncHandler(async (req: AuthedRequest, res) => {
     const { driveId, parentId, name, mimeType } = req.body as {
       driveId?: string;
       parentId?: string;
@@ -146,47 +124,28 @@ router.post('/files/create', verifyAuthToken, async (req: Request, res: Response
       mimeType?: string;
     };
     if (!driveId || !name?.trim() || !mimeType) {
-      return res.status(400).json({ status: 'error', message: 'Missing required fields: driveId, name, mimeType' });
+      throw new ValidationError('Missing required fields: driveId, name, mimeType');
     }
 
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-    if (!refreshToken) {
-      return res.status(409).json({ status: 'error', message: 'Google Drive is not connected for this account' });
-    }
-
-    const file = await createDriveFile(refreshToken, driveId, parentId, name.trim(), mimeType);
-    res.status(201).json({ status: 'success', data: file });
-  } catch (error) {
-    console.error('Create drive file error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to create file' });
-  }
-});
+    const refreshToken = await requireRefreshToken(req);
+    created(res, await createDriveFile(refreshToken, driveId, parentId, name.trim(), mimeType));
+  }, 'Failed to create file'),
+);
 
 /**
  * PATCH /drive/entries/:fileId
  * Renames a file or folder. Body: { name }.
  */
-router.patch('/entries/:fileId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const { fileId } = req.params;
+router.patch(
+  '/entries/:fileId',
+  asyncHandler(async (req: AuthedRequest, res) => {
     const { name } = req.body as { name?: string };
-    if (!name?.trim()) {
-      return res.status(400).json({ status: 'error', message: 'Missing required field: name' });
-    }
+    if (!name?.trim()) throw new ValidationError('Missing required field: name');
 
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-    if (!refreshToken) {
-      return res.status(409).json({ status: 'error', message: 'Google Drive is not connected for this account' });
-    }
-
-    const entry = await renameDriveEntry(refreshToken, fileId, name.trim());
-    res.status(200).json({ status: 'success', data: entry });
-  } catch (error) {
-    console.error('Rename drive entry error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to rename' });
-  }
-});
+    const refreshToken = await requireRefreshToken(req);
+    ok(res, await renameDriveEntry(refreshToken, req.params.fileId, name.trim()));
+  }, 'Failed to rename'),
+);
 
 /**
  * DELETE /drive/entries/:fileId
@@ -194,23 +153,14 @@ router.patch('/entries/:fileId', verifyAuthToken, async (req: Request, res: Resp
  * recoverable action, not a permanent delete. Google enforces
  * capabilities.canDelete server-side same as every other write here.
  */
-router.delete('/entries/:fileId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const { fileId } = req.params;
-
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-    if (!refreshToken) {
-      return res.status(409).json({ status: 'error', message: 'Google Drive is not connected for this account' });
-    }
-
-    await deleteDriveEntry(refreshToken, fileId);
-    res.status(200).json({ status: 'success' });
-  } catch (error) {
-    console.error('Delete drive entry error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to delete' });
-  }
-});
+router.delete(
+  '/entries/:fileId',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const refreshToken = await requireRefreshToken(req);
+    await deleteDriveEntry(refreshToken, req.params.fileId);
+    ok(res);
+  }, 'Failed to delete'),
+);
 
 /**
  * GET /drive/access-token
@@ -220,20 +170,13 @@ router.delete('/entries/:fileId', verifyAuthToken, async (req: Request, res: Res
  * serverless function's own request body size limit long before Drive's
  * actual (far larger) limit.
  */
-router.get('/access-token', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-    if (!refreshToken) {
-      return res.status(409).json({ status: 'error', message: 'Google Drive is not connected for this account' });
-    }
-
+router.get(
+  '/access-token',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const refreshToken = await requireRefreshToken(req);
     const { accessToken, expiresAt } = await getGoogleAccessToken(refreshToken);
-    res.status(200).json({ status: 'success', data: { accessToken, expiresAt } });
-  } catch (error) {
-    console.error('Get drive access token error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to get an upload token' });
-  }
-});
+    ok(res, { accessToken, expiresAt });
+  }, 'Failed to get an upload token'),
+);
 
 export default router;

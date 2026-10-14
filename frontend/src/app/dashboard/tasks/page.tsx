@@ -60,8 +60,8 @@ export default function TasksPage() {
   if (profile && !profile.port) {
     return (
       <p className="text-sm text-gray-500">
-        You haven&apos;t been given a port yet, so there&apos;s no board to show. An admin can set it in the
-        admin panel.
+        You haven&apos;t been given a port yet, so there&apos;s no board to show. An admin can set it in the admin
+        panel.
       </p>
     );
   }

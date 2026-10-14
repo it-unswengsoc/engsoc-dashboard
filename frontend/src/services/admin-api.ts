@@ -1,7 +1,6 @@
 import type { AdminUser, UpdateUserInput } from '@/types/admin';
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+import { USE_MOCK } from '@/services/api-config';
+import { api } from '@/services/api-client';
 
 export type { AdminUser, UpdateUserInput };
 
@@ -14,13 +13,7 @@ export async function getUsers(token: string): Promise<AdminUser[]> {
     return mockGetUsers();
   }
 
-  const res = await fetch(apiUrl('/admin/users'), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load users');
-  return data.data as AdminUser[];
+  return api<AdminUser[]>('/admin/users', { token, errorMessage: 'Failed to load users' });
 }
 
 export async function updateUser(token: string, userId: number, updates: UpdateUserInput): Promise<AdminUser> {
@@ -29,12 +22,10 @@ export async function updateUser(token: string, userId: number, updates: UpdateU
     return mockUpdateUser(userId, updates);
   }
 
-  const res = await fetch(apiUrl(`/admin/users/${userId}`), {
+  return api<AdminUser>(`/admin/users/${userId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(updates),
+    token,
+    body: updates,
+    errorMessage: 'Failed to update user',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to update user');
-  return data.data as AdminUser;
 }

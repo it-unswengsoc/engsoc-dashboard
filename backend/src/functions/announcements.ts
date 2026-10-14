@@ -1,3 +1,4 @@
+import { ValidationError } from '../lib/errors';
 import {
   dbGetAllAnnouncements,
   dbGetAnnouncementById,
@@ -98,16 +99,16 @@ export async function getAllAnnouncements(currentUserId: number): Promise<Announ
  */
 export function validateImageDataUri(imageUrl: string): void {
   if (!imageUrl.startsWith('data:image/')) {
-    throw new Error('Image must be an uploaded image file');
+    throw new ValidationError('Image must be an uploaded image file');
   }
   if (imageUrl.length > MAX_IMAGE_DATA_URI_LENGTH) {
-    throw new Error('Image is too large — please use one under 2MB');
+    throw new ValidationError('Image is too large — please use one under 2MB');
   }
 }
 
 export async function createAnnouncement(input: CreateAnnouncementInput): Promise<Announcement | null> {
   if (!input.content?.trim()) {
-    throw new Error('Caption is required');
+    throw new ValidationError('Caption is required');
   }
   if (input.imageUrl) {
     validateImageDataUri(input.imageUrl);
@@ -136,10 +137,10 @@ export async function createAnnouncement(input: CreateAnnouncementInput): Promis
 export async function updateAnnouncement(
   announcementId: number,
   input: UpdateAnnouncementInput,
-  editorId: number
+  editorId: number,
 ): Promise<Announcement | null> {
   if (input.content !== undefined && !input.content.trim()) {
-    throw new Error('Caption is required');
+    throw new ValidationError('Caption is required');
   }
   if (input.imageUrl) {
     validateImageDataUri(input.imageUrl);
@@ -257,7 +258,7 @@ export async function getComments(announcementId: number): Promise<AnnouncementC
 export async function addComment(
   announcementId: number,
   authorId: number,
-  content: string
+  content: string,
 ): Promise<AnnouncementComment | null> {
   try {
     const comment = await dbCreateComment(announcementId, authorId, content);
@@ -286,7 +287,7 @@ async function notifyOnComment(comment: AnnouncementComment, authorId: number): 
         type: 'alert' as const,
         title: `${commenterName} tagged you in a comment`,
         message: excerpt,
-      }))
+      })),
     );
   } catch (error) {
     console.error('Notify on comment error:', error);

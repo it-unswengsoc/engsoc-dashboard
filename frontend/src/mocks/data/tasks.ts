@@ -5,7 +5,7 @@ export const mockTasks: TaskItem[] = [
   {
     id: 1,
     name: 'finish wireframe',
-    description: 'Rough out the new dashboard layout before Friday\'s review.',
+    description: "Rough out the new dashboard layout before Friday's review.",
     dueAt: at(0, '21:30'),
     completed: false,
     status: 'pending',

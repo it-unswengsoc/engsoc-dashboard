@@ -38,8 +38,8 @@ export default function ConfirmDeleteDialog({ open, itemName, onConfirm, onClose
     <Dialog open={open} title="Move to trash" size="sm" onClose={onClose}>
       <div className="mt-5 flex flex-col gap-4">
         <p className="text-sm text-gray-600">
-          Move <span className="font-bold text-gray-900">{itemName}</span> to Drive&apos;s trash? It stays
-          recoverable there, same as deleting it in Drive itself.
+          Move <span className="font-bold text-gray-900">{itemName}</span> to Drive&apos;s trash? It stays recoverable
+          there, same as deleting it in Drive itself.
         </p>
 
         {error && (

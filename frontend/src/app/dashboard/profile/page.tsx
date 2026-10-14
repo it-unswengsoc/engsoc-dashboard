@@ -7,6 +7,7 @@ import { getProfile, updateProfile } from '@/services/auth-api';
 import type { Profile } from '@/types/auth';
 import { useProfile } from '@/lib/profile-context';
 import { portLabel } from '@/lib/ports';
+import { isUnauthorized } from '@/services/api-client';
 
 const inputStyles =
   'w-full rounded-lg border border-transparent bg-gray-100 px-3 py-2 text-sm text-gray-900 transition-colors focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]';
@@ -35,7 +36,7 @@ export default function ProfilePage() {
     getProfile(token)
       .then(setProfile)
       .catch((err) => {
-        if (err.message === 'Unauthorized') {
+        if (isUnauthorized(err)) {
           sessionStorage.removeItem('token');
           router.push('/login');
         } else {
@@ -80,7 +81,7 @@ export default function ProfilePage() {
       setSharedProfile(updated);
       setEditing(false);
     } catch (err) {
-      if (err instanceof Error && err.message === 'Unauthorized') {
+      if (isUnauthorized(err)) {
         sessionStorage.removeItem('token');
         router.push('/login');
         return;
@@ -100,10 +101,7 @@ export default function ProfilePage() {
 
   if (error) {
     return (
-      <p
-        role="alert"
-        className="rounded-lg bg-[#F1C4C9]/50 px-3 py-2 text-sm font-medium text-[#8B2E38]"
-      >
+      <p role="alert" className="rounded-lg bg-[#F1C4C9]/50 px-3 py-2 text-sm font-medium text-[#8B2E38]">
         {error}
       </p>
     );
@@ -161,9 +159,7 @@ export default function ProfilePage() {
           <form onSubmit={handleSave} noValidate>
             <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                  First name
-                </span>
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-500">First name</span>
                 <input
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
@@ -173,9 +169,7 @@ export default function ProfilePage() {
               </label>
 
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                  Last name
-                </span>
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Last name</span>
                 <input
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
@@ -186,22 +180,15 @@ export default function ProfilePage() {
 
               <Field label="Role" value={profile.role} className="capitalize" />
               <Field label="Portfolio" value={profile.port ? portLabel(profile.port) : 'Unassigned'} />
-              <Field
-                label="Member since"
-                value={new Date(profile.createdAt).toLocaleDateString()}
-              />
+              <Field label="Member since" value={new Date(profile.createdAt).toLocaleDateString()} />
               <Field label="User ID" value={`#${profile.id}`} />
             </div>
 
             {saveError && (
-              <p
-                role="alert"
-                className="mt-5 rounded-lg bg-[#F1C4C9]/50 px-3 py-2 text-sm font-medium text-[#8B2E38]"
-              >
+              <p role="alert" className="mt-5 rounded-lg bg-[#F1C4C9]/50 px-3 py-2 text-sm font-medium text-[#8B2E38]">
                 {saveError}
               </p>
             )}
-
           </form>
         ) : (
           <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
@@ -209,10 +196,7 @@ export default function ProfilePage() {
             <Field label="Last name" value={profile.lastName} />
             <Field label="Role" value={profile.role} className="capitalize" />
             <Field label="Portfolio" value={profile.port ? portLabel(profile.port) : 'Unassigned'} />
-            <Field
-              label="Member since"
-              value={new Date(profile.createdAt).toLocaleDateString()}
-            />
+            <Field label="Member since" value={new Date(profile.createdAt).toLocaleDateString()} />
             <Field label="User ID" value={`#${profile.id}`} />
           </div>
         )}
@@ -241,15 +225,7 @@ export default function ProfilePage() {
   );
 }
 
-function Field({
-  label,
-  value,
-  className = '',
-}: {
-  label: string;
-  value: ReactNode;
-  className?: string;
-}) {
+function Field({ label, value, className = '' }: { label: string; value: ReactNode; className?: string }) {
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{label}</span>

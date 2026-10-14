@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Response } from 'express';
 import {
   getAllEvents,
   getEventById,
@@ -9,161 +9,128 @@ import {
   validateEventImage,
   validateEventCoordinates,
 } from '../functions/events';
-import { getStaticMap, PlacesError } from '../functions/places';
+import { getStaticMap } from '../functions/places';
 import { decodeImageDataUri } from '../functions/announcement-images';
-import { verifyAuthToken, requireRole } from './auth';
 import { isUserAdmin } from '../functions/admin';
 import { setRsvp, getRsvpSummary } from '../functions/rsvp';
+import { verifyAuthToken, requireRole, type AuthedRequest } from '../middleware/auth';
+import { ForbiddenError, NotFoundError, ValidationError } from '../lib/errors';
+import { asyncHandler, created, ok, parseId } from '../lib/http';
 
 const router = Router();
 
 /* Only the organizer or an admin can edit/delete an official event — PUT and
    DELETE had no check at all before this, so any logged-in member could edit
-   or delete any event. Mirrors announcements.ts's canModify. */
-async function canModifyEvent(userId: number, organizerId: number | null): Promise<boolean> {
-  if (organizerId === userId) return true;
-  return isUserAdmin(userId);
+   or delete any event. Mirrors announcements.ts's canModify. Throws 404/403,
+   or returns the event. */
+async function getModifiableEvent(eventId: number, userId: number, action: 'edit' | 'delete') {
+  const event = await getEventById(eventId);
+  if (!event) throw new NotFoundError('Event not found');
+  if (event.organizerId !== userId && !(await isUserAdmin(userId))) {
+    throw new ForbiddenError(`Only the organizer or an admin can ${action} this event`);
+  }
+  return event;
+}
+
+/* Images and maps are linked from other origins' <img> tags, so they need
+   CORP relaxed (helmet defaults it to same-origin). */
+function sendImage(res: Response, body: Buffer, contentType: string, cacheControl: string) {
+  res.set({
+    'Content-Type': contentType,
+    'Cache-Control': cacheControl,
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+  });
+  res.status(200).send(body);
 }
 
 /**
- * GET /api/event
+ * GET /events
  * Retrieves all events.
  */
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    const events = await getAllEvents();
-
-    res.status(200).json({
-      status: 'success',
-      data: events,
-    });
-  } catch (error) {
-    console.error('Get events error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+router.get(
+  '/',
+  asyncHandler(async (_req, res) => {
+    ok(res, await getAllEvents());
+  }),
+);
 
 /**
  * GET /events/:eventId/image?v=...
  * Serves an event's photo as a real image response, so event lists link to
  * it instead of inlining it. Public, like the event list itself.
  */
-router.get('/:eventId/image', async (req: Request, res: Response) => {
-  try {
-    const eventId = parseInt(req.params.eventId, 10);
-    if (isNaN(eventId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid event ID' });
-    }
-
-    const dataUri = await getEventImage(eventId);
+router.get(
+  '/:eventId/image',
+  asyncHandler(async (req, res) => {
+    const dataUri = await getEventImage(parseId(req.params.eventId, 'event'));
     const image = dataUri ? decodeImageDataUri(dataUri) : null;
-    if (!image) {
-      return res.status(404).json({ status: 'error', message: 'Image not found' });
-    }
+    if (!image) throw new NotFoundError('Image not found');
 
-    res.set({
-      'Content-Type': image.contentType,
-      // The URL changes whenever the event does (v = updated_at).
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      // helmet defaults this to same-origin, which would stop the
-      // frontend's own domain from displaying it.
-      'Cross-Origin-Resource-Policy': 'cross-origin',
-    });
-    res.status(200).send(image.body);
-  } catch (error) {
-    console.error('Get event image error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+    // The URL changes whenever the event does (v = updated_at).
+    sendImage(res, image.body, image.contentType, 'public, max-age=31536000, immutable');
+  }),
+);
 
 /**
  * GET /events/:eventId/map?v=lat,lng
  * The event's location as a map image, drawn by Google Static Maps with the
  * backend's key. Public, like the event itself.
  */
-router.get('/:eventId/map', async (req: Request, res: Response) => {
-  try {
-    const eventId = parseInt(req.params.eventId, 10);
-    if (isNaN(eventId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid event ID' });
-    }
-    const event = await getEventById(eventId);
+router.get(
+  '/:eventId/map',
+  asyncHandler(async (req, res) => {
+    const event = await getEventById(parseId(req.params.eventId, 'event'));
     if (!event || event.locationLat === null || event.locationLng === null) {
-      return res.status(404).json({ status: 'error', message: 'Map not found' });
+      throw new NotFoundError('Map not found');
     }
 
+    // The URL changes whenever the coordinates do (v = lat,lng).
     const image = await getStaticMap(event.locationLat, event.locationLng);
-    res.set({
-      'Content-Type': 'image/png',
-      // The URL changes whenever the coordinates do (v = lat,lng).
-      'Cache-Control': 'public, max-age=604800',
-      'Cross-Origin-Resource-Policy': 'cross-origin',
-    });
-    res.status(200).send(image);
-  } catch (error) {
-    if (error instanceof PlacesError) return res.status(502).json({ status: 'error', message: error.message });
-    console.error('Get event map error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+    sendImage(res, image, 'image/png', 'public, max-age=604800');
+  }),
+);
 
 /**
- * GET /api/event/:eventId
+ * GET /events/:eventId
  * Retrieves a specific event by ID.
  */
-router.get('/:eventId', async (req: Request, res: Response) => {
-  try {
-    const eventId = parseInt(req.params.eventId);
-
-    if (isNaN(eventId)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid event ID',
-      });
-    }
-
-    const event = await getEventById(eventId);
-
-    if (!event) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Event not found',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      data: event,
-    });
-  } catch (error) {
-    console.error('Get event error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+router.get(
+  '/:eventId',
+  asyncHandler(async (req, res) => {
+    const event = await getEventById(parseId(req.params.eventId, 'event'));
+    if (!event) throw new NotFoundError('Event not found');
+    ok(res, event);
+  }),
+);
 
 /**
- * POST /api/event
+ * POST /events
  * Creates a new event. Director, executive or admin only.
  */
-router.post('/', verifyAuthToken, requireRole(['director', 'executive', 'admin']), async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const { title, description, imageUrl, eventType, startDate, endDate, location, locationLat, locationLng, capacity, facebookUrl, instagramUrl } =
-      req.body;
+router.post(
+  '/',
+  verifyAuthToken,
+  requireRole(['director', 'executive', 'admin']),
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const {
+      title,
+      description,
+      imageUrl,
+      eventType,
+      startDate,
+      endDate,
+      location,
+      locationLat,
+      locationLng,
+      capacity,
+      facebookUrl,
+      instagramUrl,
+    } = req.body;
 
-    if (!title || !startDate) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required fields: title, startDate',
-      });
-    }
+    if (!title || !startDate) throw new ValidationError('Missing required fields: title, startDate');
 
+    // createEvent throws a ValidationError for invalid input; a DB or
+    // Google Calendar failure resolves to null instead.
     const event = await createEvent({
       title,
       description,
@@ -174,68 +141,46 @@ router.post('/', verifyAuthToken, requireRole(['director', 'executive', 'admin']
       location,
       locationLat,
       locationLng,
-      organizerId: user.userId,
+      organizerId: req.user.userId,
       capacity,
       facebookUrl,
       instagramUrl,
     });
+    if (!event) throw new ValidationError('Failed to create event');
 
-    if (!event) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Failed to create event',
-      });
-    }
-
-    res.status(201).json({
-      status: 'success',
-      message: 'Event created successfully',
-      data: event,
-    });
-  } catch (error) {
-    // createEvent only throws for invalid input (see functions/events.ts) —
-    // a DB or Google Calendar failure resolves to null instead, handled above.
-    console.error('Create event error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to create event',
-    });
-  }
-});
+    created(res, event, { message: 'Event created successfully' });
+  }),
+);
 
 /**
- * PUT /api/event/:eventId
+ * PUT /events/:eventId
  * Edits the details of an event. Organizer or admin only.
  */
-router.put('/:eventId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const eventId = parseInt(req.params.eventId);
-    const user = (req as any).user;
+router.put(
+  '/:eventId',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const eventId = parseId(req.params.eventId, 'event');
+    await getModifiableEvent(eventId, req.user.userId, 'edit');
 
-    if (isNaN(eventId)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid event ID',
-      });
-    }
+    const {
+      title,
+      description,
+      imageUrl,
+      eventType,
+      startDate,
+      endDate,
+      location,
+      locationLat,
+      locationLng,
+      status,
+      capacity,
+      facebookUrl,
+      instagramUrl,
+    } = req.body;
 
-    const existing = await getEventById(eventId);
-    if (!existing) {
-      return res.status(404).json({ status: 'error', message: 'Event not found' });
-    }
-    if (!(await canModifyEvent(user.userId, existing.organizerId))) {
-      return res.status(403).json({ status: 'error', message: 'Only the organizer or an admin can edit this event' });
-    }
-
-    const { title, description, imageUrl, eventType, startDate, endDate, location, locationLat, locationLng, status, capacity, facebookUrl, instagramUrl } =
-      req.body;
-
-    try {
-      validateEventImage(imageUrl);
-      validateEventCoordinates(locationLat, locationLng);
-    } catch (err) {
-      return res.status(400).json({ status: 'error', message: err instanceof Error ? err.message : 'Invalid image' });
-    }
+    validateEventImage(imageUrl);
+    validateEventCoordinates(locationLat, locationLng);
 
     const event = await updateEvent(eventId, {
       title,
@@ -252,117 +197,54 @@ router.put('/:eventId', verifyAuthToken, async (req: Request, res: Response) => 
       facebookUrl,
       instagramUrl,
     });
+    if (!event) throw new NotFoundError('Event not found');
 
-    if (!event) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Event not found',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Event updated successfully',
-      data: event,
-    });
-  } catch (error) {
-    console.error('Update event error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+    ok(res, event, { message: 'Event updated successfully' });
+  }),
+);
 
 /**
- * DELETE /api/event/:eventId
+ * DELETE /events/:eventId
  * Deletes an event. Organizer or admin only.
  */
-router.delete('/:eventId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const eventId = parseInt(req.params.eventId);
-    const user = (req as any).user;
+router.delete(
+  '/:eventId',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const eventId = parseId(req.params.eventId, 'event');
+    await getModifiableEvent(eventId, req.user.userId, 'delete');
 
-    if (isNaN(eventId)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid event ID',
-      });
-    }
+    if (!(await deleteEvent(eventId))) throw new NotFoundError('Event not found');
 
-    const existing = await getEventById(eventId);
-    if (!existing) {
-      return res.status(404).json({ status: 'error', message: 'Event not found' });
-    }
-    if (!(await canModifyEvent(user.userId, existing.organizerId))) {
-      return res.status(403).json({ status: 'error', message: 'Only the organizer or an admin can delete this event' });
-    }
-
-    const deleted = await deleteEvent(eventId);
-
-    if (!deleted) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Event not found',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Event deleted successfully',
-    });
-  } catch (error) {
-    console.error('Delete event error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+    ok(res, undefined, { message: 'Event deleted successfully' });
+  }),
+);
 
 /**
  * GET /events/:eventId/rsvp
  * Who's going / not going, plus the signed-in member's own status.
  */
-router.get('/:eventId/rsvp', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const eventId = parseInt(req.params.eventId);
-    const user = (req as any).user;
-    if (isNaN(eventId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid event ID' });
-    }
-
-    const summary = await getRsvpSummary(eventId, user.userId);
-    res.status(200).json({ status: 'success', data: summary });
-  } catch (error) {
-    console.error('Get RSVP summary error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+router.get(
+  '/:eventId/rsvp',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    ok(res, await getRsvpSummary(parseId(req.params.eventId, 'event'), req.user.userId));
+  }),
+);
 
 /**
  * PUT /events/:eventId/rsvp
  * Records the signed-in member's own RSVP — any member can RSVP to any
  * event (there's no invite list; see the comment on the events table).
  */
-router.put('/:eventId/rsvp', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const eventId = parseInt(req.params.eventId);
-    const user = (req as any).user;
-    if (isNaN(eventId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid event ID' });
-    }
-
-    await setRsvp(eventId, user.userId, req.body.status);
-    const summary = await getRsvpSummary(eventId, user.userId);
-    res.status(200).json({ status: 'success', data: summary });
-  } catch (error) {
-    console.error('Set RSVP error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to update RSVP',
-    });
-  }
-});
+router.put(
+  '/:eventId/rsvp',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const eventId = parseId(req.params.eventId, 'event');
+    await setRsvp(eventId, req.user.userId, req.body.status);
+    ok(res, await getRsvpSummary(eventId, req.user.userId));
+  }, 'Failed to update RSVP'),
+);
 
 export default router;

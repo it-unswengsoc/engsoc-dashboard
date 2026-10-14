@@ -26,16 +26,24 @@ function NodeIcon({ node }: { node: BrowserNode }) {
     return (
       <span
         className="flex h-6 w-6 shrink-0 items-center justify-center rounded"
-        style={{ backgroundColor: node.kind === 'drive' ? '#B1C9DC' : FOLDER_COLOUR.bg, color: node.kind === 'drive' ? '#2A4A63' : FOLDER_COLOUR.text }}
+        style={{
+          backgroundColor: node.kind === 'drive' ? '#B1C9DC' : FOLDER_COLOUR.bg,
+          color: node.kind === 'drive' ? '#2A4A63' : FOLDER_COLOUR.text,
+        }}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="h-3.5 w-3.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+          />
         </svg>
       </span>
     );
   }
 
-  const colour = node.kind === 'entry' ? (EXTENSION_COLOURS[node.extensionLabel] ?? DEFAULT_FILE_COLOUR) : DEFAULT_FILE_COLOUR;
+  const colour =
+    node.kind === 'entry' ? (EXTENSION_COLOURS[node.extensionLabel] ?? DEFAULT_FILE_COLOUR) : DEFAULT_FILE_COLOUR;
   return (
     <span
       style={{ backgroundColor: colour.bg, color: colour.text }}
@@ -53,7 +61,10 @@ function NodeIcon({ node }: { node: BrowserNode }) {
    opening one takes a double-click. */
 export default function DriveColumn({ title, nodes, selectedId, onSelect, onOpenFile }: DriveColumnProps) {
   return (
-    <div data-drive-column className="flex h-full w-[80vw] flex-none snap-start flex-col overflow-y-auto border-r border-gray-100 md:w-auto md:min-w-[140px] md:flex-1 md:basis-0">
+    <div
+      data-drive-column
+      className="flex h-full w-[80vw] flex-none snap-start flex-col overflow-y-auto border-r border-gray-100 md:w-auto md:min-w-[140px] md:flex-1 md:basis-0"
+    >
       {/* shrink-0: truncate sets overflow: hidden, which otherwise lets the
           column squash this heading to make room once a long list
           overflows it, clipping the text. */}
@@ -106,7 +117,11 @@ export default function DriveColumn({ title, nodes, selectedId, onSelect, onOpen
    blank when it isn't known yet. */
 export function DriveColumnSkeleton({ title }: { title?: string }) {
   return (
-    <div data-drive-column className="flex h-full w-[80vw] flex-none snap-start flex-col border-r border-gray-100 md:w-auto md:min-w-[140px] md:flex-1 md:basis-0" aria-busy="true">
+    <div
+      data-drive-column
+      className="flex h-full w-[80vw] flex-none snap-start flex-col border-r border-gray-100 md:w-auto md:min-w-[140px] md:flex-1 md:basis-0"
+      aria-busy="true"
+    >
       <h3 className="shrink-0 truncate border-b border-gray-100 px-3 py-2 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">
         {title || '\u00a0'}
       </h3>

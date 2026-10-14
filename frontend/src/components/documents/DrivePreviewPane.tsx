@@ -43,7 +43,10 @@ const OPEN_BUTTON_STYLES =
 export default function DrivePreviewPane({ node, path, locationLabel, onRename, onDelete }: DrivePreviewPaneProps) {
   if (!node) {
     return (
-      <div data-preview-pane className="flex w-[85vw] shrink-0 snap-start md:w-80 flex-col items-center justify-center gap-2 border-l border-gray-100 px-6 text-center">
+      <div
+        data-preview-pane
+        className="flex w-[85vw] shrink-0 snap-start md:w-80 flex-col items-center justify-center gap-2 border-l border-gray-100 px-6 text-center"
+      >
         <p className="font-mono text-xs text-gray-400">Select a file or folder to preview.</p>
       </div>
     );
@@ -54,7 +57,10 @@ export default function DrivePreviewPane({ node, path, locationLabel, onRename, 
   const canDelete = node.kind === 'entry' && node.capabilities.canDelete;
 
   return (
-    <div data-preview-pane className="flex w-[85vw] shrink-0 snap-start md:w-80 flex-col overflow-y-auto border-l border-gray-100 px-6 py-6">
+    <div
+      data-preview-pane
+      className="flex w-[85vw] shrink-0 snap-start md:w-80 flex-col overflow-y-auto border-l border-gray-100 px-6 py-6"
+    >
       <div
         className="flex h-14 w-14 items-center justify-center rounded-xl"
         style={{ backgroundColor: isFile ? '#E5E7EB' : '#2A7D6F' }}
@@ -65,7 +71,11 @@ export default function DrivePreviewPane({ node, path, locationLabel, onRename, 
           </span>
         ) : (
           <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} className="h-7 w-7">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+            />
           </svg>
         )}
       </div>
@@ -118,9 +128,7 @@ export default function DrivePreviewPane({ node, path, locationLabel, onRename, 
           Open file
         </a>
       ) : (
-        <p className="mt-4 font-mono text-xs text-[#8B2E38]">
-          Drive didn't provide a link to open this file.
-        </p>
+        <p className="mt-4 font-mono text-xs text-[#8B2E38]">Drive didn&apos;t provide a link to open this file.</p>
       )}
     </div>
   );

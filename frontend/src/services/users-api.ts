@@ -1,7 +1,6 @@
 import type { DirectoryUser } from '@/types/directory';
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+import { USE_MOCK } from '@/services/api-config';
+import { api } from '@/services/api-client';
 
 export type { DirectoryUser };
 
@@ -13,11 +12,5 @@ export async function getDirectory(token: string): Promise<DirectoryUser[]> {
     return mockGetDirectory();
   }
 
-  const res = await fetch(apiUrl('/users'), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load members');
-  return data.data as DirectoryUser[];
+  return api<DirectoryUser[]>('/users', { token, errorMessage: 'Failed to load members' });
 }

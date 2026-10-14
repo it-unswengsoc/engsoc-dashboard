@@ -57,7 +57,15 @@ export const mockRequests: MockRequestSeed[] = [
         link: { href: 'https://fb.me/careersnight26', label: 'Facebook event' },
       },
     ],
-    attachments: [{ id: 2, fieldName: 'attachment', fileName: 'careers-night-run-sheet.pdf', mimeType: 'application/pdf', sizeBytes: 96_000 }],
+    attachments: [
+      {
+        id: 2,
+        fieldName: 'attachment',
+        fileName: 'careers-night-run-sheet.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 96_000,
+      },
+    ],
   },
   {
     id: 2,
@@ -81,8 +89,7 @@ export const mockRequests: MockRequestSeed[] = [
       },
       {
         label: 'Any ideas you might have?',
-        value:
-          'Fast cuts, no voiceover — it plays on mute. Sponsor logos need a clear 3 seconds each.',
+        value: 'Fast cuts, no voiceover — it plays on mute. Sponsor logos need a clear 3 seconds each.',
       },
       {
         label: 'Last year’s footage',
@@ -90,7 +97,9 @@ export const mockRequests: MockRequestSeed[] = [
         link: { href: 'https://drive.google.com/drive/folders/oweek2025', label: 'Last year’s footage' },
       },
     ],
-    attachments: [{ id: 3, fieldName: 'attachment', fileName: 'sponsor-logos.png', mimeType: 'image/png', sizeBytes: 240_000 }],
+    attachments: [
+      { id: 3, fieldName: 'attachment', fileName: 'sponsor-logos.png', mimeType: 'image/png', sizeBytes: 240_000 },
+    ],
   },
   {
     id: 3,

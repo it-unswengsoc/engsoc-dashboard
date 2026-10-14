@@ -1,7 +1,6 @@
 import type { AnnouncementItem, AnnouncementComment } from '@/types/announcements';
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+import { apiUrl, USE_MOCK } from '@/services/api-config';
+import { api, apiFetch } from '@/services/api-client';
 
 export type { AnnouncementItem, AnnouncementComment };
 
@@ -25,13 +24,8 @@ export async function getAnnouncements(token: string): Promise<AnnouncementItem[
     return mockGetAnnouncements();
   }
 
-  const res = await fetch(apiUrl('/announcements'), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load announcements');
-  return (data.data as AnnouncementItem[]).map(withAbsoluteImageUrl);
+  const data = await api<AnnouncementItem[]>('/announcements', { token, errorMessage: 'Failed to load announcements' });
+  return data.map(withAbsoluteImageUrl);
 }
 
 /* Director/executive/admin only — the backend enforces this (403s
@@ -39,21 +33,21 @@ export async function getAnnouncements(token: string): Promise<AnnouncementItem[
    that's true (see NewItemDialog), same trust boundary as everywhere else. */
 export async function createAnnouncement(
   token: string,
-  input: { content: string; imageUrl?: string }
+  input: { content: string; imageUrl?: string },
 ): Promise<AnnouncementItem> {
   if (USE_MOCK) {
     const { createAnnouncement: mockCreateAnnouncement } = await import('@/mocks/functions/announcements');
     return mockCreateAnnouncement(input);
   }
 
-  const res = await fetch(apiUrl('/announcements'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(input),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to create announcement');
-  return withAbsoluteImageUrl(data.data as AnnouncementItem);
+  return withAbsoluteImageUrl(
+    await api<AnnouncementItem>('/announcements', {
+      method: 'POST',
+      token,
+      body: input,
+      errorMessage: 'Failed to create announcement',
+    }),
+  );
 }
 
 /* Author or admin only — the backend enforces this (403s otherwise); the
@@ -62,21 +56,21 @@ export async function createAnnouncement(
 export async function updateAnnouncement(
   token: string,
   announcementId: number,
-  input: { content?: string; imageUrl?: string | null }
+  input: { content?: string; imageUrl?: string | null },
 ): Promise<AnnouncementItem> {
   if (USE_MOCK) {
     const { updateAnnouncement: mockUpdateAnnouncement } = await import('@/mocks/functions/announcements');
     return mockUpdateAnnouncement(announcementId, input);
   }
 
-  const res = await fetch(apiUrl(`/announcements/${announcementId}`), {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(input),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to update announcement');
-  return withAbsoluteImageUrl(data.data as AnnouncementItem);
+  return withAbsoluteImageUrl(
+    await api<AnnouncementItem>(`/announcements/${announcementId}`, {
+      method: 'PATCH',
+      token,
+      body: input,
+      errorMessage: 'Failed to update announcement',
+    }),
+  );
 }
 
 /* Author or admin only — the backend enforces this (403s otherwise); the
@@ -88,14 +82,11 @@ export async function deleteAnnouncement(token: string, announcementId: number):
     return mockDeleteAnnouncement(announcementId);
   }
 
-  const res = await fetch(apiUrl(`/announcements/${announcementId}`), {
+  await apiFetch(`/announcements/${announcementId}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    token,
+    errorMessage: 'Failed to delete announcement',
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || 'Failed to delete announcement');
-  }
 }
 
 export async function likeAnnouncement(token: string, announcementId: number): Promise<AnnouncementItem> {
@@ -104,13 +95,13 @@ export async function likeAnnouncement(token: string, announcementId: number): P
     return mockLike(announcementId);
   }
 
-  const res = await fetch(apiUrl(`/announcements/${announcementId}/like`), {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to like announcement');
-  return withAbsoluteImageUrl(data.data as AnnouncementItem);
+  return withAbsoluteImageUrl(
+    await api<AnnouncementItem>(`/announcements/${announcementId}/like`, {
+      method: 'POST',
+      token,
+      errorMessage: 'Failed to like announcement',
+    }),
+  );
 }
 
 export async function unlikeAnnouncement(token: string, announcementId: number): Promise<AnnouncementItem> {
@@ -119,13 +110,13 @@ export async function unlikeAnnouncement(token: string, announcementId: number):
     return mockUnlike(announcementId);
   }
 
-  const res = await fetch(apiUrl(`/announcements/${announcementId}/like`), {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to unlike announcement');
-  return withAbsoluteImageUrl(data.data as AnnouncementItem);
+  return withAbsoluteImageUrl(
+    await api<AnnouncementItem>(`/announcements/${announcementId}/like`, {
+      method: 'DELETE',
+      token,
+      errorMessage: 'Failed to unlike announcement',
+    }),
+  );
 }
 
 export async function getComments(token: string, announcementId: number): Promise<AnnouncementComment[]> {
@@ -134,31 +125,22 @@ export async function getComments(token: string, announcementId: number): Promis
     return mockGetComments(announcementId);
   }
 
-  const res = await fetch(apiUrl(`/announcements/${announcementId}/comments`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+  return api<AnnouncementComment[]>(`/announcements/${announcementId}/comments`, {
+    token,
+    errorMessage: 'Failed to load comments',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load comments');
-  return data.data as AnnouncementComment[];
 }
 
-export async function addComment(
-  token: string,
-  announcementId: number,
-  content: string
-): Promise<AnnouncementComment> {
+export async function addComment(token: string, announcementId: number, content: string): Promise<AnnouncementComment> {
   if (USE_MOCK) {
     const { addComment: mockAddComment } = await import('@/mocks/functions/announcements');
     return mockAddComment(announcementId, content);
   }
 
-  const res = await fetch(apiUrl(`/announcements/${announcementId}/comments`), {
+  return api<AnnouncementComment>(`/announcements/${announcementId}/comments`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ content }),
+    token,
+    body: { content },
+    errorMessage: 'Failed to add comment',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to add comment');
-  return data.data as AnnouncementComment;
 }

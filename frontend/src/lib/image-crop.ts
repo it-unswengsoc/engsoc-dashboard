@@ -53,7 +53,7 @@ async function loadDrawable(source: Blob | string): Promise<CanvasImageSource> {
     // as a bug report rather than something the user can act on.
     const reason = bitmapFailure instanceof Error ? ` (${bitmapFailure.message})` : '';
     throw new Error(
-      `This file isn't a photo format your browser can open${reason} — try re-saving it as a JPEG or PNG and uploading that instead.`
+      `This file isn't a photo format your browser can open${reason} — try re-saving it as a JPEG or PNG and uploading that instead.`,
     );
   }
 }
@@ -67,7 +67,7 @@ export async function getCroppedImageDataUrl(
   imageSrc: Blob | string,
   croppedAreaPixels: Area,
   maxDimension = 1600,
-  quality = 0.85
+  quality = 0.85,
 ): Promise<string> {
   const image = await loadDrawable(imageSrc);
 
@@ -90,7 +90,7 @@ export async function getCroppedImageDataUrl(
     0,
     0,
     outputWidth,
-    outputHeight
+    outputHeight,
   );
 
   if ('close' in image) image.close();
@@ -104,7 +104,7 @@ export async function getCroppedImageDataUrl(
     // surface that distinctly so it isn't mistaken for a real decode bug.
     if (err instanceof DOMException && err.name === 'SecurityError') {
       throw new Error(
-        'Your browser or an extension is blocking image export from this page (this is usually a privacy/ad-block feature) — try disabling extensions for this site, or use a different browser.'
+        'Your browser or an extension is blocking image export from this page (this is usually a privacy/ad-block feature) — try disabling extensions for this site, or use a different browser.',
       );
     }
     throw err;

@@ -1,7 +1,6 @@
 import type { Profile, AuthResponse } from '@/types/auth';
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+import { USE_MOCK } from '@/services/api-config';
+import { api } from '@/services/api-client';
 
 export type { Profile, AuthResponse };
 
@@ -11,15 +10,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
     return mockLogin(email, password);
   }
 
-  const res = await fetch(apiUrl('/auth/login'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Login failed');
-  return data.data;
+  return api<AuthResponse>('/auth/login', { method: 'POST', body: { email, password }, errorMessage: 'Login failed' });
 }
 
 export async function getProfile(token: string): Promise<Profile> {
@@ -28,40 +19,22 @@ export async function getProfile(token: string): Promise<Profile> {
     return mockGetProfile(token);
   }
 
-  const res = await fetch(apiUrl('/auth/profile'), {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  if (res.status === 401) throw new Error('Unauthorized');
-
-  const data = await res.json();
-  return data.data;
+  return api<Profile>('/auth/profile', { token, errorMessage: 'Failed to load profile' });
 }
 
-/* The endpoint requires both names and rejects a partial update, so callers
+/* A 401 (expired session) throws an ApiError that isUnauthorized() spots.
+   The endpoint requires both names and rejects a partial update, so callers
    send the full pair even when only one changed. */
-export async function updateProfile(
-  token: string,
-  firstName: string,
-  lastName: string,
-): Promise<Profile> {
+export async function updateProfile(token: string, firstName: string, lastName: string): Promise<Profile> {
   if (USE_MOCK) {
     const { updateProfile: mockUpdateProfile } = await import('@/mocks/functions/auth');
     return mockUpdateProfile(token, firstName, lastName);
   }
 
-  const res = await fetch(apiUrl('/auth/profile'), {
+  return api<Profile>('/auth/profile', {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ firstName, lastName }),
+    token,
+    body: { firstName, lastName },
+    errorMessage: 'Failed to update profile',
   });
-
-  if (res.status === 401) throw new Error('Unauthorized');
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to update profile');
-  return data.data;
 }

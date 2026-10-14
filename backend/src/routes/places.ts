@@ -1,43 +1,39 @@
-import { Router, Request, Response } from 'express';
-import { autocompletePlaces, getPlaceDetails, PlacesError } from '../functions/places';
-import { verifyAuthToken } from './auth';
+import { Router } from 'express';
+import { autocompletePlaces, getPlaceDetails } from '../functions/places';
+import { verifyAuthToken } from '../middleware/auth';
+import { ValidationError } from '../lib/errors';
+import { asyncHandler, ok } from '../lib/http';
 
 const router = Router();
+
+router.use(verifyAuthToken);
 
 /**
  * GET /places/autocomplete?q=…&session=…
  * Place suggestions for an event's location as it's typed.
  */
-router.get('/autocomplete', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
+router.get(
+  '/autocomplete',
+  asyncHandler(async (req, res) => {
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
     const session = typeof req.query.session === 'string' ? req.query.session : undefined;
-    if (q.length < 2) return res.status(200).json({ status: 'success', data: [] });
-    if (q.length > 200) return res.status(400).json({ status: 'error', message: 'Search is too long' });
+    if (q.length < 2) return ok(res, []);
+    if (q.length > 200) throw new ValidationError('Search is too long');
 
-    const suggestions = await autocompletePlaces(q, session);
-    res.status(200).json({ status: 'success', data: suggestions });
-  } catch (error) {
-    if (error instanceof PlacesError) return res.status(502).json({ status: 'error', message: error.message });
-    console.error('Place autocomplete error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+    ok(res, await autocompletePlaces(q, session));
+  }),
+);
 
 /**
  * GET /places/:placeId?session=…
  * A picked suggestion's name, address and coordinates.
  */
-router.get('/:placeId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
+router.get(
+  '/:placeId',
+  asyncHandler(async (req, res) => {
     const session = typeof req.query.session === 'string' ? req.query.session : undefined;
-    const place = await getPlaceDetails(req.params.placeId, session);
-    res.status(200).json({ status: 'success', data: place });
-  } catch (error) {
-    if (error instanceof PlacesError) return res.status(502).json({ status: 'error', message: error.message });
-    console.error('Place details error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+    ok(res, await getPlaceDetails(req.params.placeId, session));
+  }),
+);
 
 export default router;

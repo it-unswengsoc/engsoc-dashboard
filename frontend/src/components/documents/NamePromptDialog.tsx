@@ -15,7 +15,14 @@ interface NamePromptDialogProps {
 /* One small reusable dialog for anything that's just "type a name, submit
    it" — creating a folder, creating a blank Doc/Sheet/Slides, or renaming
    an existing file/folder. */
-export default function NamePromptDialog({ open, title, submitLabel, initialValue = '', onSubmit, onClose }: NamePromptDialogProps) {
+export default function NamePromptDialog({
+  open,
+  title,
+  submitLabel,
+  initialValue = '',
+  onSubmit,
+  onClose,
+}: NamePromptDialogProps) {
   const [name, setName] = useState(initialValue);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');

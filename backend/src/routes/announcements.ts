@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
 import {
   getAllAnnouncements,
   getAnnouncementImage,
@@ -13,18 +13,23 @@ import {
   getAnnouncementAuthorId,
   getCommentAuthorId,
 } from '../functions/announcements';
-import { verifyAuthToken, requireRole } from './auth';
 import { isUserAdmin } from '../functions/admin';
 import { decodeImageDataUri, isValidAnnouncementImageSignature } from '../functions/announcement-images';
+import { verifyAuthToken, requireRole, type AuthedRequest } from '../middleware/auth';
+import { ForbiddenError, NotFoundError, ValidationError } from '../lib/errors';
+import { asyncHandler, created, ok, parseId } from '../lib/http';
 
 const router = Router();
 
 /* Only the author or an admin can edit/delete their own announcement/comment
    — anyone with a valid token could delete before this (POST already needed
-   director/executive/admin, but delete had no check at all). */
-async function canModify(userId: number, authorId: number | null): Promise<boolean> {
-  if (authorId === userId) return true;
-  return isUserAdmin(userId);
+   director/executive/admin, but delete had no check at all). authorId is
+   null when the announcement/comment doesn't exist. */
+async function assertCanModify(userId: number, authorId: number | null, what: string, action: 'edit' | 'delete') {
+  if (authorId === null) throw new NotFoundError(`${what} not found`);
+  if (authorId !== userId && !(await isUserAdmin(userId))) {
+    throw new ForbiddenError(`Only the author or an admin can ${action} this`);
+  }
 }
 
 /**
@@ -32,23 +37,13 @@ async function canModify(userId: number, authorId: number | null): Promise<boole
  * Retrieves all announcements. Requires authentication because
  * isLikedByMe is computed per requesting user.
  */
-router.get('/', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const announcements = await getAllAnnouncements(user.userId);
-
-    res.status(200).json({
-      status: 'success',
-      data: announcements,
-    });
-  } catch (error) {
-    console.error('Get announcements error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+router.get(
+  '/',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    ok(res, await getAllAnnouncements(req.user.userId));
+  }),
+);
 
 /**
  * GET /announcements/:announcementId/image?v=...&sig=...
@@ -58,8 +53,9 @@ router.get('/', verifyAuthToken, async (req: Request, res: Response) => {
  * authenticated list/create/update response hands out (see
  * functions/announcement-images.ts).
  */
-router.get('/:announcementId/image', async (req: Request, res: Response) => {
-  try {
+router.get(
+  '/:announcementId/image',
+  asyncHandler(async (req, res) => {
     const announcementId = parseInt(req.params.announcementId, 10);
     const { v, sig } = req.query;
     if (
@@ -68,14 +64,12 @@ router.get('/:announcementId/image', async (req: Request, res: Response) => {
       typeof sig !== 'string' ||
       !isValidAnnouncementImageSignature(announcementId, v, sig)
     ) {
-      return res.status(403).json({ status: 'error', message: 'Invalid image link' });
+      throw new ForbiddenError('Invalid image link');
     }
 
     const dataUri = await getAnnouncementImage(announcementId);
     const image = dataUri ? decodeImageDataUri(dataUri) : null;
-    if (!image) {
-      return res.status(404).json({ status: 'error', message: 'Image not found' });
-    }
+    if (!image) throw new NotFoundError('Image not found');
 
     res.set({
       'Content-Type': image.contentType,
@@ -87,232 +81,108 @@ router.get('/:announcementId/image', async (req: Request, res: Response) => {
       'Cross-Origin-Resource-Policy': 'cross-origin',
     });
     res.status(200).send(image.body);
-  } catch (error) {
-    console.error('Get announcement image error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+  }),
+);
 
 /**
  * POST /announcements
  * Creates a new announcement authored by the requesting user. Director,
  * executive or admin only.
  */
-router.post('/', verifyAuthToken, requireRole(['director', 'executive', 'admin']), async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
+router.post(
+  '/',
+  verifyAuthToken,
+  requireRole(['director', 'executive', 'admin']),
+  asyncHandler(async (req: AuthedRequest, res) => {
     const { content, imageUrl } = req.body;
 
-    const announcement = await createAnnouncement({
-      authorId: user.userId,
-      content,
-      imageUrl,
-    });
+    // createAnnouncement throws a ValidationError for invalid input
+    // (caption missing, image too large or not an image); a DB failure
+    // resolves to null instead.
+    const announcement = await createAnnouncement({ authorId: req.user.userId, content, imageUrl });
+    if (!announcement) throw new ValidationError('Failed to create announcement');
 
-    if (!announcement) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Failed to create announcement',
-      });
-    }
-
-    res.status(201).json({
-      status: 'success',
-      message: 'Announcement created successfully',
-      data: announcement,
-    });
-  } catch (error) {
-    // createAnnouncement only throws for invalid input (caption missing,
-    // image too large or not an image) — a DB failure resolves to null
-    // instead, handled above. Same pattern as events.ts's createEvent.
-    console.error('Create announcement error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to create announcement',
-    });
-  }
-});
+    created(res, announcement, { message: 'Announcement created successfully' });
+  }),
+);
 
 /**
  * PATCH /announcements/:announcementId
  * Edits an announcement's caption and/or image. Author or admin only. Body:
  * { content?, imageUrl? } — imageUrl: null clears an existing image.
  */
-router.patch('/:announcementId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const announcementId = parseInt(req.params.announcementId);
-    const user = (req as any).user;
+router.patch(
+  '/:announcementId',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const announcementId = parseId(req.params.announcementId, 'announcement');
     const { content, imageUrl } = req.body as { content?: string; imageUrl?: string | null };
 
-    if (isNaN(announcementId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid announcement ID' });
-    }
+    await assertCanModify(req.user.userId, await getAnnouncementAuthorId(announcementId), 'Announcement', 'edit');
 
-    const authorId = await getAnnouncementAuthorId(announcementId);
-    if (authorId === null) {
-      return res.status(404).json({ status: 'error', message: 'Announcement not found' });
-    }
-    if (!(await canModify(user.userId, authorId))) {
-      return res.status(403).json({ status: 'error', message: 'Only the author or an admin can edit this' });
-    }
+    const announcement = await updateAnnouncement(announcementId, { content, imageUrl }, req.user.userId);
+    if (!announcement) throw new ValidationError('Failed to update announcement');
 
-    const announcement = await updateAnnouncement(announcementId, { content, imageUrl }, user.userId);
-    if (!announcement) {
-      return res.status(400).json({ status: 'error', message: 'Failed to update announcement' });
-    }
-
-    res.status(200).json({ status: 'success', message: 'Announcement updated', data: announcement });
-  } catch (error) {
-    console.error('Update announcement error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to update announcement',
-    });
-  }
-});
+    ok(res, announcement, { message: 'Announcement updated' });
+  }),
+);
 
 /**
  * DELETE /announcements/:announcementId
  * Deletes an announcement. Author or admin only.
  */
-router.delete('/:announcementId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const announcementId = parseInt(req.params.announcementId);
-    const user = (req as any).user;
+router.delete(
+  '/:announcementId',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const announcementId = parseId(req.params.announcementId, 'announcement');
+    await assertCanModify(req.user.userId, await getAnnouncementAuthorId(announcementId), 'Announcement', 'delete');
 
-    if (isNaN(announcementId)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid announcement ID',
-      });
-    }
+    if (!(await deleteAnnouncement(announcementId))) throw new NotFoundError('Announcement not found');
 
-    const authorId = await getAnnouncementAuthorId(announcementId);
-    if (authorId === null) {
-      return res.status(404).json({ status: 'error', message: 'Announcement not found' });
-    }
-    if (!(await canModify(user.userId, authorId))) {
-      return res.status(403).json({ status: 'error', message: 'Only the author or an admin can delete this' });
-    }
-
-    const deleted = await deleteAnnouncement(announcementId);
-
-    if (!deleted) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Announcement not found',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Announcement deleted successfully',
-    });
-  } catch (error) {
-    console.error('Delete announcement error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+    ok(res, undefined, { message: 'Announcement deleted successfully' });
+  }),
+);
 
 /**
  * POST /announcements/:announcementId/like
  * Likes an announcement on behalf of the requesting user.
  */
-router.post('/:announcementId/like', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const announcementId = parseInt(req.params.announcementId);
-    const user = (req as any).user;
-
-    if (isNaN(announcementId)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid announcement ID',
-      });
-    }
-
-    const announcement = await likeAnnouncement(announcementId, user.userId);
-
-    if (!announcement) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Announcement not found',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Announcement liked',
-      data: announcement,
-    });
-  } catch (error) {
-    console.error('Like announcement error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+router.post(
+  '/:announcementId/like',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const announcement = await likeAnnouncement(parseId(req.params.announcementId, 'announcement'), req.user.userId);
+    if (!announcement) throw new NotFoundError('Announcement not found');
+    ok(res, announcement, { message: 'Announcement liked' });
+  }),
+);
 
 /**
  * DELETE /announcements/:announcementId/like
  * Removes the requesting user's like from an announcement.
  */
-router.delete('/:announcementId/like', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const announcementId = parseInt(req.params.announcementId);
-    const user = (req as any).user;
-
-    if (isNaN(announcementId)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid announcement ID',
-      });
-    }
-
-    const announcement = await unlikeAnnouncement(announcementId, user.userId);
-
-    if (!announcement) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Announcement not found',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Announcement unliked',
-      data: announcement,
-    });
-  } catch (error) {
-    console.error('Unlike announcement error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+router.delete(
+  '/:announcementId/like',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const announcement = await unlikeAnnouncement(parseId(req.params.announcementId, 'announcement'), req.user.userId);
+    if (!announcement) throw new NotFoundError('Announcement not found');
+    ok(res, announcement, { message: 'Announcement unliked' });
+  }),
+);
 
 /**
  * GET /announcements/:announcementId/comments
  * Lists every comment on an announcement, oldest first.
  */
-router.get('/:announcementId/comments', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const announcementId = parseInt(req.params.announcementId);
-    if (isNaN(announcementId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid announcement ID' });
-    }
-
-    const comments = await getComments(announcementId);
-    res.status(200).json({ status: 'success', data: comments });
-  } catch (error) {
-    console.error('Get comments error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+router.get(
+  '/:announcementId/comments',
+  verifyAuthToken,
+  asyncHandler(async (req, res) => {
+    ok(res, await getComments(parseId(req.params.announcementId, 'announcement')));
+  }),
+);
 
 /**
  * POST /announcements/:announcementId/comments
@@ -320,62 +190,36 @@ router.get('/:announcementId/comments', verifyAuthToken, async (req: Request, re
  * comment — only posting the announcement itself is director/exec/admin
  * only.
  */
-router.post('/:announcementId/comments', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const announcementId = parseInt(req.params.announcementId);
-    const user = (req as any).user;
+router.post(
+  '/:announcementId/comments',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const announcementId = parseId(req.params.announcementId, 'announcement');
     const { content } = req.body as { content?: string };
+    if (!content?.trim()) throw new ValidationError('Missing required field: content');
 
-    if (isNaN(announcementId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid announcement ID' });
-    }
-    if (!content?.trim()) {
-      return res.status(400).json({ status: 'error', message: 'Missing required field: content' });
-    }
+    const comment = await addComment(announcementId, req.user.userId, content.trim());
+    if (!comment) throw new NotFoundError('Announcement not found');
 
-    const comment = await addComment(announcementId, user.userId, content.trim());
-    if (!comment) {
-      return res.status(404).json({ status: 'error', message: 'Announcement not found' });
-    }
-
-    res.status(201).json({ status: 'success', message: 'Comment added', data: comment });
-  } catch (error) {
-    console.error('Add comment error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+    created(res, comment, { message: 'Comment added' });
+  }),
+);
 
 /**
  * DELETE /announcements/:announcementId/comments/:commentId
  * Deletes a comment. Author or admin only.
  */
-router.delete('/:announcementId/comments/:commentId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const commentId = parseInt(req.params.commentId);
-    const user = (req as any).user;
+router.delete(
+  '/:announcementId/comments/:commentId',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const commentId = parseId(req.params.commentId, 'comment');
+    await assertCanModify(req.user.userId, await getCommentAuthorId(commentId), 'Comment', 'delete');
 
-    if (isNaN(commentId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid comment ID' });
-    }
+    if (!(await deleteComment(commentId))) throw new NotFoundError('Comment not found');
 
-    const authorId = await getCommentAuthorId(commentId);
-    if (authorId === null) {
-      return res.status(404).json({ status: 'error', message: 'Comment not found' });
-    }
-    if (!(await canModify(user.userId, authorId))) {
-      return res.status(403).json({ status: 'error', message: 'Only the author or an admin can delete this' });
-    }
-
-    const deleted = await deleteComment(commentId);
-    if (!deleted) {
-      return res.status(404).json({ status: 'error', message: 'Comment not found' });
-    }
-
-    res.status(200).json({ status: 'success', message: 'Comment deleted' });
-  } catch (error) {
-    console.error('Delete comment error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+    ok(res, undefined, { message: 'Comment deleted' });
+  }),
+);
 
 export default router;

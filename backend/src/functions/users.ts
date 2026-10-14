@@ -1,7 +1,6 @@
-import { QueryResult } from 'pg';
+import { type QueryResult, type QueryResultRow } from 'pg';
 import type { AuthorRole } from './announcements';
 import pool from '../database/pool';
-
 
 /* A minimal, non-admin member directory — every active user, without the
    admin-only fields (isActive/lastLogin/hasGoogleAccount) that
@@ -18,7 +17,7 @@ export interface DirectoryUser {
   port: string | null;
 }
 
-function rowToDirectoryUser(row: any): DirectoryUser {
+function rowToDirectoryUser(row: QueryResultRow): DirectoryUser {
   return {
     id: row.id,
     firstName: row.first_name,
@@ -34,7 +33,7 @@ export async function listDirectoryUsers(): Promise<DirectoryUser[]> {
     `SELECT id, first_name, last_name, email, role, port
      FROM users
      WHERE is_active = true
-     ORDER BY first_name, last_name`
+     ORDER BY first_name, last_name`,
   );
   return result.rows.map(rowToDirectoryUser);
 }

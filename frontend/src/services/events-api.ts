@@ -1,7 +1,6 @@
 import type { EventType, EventItem } from '@/types/events';
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+import { apiUrl, USE_MOCK } from '@/services/api-config';
+import { api, apiFetch } from '@/services/api-client';
 
 export type { EventType, EventItem };
 
@@ -54,10 +53,8 @@ export async function getEvents(): Promise<EventItem[]> {
     return mockGetEvents();
   }
 
-  const res = await fetch(apiUrl('/events'), { cache: 'no-store' });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load events');
-  return (data.data as RawEvent[]).map(toEventItem);
+  const data = await api<RawEvent[]>('/events', { errorMessage: 'Failed to load events' });
+  return data.map(toEventItem);
 }
 
 /* Official events don't carry every field (e.g. capacity) into their
@@ -73,10 +70,7 @@ export async function getEventById(eventId: number): Promise<EventItem> {
     return event;
   }
 
-  const res = await fetch(apiUrl(`/events/${eventId}`), { cache: 'no-store' });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load event');
-  return toEventItem(data.data as RawEvent);
+  return toEventItem(await api<RawEvent>(`/events/${eventId}`, { errorMessage: 'Failed to load event' }));
 }
 
 export interface CreateEventInput {
@@ -108,18 +102,9 @@ export async function createEvent(token: string, input: CreateEventInput): Promi
     return mockCreateEvent(input);
   }
 
-  const res = await fetch(apiUrl('/events'), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(input),
-  });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to create event');
-  return toEventItem(data.data as RawEvent);
+  return toEventItem(
+    await api<RawEvent>('/events', { method: 'POST', token, body: input, errorMessage: 'Failed to create event' }),
+  );
 }
 
 /* Organizer or admin only — the backend enforces this (403s otherwise); the
@@ -130,18 +115,14 @@ export async function updateEvent(token: string, eventId: number, input: UpdateE
     return mockUpdateEvent(eventId, input);
   }
 
-  const res = await fetch(apiUrl(`/events/${eventId}`), {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(input),
-  });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to update event');
-  return toEventItem(data.data as RawEvent);
+  return toEventItem(
+    await api<RawEvent>(`/events/${eventId}`, {
+      method: 'PUT',
+      token,
+      body: input,
+      errorMessage: 'Failed to update event',
+    }),
+  );
 }
 
 /* Organizer or admin only — the backend enforces this (403s otherwise); the
@@ -152,14 +133,7 @@ export async function deleteEvent(token: string, eventId: number): Promise<void>
     return mockDeleteEvent(eventId);
   }
 
-  const res = await fetch(apiUrl(`/events/${eventId}`), {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || 'Failed to delete event');
-  }
+  await apiFetch(`/events/${eventId}`, { method: 'DELETE', token, errorMessage: 'Failed to delete event' });
 }
 
 export type RsvpStatus = 'going' | 'not_going';
@@ -184,13 +158,7 @@ export async function getRsvpSummary(token: string, eventId: number): Promise<Rs
     return mockGetRsvpSummary(eventId);
   }
 
-  const res = await fetch(apiUrl(`/events/${eventId}/rsvp`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load RSVPs');
-  return data.data as RsvpSummary;
+  return api<RsvpSummary>(`/events/${eventId}/rsvp`, { token, errorMessage: 'Failed to load RSVPs' });
 }
 
 export async function setRsvp(token: string, eventId: number, status: RsvpStatus): Promise<RsvpSummary> {
@@ -199,12 +167,10 @@ export async function setRsvp(token: string, eventId: number, status: RsvpStatus
     return mockSetRsvp(eventId, status);
   }
 
-  const res = await fetch(apiUrl(`/events/${eventId}/rsvp`), {
+  return api<RsvpSummary>(`/events/${eventId}/rsvp`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status }),
+    token,
+    body: { status },
+    errorMessage: 'Failed to update RSVP',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to update RSVP');
-  return data.data as RsvpSummary;
 }

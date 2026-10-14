@@ -8,9 +8,22 @@ export type { EventRowData, TaskRowData, DashboardStats };
 
 /* ---------- Date helpers ---------- */
 
-const MONTHS_SHORT = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS_SHORT = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const MONTHS_LONG = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+const DAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /* "21/08/26" */
 function toSlashDate(d: Date): string {
@@ -114,7 +127,11 @@ export function toRecentAnnouncements(announcements: AnnouncementItem[]): Announ
    is a simple recency window rather than an unread count. */
 const NEW_ANNOUNCEMENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function toDashboardStats(tasks: TaskItem[], events: EventItem[], announcements: AnnouncementItem[]): DashboardStats {
+export function toDashboardStats(
+  tasks: TaskItem[],
+  events: EventItem[],
+  announcements: AnnouncementItem[],
+): DashboardStats {
   const open = tasks.filter((t) => !t.completed).length;
   const now = Date.now();
   const recent = announcements.filter((a) => now - new Date(a.createdAt).getTime() < NEW_ANNOUNCEMENT_WINDOW_MS).length;

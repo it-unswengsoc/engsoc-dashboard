@@ -21,13 +21,7 @@ interface StaggerRevealProps {
    appearing. Renders a plain div, so it's safe to drop existing layout
    classes (divide-y, grid, flex, ...) straight onto it in place of a
    wrapper that's otherwise just there for styling. */
-export default function StaggerReveal({
-  children,
-  className,
-  stagger = 0.06,
-  y = 14,
-  replayKey,
-}: StaggerRevealProps) {
+export default function StaggerReveal({ children, className, stagger = 0.06, y = 14, replayKey }: StaggerRevealProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,11 +33,7 @@ export default function StaggerReveal({
 
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
-    gsap.fromTo(
-      items,
-      { opacity: 0, y },
-      { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out', stagger }
-    );
+    gsap.fromTo(items, { opacity: 0, y }, { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out', stagger });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [replayKey]);
 

@@ -56,9 +56,7 @@ function SearchResultRow({ result, onNavigate }: { result: DriveSearchResultData
 
 export default function Header() {
   const { profile } = useProfile();
-  const initials = profile
-    ? ((profile.firstName?.[0] ?? '') + (profile.lastName?.[0] ?? '')).toUpperCase()
-    : '';
+  const initials = profile ? ((profile.firstName?.[0] ?? '') + (profile.lastName?.[0] ?? '')).toUpperCase() : '';
   const [newDialogOpen, setNewDialogOpen] = useState(false);
   const [hasOpenedNewDialogOnce, setHasOpenedNewDialogOnce] = useState(false);
 
@@ -135,7 +133,12 @@ export default function Header() {
           stroke="currentColor"
           viewBox="0 0 24 24"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+          />
         </svg>
 
         {showDropdown && (
@@ -167,18 +170,8 @@ export default function Header() {
           aria-label="New"
           className="flex items-center gap-2 rounded-xl bg-[#B1C9DC] px-3 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#9db8cd] hover:shadow-md active:scale-[0.98] sm:px-4"
         >
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2.5}
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 4v16m8-8H4"
-            />
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
           <span className="hidden sm:inline">New</span>
         </button>
@@ -194,9 +187,7 @@ export default function Header() {
         </Link>
       </div>
 
-      {hasOpenedNewDialogOnce && (
-        <NewItemDialog open={newDialogOpen} onClose={() => setNewDialogOpen(false)} />
-      )}
+      {hasOpenedNewDialogOnce && <NewItemDialog open={newDialogOpen} onClose={() => setNewDialogOpen(false)} />}
     </header>
   );
 }

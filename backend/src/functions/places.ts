@@ -3,6 +3,8 @@
    asks Google. Needs the Places API (New) and the Maps Static API enabled
    on GOOGLE_MAPS_API_KEY's project (or GOOGLE_API_KEY's, as a fallback). */
 
+import { UpstreamError } from '../lib/errors';
+
 const API_KEY = process.env.GOOGLE_MAPS_API_KEY || process.env.GOOGLE_API_KEY || '';
 
 /* Suggestions lean towards UNSW and Sydney, and stay in Australia. */
@@ -24,9 +26,28 @@ export interface PlaceDetails {
 }
 
 /** Thrown when Google refuses or fails — the route answers 502. */
-export class PlacesError extends Error {}
+export class PlacesError extends UpstreamError {}
 
-async function googleJson(url: string, init: RequestInit & { fieldMask?: string }): Promise<any> {
+/* Just the parts of Google's responses read below. */
+interface GoogleText {
+  text?: string;
+}
+interface AutocompleteResponse {
+  suggestions?: {
+    placePrediction?: {
+      placeId: string;
+      text?: GoogleText;
+      structuredFormat?: { mainText?: GoogleText; secondaryText?: GoogleText };
+    };
+  }[];
+}
+interface PlaceResponse {
+  id: string;
+  formattedAddress?: string;
+  location?: { latitude: number; longitude: number };
+}
+
+async function googleJson<T>(url: string, init: RequestInit & { fieldMask?: string }): Promise<T> {
   if (!API_KEY) throw new PlacesError('Location search is not set up');
   const { fieldMask, headers, ...rest } = init;
   const res = await fetch(url, {
@@ -38,18 +59,18 @@ async function googleJson(url: string, init: RequestInit & { fieldMask?: string 
       ...(headers as Record<string, string>),
     },
   });
-  const data: any = await res.json().catch(() => ({}));
+  const data: unknown = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.error('Google Places error:', res.status, data?.error?.message);
+    console.error('Google Places error:', res.status, (data as { error?: { message?: string } }).error?.message);
     throw new PlacesError('Location search is unavailable right now');
   }
-  return data;
+  return data as T;
 }
 
 /* `sessionToken` groups one search's keystrokes with the pick that ends it,
    which Google bills as a single session. */
 export async function autocompletePlaces(input: string, sessionToken?: string): Promise<PlaceSuggestion[]> {
-  const data = await googleJson('https://places.googleapis.com/v1/places:autocomplete', {
+  const data = await googleJson<AutocompleteResponse>('https://places.googleapis.com/v1/places:autocomplete', {
     method: 'POST',
     body: JSON.stringify({
       input,
@@ -59,9 +80,9 @@ export async function autocompletePlaces(input: string, sessionToken?: string): 
     }),
   });
   return (data.suggestions ?? [])
-    .map((s: any) => s.placePrediction)
-    .filter(Boolean)
-    .map((p: any) => ({
+    .map((s) => s.placePrediction)
+    .filter((p) => p !== undefined)
+    .map((p) => ({
       placeId: p.placeId,
       name: p.structuredFormat?.mainText?.text ?? p.text?.text ?? '',
       detail: p.structuredFormat?.secondaryText?.text ?? '',
@@ -70,10 +91,13 @@ export async function autocompletePlaces(input: string, sessionToken?: string): 
 
 export async function getPlaceDetails(placeId: string, sessionToken?: string): Promise<PlaceDetails> {
   const query = sessionToken ? `?sessionToken=${encodeURIComponent(sessionToken)}` : '';
-  const data = await googleJson(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}${query}`, {
-    method: 'GET',
-    fieldMask: 'id,formattedAddress,location',
-  });
+  const data = await googleJson<PlaceResponse>(
+    `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}${query}`,
+    {
+      method: 'GET',
+      fieldMask: 'id,formattedAddress,location',
+    },
+  );
   if (!data.location) throw new PlacesError('That place has no location');
   return {
     placeId: data.id,

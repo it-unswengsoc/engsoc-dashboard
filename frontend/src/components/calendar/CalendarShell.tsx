@@ -39,10 +39,14 @@ function viewFromPathname(pathname: string): CalendarView {
 
 function shift(d: Date, view: CalendarView, dir: 1 | -1): Date {
   switch (view) {
-    case 'day': return addDays(d, dir);
-    case 'week': return addDays(d, dir * 7);
-    case 'month': return addMonths(d, dir);
-    case 'year': return addYears(d, dir);
+    case 'day':
+      return addDays(d, dir);
+    case 'week':
+      return addDays(d, dir * 7);
+    case 'month':
+      return addMonths(d, dir);
+    case 'year':
+      return addYears(d, dir);
   }
 }
 
@@ -120,7 +124,9 @@ export default function CalendarShell({ children }: CalendarShellProps) {
     function loadTasks() {
       const token = sessionStorage.getItem('token');
       if (!token) return;
-      getTasks(token).then(setTasks).catch(() => {});
+      getTasks(token)
+        .then(setTasks)
+        .catch(() => {});
     }
 
     loadTasks();
@@ -173,7 +179,7 @@ export default function CalendarShell({ children }: CalendarShellProps) {
           />
           {!googleConnected && (
             <p className="border-b border-gray-200 bg-[#F4EFD3] px-4 py-2 font-mono text-xs font-bold text-[#7A6A2E]">
-              Your Google Calendar isn't connected — sign out and back in with Google to see your events here.
+              Your Google Calendar isn&apos;t connected — sign out and back in with Google to see your events here.
             </p>
           )}
           {loadError && (
@@ -195,13 +201,7 @@ export default function CalendarShell({ children }: CalendarShellProps) {
               {dueTasks.length === 0 ? (
                 <p className="px-4 py-6 text-center font-mono text-xs text-gray-400">Nothing due — nice.</p>
               ) : (
-                dueTasks.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    {...task}
-                    onStatusChanged={handleTaskStatusChanged}
-                  />
-                ))
+                dueTasks.map((task) => <TaskRow key={task.id} {...task} onStatusChanged={handleTaskStatusChanged} />)
               )}
             </div>
           </div>

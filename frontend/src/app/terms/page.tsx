@@ -54,10 +54,12 @@ export default function TermsOfServicePage() {
         </div>
 
         <div className="mt-8 flex gap-3 rounded-lg border border-gray-100 bg-[#B1C9DC]/10 px-4 py-4">
-          <span className="whitespace-nowrap font-mono text-[11px] font-bold uppercase tracking-wide text-[#3D6C94]">TL;DR</span>
+          <span className="whitespace-nowrap font-mono text-[11px] font-bold uppercase tracking-wide text-[#3D6C94]">
+            TL;DR
+          </span>
           <p className="text-sm text-gray-600">
-            The Dashboard is run by and for UNSW Engineering Society members, best-effort and free of charge. Use
-            it for Society business, keep your account to yourself, and it keeps working for everyone.
+            The Dashboard is run by and for UNSW Engineering Society members, best-effort and free of charge. Use it for
+            Society business, keep your account to yourself, and it keeps working for everyone.
           </p>
         </div>
 
@@ -75,8 +77,8 @@ export default function TermsOfServicePage() {
               <code className="rounded bg-[#B1C9DC]/20 px-1.5 py-0.5 font-mono text-[13px] text-[#3D6C94]">
                 @unswengsoc.com
               </code>{' '}
-              Google Workspace account. Access follows Society membership — it isn&rsquo;t granted or sold
-              independently of it, and is revoked when that membership ends.
+              Google Workspace account. Access follows Society membership — it isn&rsquo;t granted or sold independently
+              of it, and is revoked when that membership ends.
             </p>
           </Clause>
 
@@ -86,7 +88,10 @@ export default function TermsOfServicePage() {
               events and documents. In particular, don&rsquo;t:
             </p>
             <ul className="my-3 list-disc space-y-1.5 pl-5 marker:text-[#3D6C94]">
-              <li>Post content that&rsquo;s offensive, harassing, or unrelated to Society business in announcements or comments;</li>
+              <li>
+                Post content that&rsquo;s offensive, harassing, or unrelated to Society business in announcements or
+                comments;
+              </li>
               <li>Attempt to access another member&rsquo;s account, or data you haven&rsquo;t been given access to;</li>
               <li>Use the platform, or data read from it, for anything outside Society operations.</li>
             </ul>
@@ -94,34 +99,34 @@ export default function TermsOfServicePage() {
 
           <Clause num="04" title="Your account">
             <p>
-              You&rsquo;re responsible for activity under your own sign-in. Director, executive and admin accounts
-              carry extra reach — posting official announcements, assigning tasks, managing members — and are
-              expected to use it in line with the Society&rsquo;s own governance, not just these terms.
+              You&rsquo;re responsible for activity under your own sign-in. Director, executive and admin accounts carry
+              extra reach — posting official announcements, assigning tasks, managing members — and are expected to use
+              it in line with the Society&rsquo;s own governance, not just these terms.
             </p>
           </Clause>
 
           <Clause num="05" title="Content you post">
             <p>
-              Announcements, comments and tasks you create stay attributed to you. The Society may remove content
-              that breaches acceptable use, and an admin or the original author can edit or delete a post through
-              the platform itself.
+              Announcements, comments and tasks you create stay attributed to you. The Society may remove content that
+              breaches acceptable use, and an admin or the original author can edit or delete a post through the
+              platform itself.
             </p>
           </Clause>
 
           <Clause num="06" title="No warranty">
             <p>
               The Dashboard is built and maintained by student volunteers and provided{' '}
-              <strong className="text-gray-900">as is</strong>, best-effort. There&rsquo;s no guaranteed uptime,
-              and features may change or be unavailable while the platform is developed further. It isn&rsquo;t a
-              substitute for the Society&rsquo;s official records where those are required to live elsewhere.
+              <strong className="text-gray-900">as is</strong>, best-effort. There&rsquo;s no guaranteed uptime, and
+              features may change or be unavailable while the platform is developed further. It isn&rsquo;t a substitute
+              for the Society&rsquo;s official records where those are required to live elsewhere.
             </p>
             <div className="mt-3 flex gap-2.5 rounded-lg bg-[#F1C4C9]/30 px-3.5 py-3 text-sm text-gray-600">
               <span className="whitespace-nowrap pt-0.5 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8B2E38]">
                 Note
               </span>
               <span>
-                Calendar and Drive features depend on Google&rsquo;s own services being reachable — an outage on
-                their end can affect those features here too.
+                Calendar and Drive features depend on Google&rsquo;s own services being reachable — an outage on their
+                end can affect those features here too.
               </span>
             </div>
           </Clause>
@@ -129,8 +134,8 @@ export default function TermsOfServicePage() {
           <Clause num="07" title="Changes & termination">
             <p>
               These terms may be updated as the Dashboard evolves — the effective date above reflects the latest
-              revision. Access can be suspended or revoked for a breach of these terms, or simply when your
-              Society membership ends.
+              revision. Access can be suspended or revoked for a breach of these terms, or simply when your Society
+              membership ends.
             </p>
           </Clause>
 

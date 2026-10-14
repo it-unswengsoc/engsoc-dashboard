@@ -82,15 +82,13 @@ export default function DocumentsView() {
   const [googleConnected, setGoogleConnected] = useState(cached?.connected ?? true);
   const [departmentsLoading, setDepartmentsLoading] = useState(cached === null);
   const [departmentsError, setDepartmentsError] = useState('');
-  const [activeDepartment, setActiveDepartment] = useState<DriveDepartmentData | null>(
-    cached?.departments[0] ?? null
-  );
+  const [activeDepartment, setActiveDepartment] = useState<DriveDepartmentData | null>(cached?.departments[0] ?? null);
 
   // columns[0] is always the active department's drives; columns[i] for
   // i > 0 is the contents of selected[i - 1]. Both track the *full* path,
   // even the part scrolled out of MAX_VISIBLE_COLUMNS.
   const [columns, setColumns] = useState<BrowserNode[][]>(
-    cached?.departments[0] ? [cached.departments[0].drives.map(driveToBrowserNode)] : []
+    cached?.departments[0] ? [cached.departments[0].drives.map(driveToBrowserNode)] : [],
   );
   const [selected, setSelected] = useState<BrowserNode[]>([]);
   const [pendingColumnAt, setPendingColumnAt] = useState<number | null>(null);
@@ -120,7 +118,8 @@ export default function DocumentsView() {
   useEffect(() => {
     if (departmentsLoading || departmentsError) return;
     const token = sessionStorage.getItem('token');
-    if (token) writeSessionCache<CachedDepartments>(DEPARTMENTS_CACHE_KEY, token, { departments, connected: googleConnected });
+    if (token)
+      writeSessionCache<CachedDepartments>(DEPARTMENTS_CACHE_KEY, token, { departments, connected: googleConnected });
   }, [departments, googleConnected, departmentsLoading, departmentsError]);
 
   useEffect(() => {
@@ -184,12 +183,18 @@ export default function DocumentsView() {
           prev.map((dept) => ({
             ...dept,
             drives: dept.drives.map((drive) => ({ ...drive, fileCount: countById.get(drive.id) ?? drive.fileCount })),
-          }))
+          })),
         );
         setActiveDepartment((prev) =>
           prev
-            ? { ...prev, drives: prev.drives.map((drive) => ({ ...drive, fileCount: countById.get(drive.id) ?? drive.fileCount })) }
-            : prev
+            ? {
+                ...prev,
+                drives: prev.drives.map((drive) => ({
+                  ...drive,
+                  fileCount: countById.get(drive.id) ?? drive.fileCount,
+                })),
+              }
+            : prev,
         );
         // Only the top-level drive column can show stale counts from this
         // fetch — once the member has navigated into a folder, whatever's
@@ -200,10 +205,10 @@ export default function DocumentsView() {
               ? prev
               : [
                   prev[0].map((node) =>
-                    node.kind === 'drive' ? { ...node, fileCount: countById.get(node.id) ?? node.fileCount } : node
+                    node.kind === 'drive' ? { ...node, fileCount: countById.get(node.id) ?? node.fileCount } : node,
                   ),
                   ...prev.slice(1),
-                ]
+                ],
           );
         }
       })
@@ -212,7 +217,8 @@ export default function DocumentsView() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+    // `cached` is read once on mount and never changes.
+  }, [router, cached]);
 
   function selectDepartment(department: DriveDepartmentData) {
     setActiveDepartment(department);
@@ -451,7 +457,7 @@ export default function DocumentsView() {
 
       {!googleConnected && (
         <p className="mt-4 rounded-xl border border-gray-200 bg-[#F4EFD3] px-4 py-2 font-mono text-xs font-bold text-[#7A6A2E]">
-          Your Google Drive isn't connected — sign out and back in with Google to see your files here.
+          Your Google Drive isn&apos;t connected — sign out and back in with Google to see your files here.
         </p>
       )}
 
@@ -503,13 +509,7 @@ export default function DocumentsView() {
             <div className="flex flex-none md:min-w-0 md:flex-1">
               <DriveColumnSkeleton />
             </div>
-            <DrivePreviewPane
-              node={null}
-              path={[]}
-              locationLabel=""
-              onRename={() => {}}
-              onDelete={() => {}}
-            />
+            <DrivePreviewPane node={null} path={[]} locationLabel="" onRename={() => {}} onDelete={() => {}} />
           </>
         ) : departmentsError ? (
           <p className="p-6 font-mono text-xs text-[#8B2E38]">{departmentsError}</p>
@@ -601,7 +601,11 @@ export default function DocumentsView() {
 function FolderIcon() {
   return (
     <svg className="h-7 w-7 text-gray-900" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"
+      />
     </svg>
   );
 }

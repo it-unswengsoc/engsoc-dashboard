@@ -1,6 +1,5 @@
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+import { USE_MOCK } from '@/services/api-config';
+import { api } from '@/services/api-client';
 
 /* Location search for events, through the backend (which holds the Google
    key — see backend/src/functions/places.ts). */
@@ -26,13 +25,7 @@ export async function searchPlaces(token: string, query: string, session: string
   }
 
   const params = new URLSearchParams({ q: query, session });
-  const res = await fetch(apiUrl(`/places/autocomplete?${params}`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Location search failed');
-  return data.data as PlaceSuggestion[];
+  return api<PlaceSuggestion[]>(`/places/autocomplete?${params}`, { token, errorMessage: 'Location search failed' });
 }
 
 export async function getPlace(token: string, placeId: string, session: string): Promise<PlaceDetails> {
@@ -41,11 +34,8 @@ export async function getPlace(token: string, placeId: string, session: string):
     return mockGetPlace(placeId);
   }
 
-  const res = await fetch(apiUrl(`/places/${encodeURIComponent(placeId)}?session=${encodeURIComponent(session)}`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+  return api<PlaceDetails>(`/places/${encodeURIComponent(placeId)}?session=${encodeURIComponent(session)}`, {
+    token,
+    errorMessage: 'Failed to load that place',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load that place');
-  return data.data as PlaceDetails;
 }

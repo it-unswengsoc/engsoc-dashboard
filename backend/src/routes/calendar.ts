@@ -1,5 +1,4 @@
-import { Router, Request, Response } from 'express';
-import { verifyAuthToken } from './auth';
+import { Router } from 'express';
 import { getUserGoogleRefreshToken } from '../functions/auth';
 import {
   getUserCalendarEvents,
@@ -7,10 +6,24 @@ import {
   updateUserCalendarEvent,
   deleteUserCalendarEvent,
 } from '../functions/user-calendar';
+import { verifyAuthToken, type AuthedRequest } from '../middleware/auth';
+import { ValidationError } from '../lib/errors';
+import { asyncHandler, created, ok } from '../lib/http';
 
 const router = Router();
 
+router.use(verifyAuthToken);
+
 const NOT_CONNECTED_MESSAGE = "Your Google Calendar isn't connected — sign out and back in with Google first.";
+
+/* The member's own refresh token — every write here goes through it, so
+   there's nothing else to authorize. 400s when they haven't connected
+   Google yet. */
+async function requireRefreshToken(req: AuthedRequest): Promise<string> {
+  const refreshToken = await getUserGoogleRefreshToken(req.user.userId);
+  if (!refreshToken) throw new ValidationError(NOT_CONNECTED_MESSAGE);
+  return refreshToken;
+}
 
 /**
  * GET /calendar/events
@@ -24,18 +37,11 @@ const NOT_CONNECTED_MESSAGE = "Your Google Calendar isn't connected — sign out
  * ?from=&to= (ISO datetimes) to widen it, e.g. for a member paging further
  * out in the Year view.
  */
-router.get('/events', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-
-    if (!refreshToken) {
-      return res.status(200).json({
-        status: 'success',
-        data: [],
-        connected: false,
-      });
-    }
+router.get(
+  '/events',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const refreshToken = await getUserGoogleRefreshToken(req.user.userId);
+    if (!refreshToken) return ok(res, [], { connected: false });
 
     const now = new Date();
     const timeMin =
@@ -47,40 +53,26 @@ router.get('/events', verifyAuthToken, async (req: Request, res: Response) => {
         ? req.query.to
         : new Date(now.getFullYear() + 1, now.getMonth(), 1).toISOString();
 
-    const events = await getUserCalendarEvents(refreshToken, timeMin, timeMax);
+    ok(res, await getUserCalendarEvents(refreshToken, timeMin, timeMax), { connected: true });
+  }),
+);
 
-    res.status(200).json({
-      status: 'success',
-      data: events,
-      connected: true,
-    });
-  } catch (error) {
-    console.error('Get user calendar events error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+/* Google rejecting a write is almost always a malformed event (bad dates,
+   a deleted event id), so its message goes back as a 400 for the member. */
 
 /**
  * POST /calendar/events
  * Creates a personal event directly on the signed-in member's own Google
- * Calendar — not Postgres, not shared with anyone else. Auth-only: it's
- * inherently scoped to "my own calendar" by construction (writes go through
- * the caller's own refresh token, so there's nothing else to authorize).
+ * Calendar — not Postgres, not shared with anyone else.
  */
-router.post('/events', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-    if (!refreshToken) {
-      return res.status(400).json({ status: 'error', message: NOT_CONNECTED_MESSAGE });
-    }
+router.post(
+  '/events',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const refreshToken = await requireRefreshToken(req);
 
     const { title, description, location, startsAt, endsAt, allDay } = req.body;
     if (!title || !startsAt || !endsAt) {
-      return res.status(400).json({ status: 'error', message: 'Missing required fields: title, startsAt, endsAt' });
+      throw new ValidationError('Missing required fields: title, startsAt, endsAt');
     }
 
     const event = await createUserCalendarEvent(refreshToken, {
@@ -90,29 +82,22 @@ router.post('/events', verifyAuthToken, async (req: Request, res: Response) => {
       startsAt,
       endsAt,
       allDay: !!allDay,
+    }).catch((error) => {
+      throw ValidationError.from(error, 'Failed to create event');
     });
 
-    res.status(201).json({ status: 'success', message: 'Event created', data: event });
-  } catch (error) {
-    console.error('Create personal calendar event error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to create event',
-    });
-  }
-});
+    created(res, event, { message: 'Event created' });
+  }),
+);
 
 /**
  * PUT /calendar/events/:googleEventId
  * Updates a personal event on the signed-in member's own Google Calendar.
  */
-router.put('/events/:googleEventId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-    if (!refreshToken) {
-      return res.status(400).json({ status: 'error', message: NOT_CONNECTED_MESSAGE });
-    }
+router.put(
+  '/events/:googleEventId',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const refreshToken = await requireRefreshToken(req);
 
     const { title, description, location, startsAt, endsAt, allDay } = req.body;
     const event = await updateUserCalendarEvent(refreshToken, req.params.googleEventId, {
@@ -122,39 +107,29 @@ router.put('/events/:googleEventId', verifyAuthToken, async (req: Request, res: 
       startsAt,
       endsAt,
       allDay,
+    }).catch((error) => {
+      throw ValidationError.from(error, 'Failed to update event');
     });
 
-    res.status(200).json({ status: 'success', message: 'Event updated', data: event });
-  } catch (error) {
-    console.error('Update personal calendar event error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to update event',
-    });
-  }
-});
+    ok(res, event, { message: 'Event updated' });
+  }),
+);
 
 /**
  * DELETE /calendar/events/:googleEventId
  * Deletes a personal event from the signed-in member's own Google Calendar.
  */
-router.delete('/events/:googleEventId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const refreshToken = await getUserGoogleRefreshToken(user.userId);
-    if (!refreshToken) {
-      return res.status(400).json({ status: 'error', message: NOT_CONNECTED_MESSAGE });
-    }
+router.delete(
+  '/events/:googleEventId',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const refreshToken = await requireRefreshToken(req);
 
-    await deleteUserCalendarEvent(refreshToken, req.params.googleEventId);
-    res.status(200).json({ status: 'success', message: 'Event deleted' });
-  } catch (error) {
-    console.error('Delete personal calendar event error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to delete event',
+    await deleteUserCalendarEvent(refreshToken, req.params.googleEventId).catch((error) => {
+      throw ValidationError.from(error, 'Failed to delete event');
     });
-  }
-});
+
+    ok(res, undefined, { message: 'Event deleted' });
+  }),
+);
 
 export default router;

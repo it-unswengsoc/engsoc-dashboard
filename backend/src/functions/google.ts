@@ -1,4 +1,4 @@
-import { OAuth2Client, TokenPayload } from 'google-auth-library';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
@@ -100,8 +100,7 @@ export async function exchangeGoogleCode(code: string): Promise<{
   // account belongs to — check that first. Fall back to the email suffix for
   // safety, though a genuine unswengsoc.com Workspace account should always
   // carry a matching hd.
-  const isAllowedDomain =
-    payload.hd === ALLOWED_GOOGLE_DOMAIN || payload.email.endsWith(`@${ALLOWED_GOOGLE_DOMAIN}`);
+  const isAllowedDomain = payload.hd === ALLOWED_GOOGLE_DOMAIN || payload.email.endsWith(`@${ALLOWED_GOOGLE_DOMAIN}`);
 
   if (!isAllowedDomain) {
     throw new GoogleDomainError();
@@ -129,9 +128,7 @@ export async function exchangeGoogleCode(code: string): Promise<{
  * upload never has to pass through a serverless function's own request
  * body size limit.
  */
-export async function getGoogleAccessToken(
-  refreshToken: string
-): Promise<{ accessToken: string; expiresAt: number }> {
+export async function getGoogleAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresAt: number }> {
   const client = getOAuthClient();
   client.setCredentials({ refresh_token: refreshToken });
   const { credentials } = await client.refreshAccessToken();

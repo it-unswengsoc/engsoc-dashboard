@@ -55,7 +55,7 @@ function mockId(prefix: string): string {
 export async function createDriveFolder(
   driveId: string,
   parentId: string | undefined,
-  name: string
+  name: string,
 ): Promise<DriveEntry> {
   const entry: DriveEntry = {
     id: mockId('mock-folder'),
@@ -76,7 +76,7 @@ export async function createDriveFile(
   driveId: string,
   parentId: string | undefined,
   name: string,
-  mimeType: string
+  mimeType: string,
 ): Promise<DriveEntry> {
   const entry: DriveEntry = {
     id: mockId('mock-file'),
@@ -104,11 +104,7 @@ export async function renameDriveEntry(fileId: string, name: string): Promise<Dr
   throw new Error('Not found in mock data');
 }
 
-export async function uploadDriveFile(
-  driveId: string,
-  parentId: string | undefined,
-  file: File
-): Promise<DriveEntry> {
+export async function uploadDriveFile(driveId: string, parentId: string | undefined, file: File): Promise<DriveEntry> {
   const entry: DriveEntry = {
     id: mockId('mock-upload'),
     name: file.name,

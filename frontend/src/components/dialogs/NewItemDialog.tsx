@@ -30,8 +30,6 @@ const options: { view: Exclude<View, 'chooser'>; label: string; icon: LucideIcon
   { view: 'task', label: 'New task', icon: ClipboardList },
 ];
 
-
-
 export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
   const router = useRouter();
   const [view, setView] = useState<View>('chooser');
@@ -57,8 +55,12 @@ export default function NewItemDialog({ open, onClose }: NewItemDialogProps) {
 
       const token = sessionStorage.getItem('token');
       if (token) {
-        getProfile(token).then((p) => setRole(p.role)).catch(() => {});
-        getDirectory(token).then(setDirectory).catch(() => {});
+        getProfile(token)
+          .then((p) => setRole(p.role))
+          .catch(() => {});
+        getDirectory(token)
+          .then(setDirectory)
+          .catch(() => {});
       }
     }
   }, [open]);

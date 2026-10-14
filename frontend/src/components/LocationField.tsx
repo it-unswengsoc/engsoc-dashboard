@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Check, MapPin } from 'lucide-react';
 import { getPlace, searchPlaces, type PlaceSuggestion } from '@/services/places-api';
 
@@ -48,6 +48,7 @@ export default function LocationField({
   disabled = false,
   maxLength = 100,
 }: LocationFieldProps) {
+  const listboxId = useId();
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -152,6 +153,7 @@ export default function LocationField({
             placeholder={unavailable ? 'Where is it?' : 'Search for a place, or type an address'}
             role="combobox"
             aria-expanded={open && suggestions.length > 0}
+            aria-controls={listboxId}
             aria-autocomplete="list"
             autoComplete="off"
             className={`${inputClassName} pl-9`}
@@ -171,6 +173,7 @@ export default function LocationField({
 
       {open && suggestions.length > 0 && (
         <ul
+          id={listboxId}
           role="listbox"
           className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
         >

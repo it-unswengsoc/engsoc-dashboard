@@ -1,6 +1,5 @@
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+import { USE_MOCK } from '@/services/api-config';
+import { api, apiFetch } from '@/services/api-client';
 
 export interface UserCalendarEvent {
   id: string;
@@ -61,13 +60,7 @@ export async function getMyCalendarEvents(token: string): Promise<UserCalendarRe
     };
   }
 
-  const res = await fetch(apiUrl('/calendar/events'), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load your Google Calendar');
+  const data = await apiFetch('/calendar/events', { token, errorMessage: 'Failed to load your Google Calendar' });
   return { events: data.data as UserCalendarEvent[], connected: data.connected as boolean };
 }
 
@@ -89,34 +82,30 @@ export async function createMyCalendarEvent(token: string, input: PersonalEventI
     return createPersonalEvent(input);
   }
 
-  const res = await fetch(apiUrl('/calendar/events'), {
+  return api<UserCalendarEvent>('/calendar/events', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(input),
+    token,
+    body: input,
+    errorMessage: 'Failed to create event',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to create event');
-  return data.data as UserCalendarEvent;
 }
 
 export async function updateMyCalendarEvent(
   token: string,
   googleEventId: string,
-  input: Partial<PersonalEventInput>
+  input: Partial<PersonalEventInput>,
 ): Promise<UserCalendarEvent> {
   if (USE_MOCK) {
     const { updatePersonalEvent } = await import('@/mocks/functions/user-calendar');
     return updatePersonalEvent(googleEventId, input);
   }
 
-  const res = await fetch(apiUrl(`/calendar/events/${encodeURIComponent(googleEventId)}`), {
+  return api<UserCalendarEvent>(`/calendar/events/${encodeURIComponent(googleEventId)}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(input),
+    token,
+    body: input,
+    errorMessage: 'Failed to update event',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to update event');
-  return data.data as UserCalendarEvent;
 }
 
 export async function deleteMyCalendarEvent(token: string, googleEventId: string): Promise<void> {
@@ -125,12 +114,9 @@ export async function deleteMyCalendarEvent(token: string, googleEventId: string
     return deletePersonalEvent(googleEventId);
   }
 
-  const res = await fetch(apiUrl(`/calendar/events/${encodeURIComponent(googleEventId)}`), {
+  await apiFetch(`/calendar/events/${encodeURIComponent(googleEventId)}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    token,
+    errorMessage: 'Failed to delete event',
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || 'Failed to delete event');
-  }
 }

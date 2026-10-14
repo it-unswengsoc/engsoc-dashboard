@@ -1,7 +1,6 @@
 import type { DriveDepartment, DriveEntry, DriveSearchResult } from '@/types/documents';
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+import { USE_MOCK } from '@/services/api-config';
+import { api, apiFetch } from '@/services/api-client';
 
 export type { DriveDepartment, DriveEntry, DriveSearchResult };
 
@@ -28,21 +27,16 @@ export interface DriveEntriesResult {
    only needs drive names (e.g. DriveFilePicker's destination dropdown),
    not the Documents page's own folder cards, the one place that actually
    displays a count. */
-export async function getDriveDepartments(
-  token: string,
-  includeFileCounts = true
-): Promise<DriveDepartmentsResult> {
+export async function getDriveDepartments(token: string, includeFileCounts = true): Promise<DriveDepartmentsResult> {
   if (USE_MOCK) {
     const { getDriveDepartments: mockGetDriveDepartments } = await import('@/mocks/functions/documents');
     return { departments: await mockGetDriveDepartments(), connected: true };
   }
 
-  const res = await fetch(apiUrl(`/drive/folders${includeFileCounts ? '' : '?counts=0'}`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+  const data = await apiFetch(`/drive/folders${includeFileCounts ? '' : '?counts=0'}`, {
+    token,
+    errorMessage: 'Failed to load Drive folders',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load Drive folders');
   return { departments: data.data as DriveDepartment[], connected: data.connected as boolean };
 }
 
@@ -51,11 +45,7 @@ export async function getDriveDepartments(
    signed-in member's own Google account. Called as the member clicks into
    directories, so the page can behave like a real file browser instead of
    one static list. */
-export async function getDriveEntries(
-  token: string,
-  driveId: string,
-  folderId?: string
-): Promise<DriveEntriesResult> {
+export async function getDriveEntries(token: string, driveId: string, folderId?: string): Promise<DriveEntriesResult> {
   if (USE_MOCK) {
     const { getDriveEntries: mockGetDriveEntries } = await import('@/mocks/functions/documents');
     return { entries: await mockGetDriveEntries(driveId, folderId), connected: true };
@@ -64,12 +54,10 @@ export async function getDriveEntries(
   const params = new URLSearchParams({ driveId });
   if (folderId) params.set('folderId', folderId);
 
-  const res = await fetch(apiUrl(`/drive/entries?${params.toString()}`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+  const data = await apiFetch(`/drive/entries?${params.toString()}`, {
+    token,
+    errorMessage: 'Failed to load Drive contents',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load Drive contents');
   return { entries: data.data as DriveEntry[], connected: data.connected as boolean };
 }
 
@@ -82,34 +70,29 @@ export async function searchDrive(token: string, query: string): Promise<DriveSe
     return mockSearchDrive(query);
   }
 
-  const res = await fetch(apiUrl(`/drive/search?q=${encodeURIComponent(query)}`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+  return api<DriveSearchResult[]>(`/drive/search?q=${encodeURIComponent(query)}`, {
+    token,
+    errorMessage: 'Failed to search Drive',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to search Drive');
-  return data.data as DriveSearchResult[];
 }
 
 export async function createDriveFolder(
   token: string,
   driveId: string,
   parentId: string | undefined,
-  name: string
+  name: string,
 ): Promise<DriveEntry> {
   if (USE_MOCK) {
     const { createDriveFolder: mockCreateDriveFolder } = await import('@/mocks/functions/documents');
     return mockCreateDriveFolder(driveId, parentId, name);
   }
 
-  const res = await fetch(apiUrl('/drive/folders/create'), {
+  return api<DriveEntry>('/drive/folders/create', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ driveId, parentId, name }),
+    token,
+    body: { driveId, parentId, name },
+    errorMessage: 'Failed to create folder',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to create folder');
-  return data.data as DriveEntry;
 }
 
 export async function createDriveFile(
@@ -117,21 +100,19 @@ export async function createDriveFile(
   driveId: string,
   parentId: string | undefined,
   name: string,
-  mimeType: string
+  mimeType: string,
 ): Promise<DriveEntry> {
   if (USE_MOCK) {
     const { createDriveFile: mockCreateDriveFile } = await import('@/mocks/functions/documents');
     return mockCreateDriveFile(driveId, parentId, name, mimeType);
   }
 
-  const res = await fetch(apiUrl('/drive/files/create'), {
+  return api<DriveEntry>('/drive/files/create', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ driveId, parentId, name, mimeType }),
+    token,
+    body: { driveId, parentId, name, mimeType },
+    errorMessage: 'Failed to create file',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to create file');
-  return data.data as DriveEntry;
 }
 
 export async function renameDriveEntry(token: string, fileId: string, name: string): Promise<DriveEntry> {
@@ -140,14 +121,12 @@ export async function renameDriveEntry(token: string, fileId: string, name: stri
     return mockRenameDriveEntry(fileId, name);
   }
 
-  const res = await fetch(apiUrl(`/drive/entries/${encodeURIComponent(fileId)}`), {
+  return api<DriveEntry>(`/drive/entries/${encodeURIComponent(fileId)}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ name }),
+    token,
+    body: { name },
+    errorMessage: 'Failed to rename',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to rename');
-  return data.data as DriveEntry;
 }
 
 /* Moves a file or folder to Drive's own Trash (recoverable there), not a
@@ -158,14 +137,11 @@ export async function deleteDriveEntry(token: string, fileId: string): Promise<v
     return mockDeleteDriveEntry(fileId);
   }
 
-  const res = await fetch(apiUrl(`/drive/entries/${encodeURIComponent(fileId)}`), {
+  await apiFetch(`/drive/entries/${encodeURIComponent(fileId)}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    token,
+    errorMessage: 'Failed to delete',
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || 'Failed to delete');
-  }
 }
 
 /* A short-lived Google access token for uploading a file's bytes straight
@@ -176,13 +152,10 @@ export async function getDriveAccessToken(token: string): Promise<{ accessToken:
     return { accessToken: 'mock-access-token', expiresAt: Date.now() + 60 * 60 * 1000 };
   }
 
-  const res = await fetch(apiUrl('/drive/access-token'), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+  return api<{ accessToken: string; expiresAt: number }>('/drive/access-token', {
+    token,
+    errorMessage: 'Failed to get an upload token',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to get an upload token');
-  return data.data as { accessToken: string; expiresAt: number };
 }
 
 /* Uploads directly to Google's own multipart upload endpoint using a
@@ -194,7 +167,7 @@ export async function uploadDriveFile(
   accessToken: string,
   driveId: string,
   parentId: string | undefined,
-  file: File
+  file: File,
 ): Promise<DriveEntry> {
   if (USE_MOCK) {
     const { uploadDriveFile: mockUploadDriveFile } = await import('@/mocks/functions/documents');
@@ -219,7 +192,7 @@ export async function uploadDriveFile(
         'Content-Type': `multipart/related; boundary=${boundary}`,
       },
       body,
-    }
+    },
   );
 
   const data = await res.json();

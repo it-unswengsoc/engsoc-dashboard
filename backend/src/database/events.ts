@@ -1,8 +1,7 @@
-import { QueryResult } from 'pg';
-import { Event, CreateEventInput, UpdateEventInput } from '../functions/events';
+import { type QueryResult, type QueryResultRow } from 'pg';
+import { type Event, type CreateEventInput, type UpdateEventInput } from '../functions/events';
 import pool from './pool';
 import { eventImagePath, eventMapPath } from '../functions/event-images';
-
 
 /* The image itself (a data: URI) is left out of every list and row — it's
    served on its own by GET /events/:id/image (see eventImagePath). */
@@ -14,7 +13,7 @@ const EVENT_COLUMNS = `id, title, description, image_url IS NOT NULL AS has_imag
  * Maps a raw database row to the Event interface,
  * converting snake_case column names to camelCase.
  */
-function rowToEvent(row: any): Event {
+function rowToEvent(row: QueryResultRow): Event {
   return {
     id: row.id,
     title: row.title,
@@ -46,9 +45,7 @@ function rowToEvent(row: any): Event {
  * Returns an array of Event objects (empty array if no events exist).
  */
 export async function dbGetAllEvents(): Promise<Event[]> {
-  const result: QueryResult = await pool.query(
-    `SELECT ${EVENT_COLUMNS} FROM events ORDER BY start_date ASC`
-  );
+  const result: QueryResult = await pool.query(`SELECT ${EVENT_COLUMNS} FROM events ORDER BY start_date ASC`);
   return result.rows.map(rowToEvent);
 }
 
@@ -57,10 +54,7 @@ export async function dbGetAllEvents(): Promise<Event[]> {
  * Returns the Event if found, or null if no row matches.
  */
 export async function dbGetEventById(eventId: number): Promise<Event | null> {
-  const result: QueryResult = await pool.query(
-    `SELECT ${EVENT_COLUMNS} FROM events WHERE id = $1`,
-    [eventId]
-  );
+  const result: QueryResult = await pool.query(`SELECT ${EVENT_COLUMNS} FROM events WHERE id = $1`, [eventId]);
   if (result.rows.length === 0) return null;
   return rowToEvent(result.rows[0]);
 }
@@ -99,7 +93,7 @@ export async function dbCreateEvent(input: CreateEventInput): Promise<Event | nu
       input.instagramUrl ?? null,
       input.locationLat ?? null,
       input.locationLng ?? null,
-    ]
+    ],
   );
   if (result.rows.length === 0) return null;
   return rowToEvent(result.rows[0]);
@@ -110,12 +104,9 @@ export async function dbCreateEvent(input: CreateEventInput): Promise<Event | nu
  * Leaves unspecified fields unchanged.
  * Returns the updated Event, or null if no event with that ID exists.
  */
-export async function dbUpdateEvent(
-  eventId: number,
-  input: UpdateEventInput
-): Promise<Event | null> {
+export async function dbUpdateEvent(eventId: number, input: UpdateEventInput): Promise<Event | null> {
   const setClauses: string[] = [];
-  const values: any[] = [];
+  const values: unknown[] = [];
   let paramIndex = 1;
 
   if (input.title !== undefined) {
@@ -184,7 +175,7 @@ export async function dbUpdateEvent(
      SET ${setClauses.join(', ')}
      WHERE id = $${paramIndex}
      RETURNING ${EVENT_COLUMNS}`,
-    values
+    values,
   );
 
   if (result.rows.length === 0) return null;
@@ -196,10 +187,7 @@ export async function dbUpdateEvent(
  * Returns true if a row was deleted, false if no event with that ID existed.
  */
 export async function dbDeleteEvent(eventId: number): Promise<boolean> {
-  const result: QueryResult = await pool.query(
-    `DELETE FROM events WHERE id = $1 RETURNING id`,
-    [eventId]
-  );
+  const result: QueryResult = await pool.query(`DELETE FROM events WHERE id = $1 RETURNING id`, [eventId]);
   return (result.rowCount ?? 0) > 0;
 }
 
@@ -208,14 +196,8 @@ export async function dbDeleteEvent(eventId: number): Promise<boolean> {
  * from dbUpdateEvent so this can't be set through the public update API —
  * only the calendar-sync flow in functions/events.ts writes it.
  */
-export async function dbSetGoogleCalendarEventId(
-  eventId: number,
-  googleCalendarEventId: string
-): Promise<void> {
-  await pool.query(`UPDATE events SET google_calendar_event_id = $1 WHERE id = $2`, [
-    googleCalendarEventId,
-    eventId,
-  ]);
+export async function dbSetGoogleCalendarEventId(eventId: number, googleCalendarEventId: string): Promise<void> {
+  await pool.query(`UPDATE events SET google_calendar_event_id = $1 WHERE id = $2`, [googleCalendarEventId, eventId]);
 }
 
 /**
@@ -226,13 +208,13 @@ export async function dbSetGoogleCalendarEventId(
  * flow instead of a plain personal-calendar write).
  */
 export async function dbGetEventIdsByGoogleCalendarEventIds(
-  googleCalendarEventIds: string[]
+  googleCalendarEventIds: string[],
 ): Promise<Map<string, number>> {
   if (googleCalendarEventIds.length === 0) return new Map();
 
   const result: QueryResult = await pool.query(
     `SELECT id, google_calendar_event_id FROM events WHERE google_calendar_event_id = ANY($1)`,
-    [googleCalendarEventIds]
+    [googleCalendarEventIds],
   );
   return new Map(result.rows.map((row) => [row.google_calendar_event_id as string, row.id as number]));
 }

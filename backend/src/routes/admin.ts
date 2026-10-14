@@ -1,28 +1,24 @@
-import { Router, Request, Response } from 'express';
-import { verifyAuthToken, requireAdmin } from './auth';
-import {
-  listUsers,
-  updateUserRoleAndPortfolio,
-  InactiveTreasurerError,
-  USER_ROLES,
-  USER_PORTFOLIOS,
-} from '../functions/admin';
+import { Router } from 'express';
+import { verifyAuthToken, requireAdmin } from '../middleware/auth';
+import { listUsers, updateUserRoleAndPortfolio, USER_ROLES, USER_PORTFOLIOS } from '../functions/admin';
+import type { UserPortfolio, UserRole } from '../functions/admin';
+import { NotFoundError, ValidationError } from '../lib/errors';
+import { asyncHandler, ok } from '../lib/http';
 
 const router = Router();
+
+router.use(verifyAuthToken, requireAdmin);
 
 /**
  * GET /admin/users
  * Lists every user account — admin only (see requireAdmin).
  */
-router.get('/users', verifyAuthToken, requireAdmin, async (req: Request, res: Response) => {
-  try {
-    const users = await listUsers();
-    res.status(200).json({ status: 'success', data: users });
-  } catch (error) {
-    console.error('List users error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to load users' });
-  }
-});
+router.get(
+  '/users',
+  asyncHandler(async (_req, res) => {
+    ok(res, await listUsers());
+  }, 'Failed to load users'),
+);
 
 /**
  * PATCH /admin/users/:userId
@@ -33,41 +29,37 @@ router.get('/users', verifyAuthToken, requireAdmin, async (req: Request, res: Re
  * against the same enum values Postgres itself enforces on the column, so a
  * bad value 400s here rather than surfacing a raw database error.
  */
-router.patch('/users/:userId', verifyAuthToken, requireAdmin, async (req: Request, res: Response) => {
-  try {
+router.patch(
+  '/users/:userId',
+  asyncHandler(async (req, res) => {
     const userId = Number(req.params.userId);
-    if (!Number.isInteger(userId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid user id' });
-    }
+    if (!Number.isInteger(userId)) throw new ValidationError('Invalid user id');
 
     const { role, port, isTreasurer } = req.body as { role?: string; port?: string | null; isTreasurer?: unknown };
 
-    if (role !== undefined && !USER_ROLES.includes(role as any)) {
-      return res.status(400).json({ status: 'error', message: `role must be one of: ${USER_ROLES.join(', ')}` });
+    if (role !== undefined && !USER_ROLES.includes(role as UserRole)) {
+      throw new ValidationError(`role must be one of: ${USER_ROLES.join(', ')}`);
     }
-    if (port !== undefined && port !== null && !USER_PORTFOLIOS.includes(port as any)) {
-      return res.status(400).json({ status: 'error', message: `port must be one of: ${USER_PORTFOLIOS.join(', ')}` });
+    if (port !== undefined && port !== null && !USER_PORTFOLIOS.includes(port as UserPortfolio)) {
+      throw new ValidationError(`port must be one of: ${USER_PORTFOLIOS.join(', ')}`);
     }
     if (isTreasurer !== undefined && typeof isTreasurer !== 'boolean') {
-      return res.status(400).json({ status: 'error', message: 'isTreasurer must be true or false' });
+      throw new ValidationError('isTreasurer must be true or false');
     }
     if (role === undefined && port === undefined && isTreasurer === undefined) {
-      return res.status(400).json({ status: 'error', message: 'Nothing to update — provide role, port and/or isTreasurer' });
+      throw new ValidationError('Nothing to update — provide role, port and/or isTreasurer');
     }
 
-    const updated = await updateUserRoleAndPortfolio(userId, role as any, port as any, isTreasurer);
-    if (!updated) {
-      return res.status(404).json({ status: 'error', message: 'User not found' });
-    }
+    const updated = await updateUserRoleAndPortfolio(
+      userId,
+      role as UserRole | undefined,
+      port as UserPortfolio | null | undefined,
+      isTreasurer,
+    );
+    if (!updated) throw new NotFoundError('User not found');
 
-    res.status(200).json({ status: 'success', data: updated });
-  } catch (error) {
-    if (error instanceof InactiveTreasurerError) {
-      return res.status(400).json({ status: 'error', message: error.message });
-    }
-    console.error('Update user error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to update user' });
-  }
-});
+    ok(res, updated);
+  }, 'Failed to update user'),
+);
 
 export default router;

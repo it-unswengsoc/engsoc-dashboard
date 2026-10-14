@@ -254,7 +254,9 @@ export default function AnnouncementRow({ onDeleted, ...announcement }: Announce
         .finally(() => setCommentsLoading(false));
     }
     if (directory === null) {
-      getDirectory(token).then(setDirectory).catch(() => setDirectory([]));
+      getDirectory(token)
+        .then(setDirectory)
+        .catch(() => setDirectory([]));
     }
   }, [commentsOpen, comments, directory, id, router]);
 

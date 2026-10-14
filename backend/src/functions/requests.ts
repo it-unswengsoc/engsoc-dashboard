@@ -1,3 +1,4 @@
+import { ForbiddenError, NotFoundError, ValidationError } from '../lib/errors';
 import {
   dbGetRequestsOfTypes,
   dbGetRequestsByRequester,
@@ -15,13 +16,7 @@ import {
 } from '../database/requests';
 import { createNotificationsBulk, type CreateNotificationInput } from './notifications';
 import type { TaskAssignee } from './tasks';
-import {
-  getRequestType,
-  canActOn,
-  actionableRequestTypes,
-  type RequestTypeDef,
-  type Viewer,
-} from './request-types';
+import { getRequestType, canActOn, actionableRequestTypes, type RequestTypeDef, type Viewer } from './request-types';
 
 // Matches the request_status enum. 'approved' exists in the schema but
 // nothing moves a request into it: accepting goes straight to in_progress.
@@ -72,13 +67,13 @@ export interface Request extends RequestRecord {
 }
 
 /** Thrown when there's no such request, or the viewer isn't allowed to know it exists. */
-export class RequestNotFoundError extends Error {}
+export class RequestNotFoundError extends NotFoundError {}
 
 /** Thrown when the viewer can see a request but not act on it. */
-export class ForbiddenRequestError extends Error {}
+export class ForbiddenRequestError extends ForbiddenError {}
 
 /** Thrown for a bad submission or action body — the route answers 400. */
-export class RequestValidationError extends Error {}
+export class RequestValidationError extends ValidationError {}
 
 export { RequestStatusConflictError } from '../database/requests';
 
@@ -140,7 +135,7 @@ async function loadActionable(userId: number, requestId: number) {
  * even while it's empty.
  */
 export async function listRequests(
-  userId: number
+  userId: number,
 ): Promise<{ incoming: Request[]; mine: Request[]; handles: string[] }> {
   const viewer = await getViewer(userId);
   const handles = actionableRequestTypes(viewer);
@@ -172,7 +167,8 @@ export async function submitRequest(userId: number, input: SubmitRequestInput): 
   const formData = parseFormData(input.formData, type);
 
   const explicitTitle = typeof input.title === 'string' ? input.title : '';
-  const formTitle = type.titleField && typeof formData[type.titleField] === 'string' ? (formData[type.titleField] as string) : '';
+  const formTitle =
+    type.titleField && typeof formData[type.titleField] === 'string' ? (formData[type.titleField] as string) : '';
   const title = (explicitTitle || formTitle).trim();
   if (!title) throw new RequestValidationError('Title is required');
   if (title.length > 255) throw new RequestValidationError('Title must be 255 characters or fewer');
@@ -206,9 +202,11 @@ export async function submitRequest(userId: number, input: SubmitRequestInput): 
       type: 'request',
       requestId: record.id,
       // A grievance's subject stays out of notifications and their emails.
-      title: type.confidential ? `New ${type.label.toLowerCase()} submitted` : `New ${type.label.toLowerCase()}: ${title}`,
+      title: type.confidential
+        ? `New ${type.label.toLowerCase()} submitted`
+        : `New ${type.label.toLowerCase()}: ${title}`,
       message: isAnonymous ? undefined : `From ${viewer.name}`,
-    }
+    },
   );
 
   return toView(record, viewer, type);
@@ -283,7 +281,8 @@ function parseText(raw: unknown, what: string, required: boolean): string | null
     if (required) throw new RequestValidationError(`${what} is required`);
     return null;
   }
-  if (text.length > MAX_TEXT_LENGTH) throw new RequestValidationError(`${what} must be ${MAX_TEXT_LENGTH} characters or fewer`);
+  if (text.length > MAX_TEXT_LENGTH)
+    throw new RequestValidationError(`${what} must be ${MAX_TEXT_LENGTH} characters or fewer`);
   return text;
 }
 
@@ -296,7 +295,7 @@ function parseText(raw: unknown, what: string, required: boolean): string | null
 export async function acceptRequest(
   userId: number,
   requestId: number,
-  input: { assigneeIds?: unknown; notes?: unknown }
+  input: { assigneeIds?: unknown; notes?: unknown },
 ): Promise<Request> {
   const { viewer, record, type } = await loadActionable(userId, requestId);
   const notes = parseText(input.notes, 'Notes', false);
@@ -329,7 +328,7 @@ export async function acceptRequest(
         taskId: accepted.taskId,
         title: `New task assigned: ${accepted.title}`,
         message: accepted.neededBy ? `Due ${new Date(accepted.neededBy).toLocaleDateString()}` : undefined,
-      }
+      },
     );
   }
   await notifyRequester(accepted, viewer.id, type, 'was accepted');
@@ -341,7 +340,7 @@ export async function acceptRequest(
 export async function updateRequestAssignees(
   userId: number,
   requestId: number,
-  input: { assigneeIds?: unknown }
+  input: { assigneeIds?: unknown },
 ): Promise<Request> {
   const { viewer, record, type } = await loadActionable(userId, requestId);
   if (!type.assignable) throw new RequestValidationError(`A ${type.label.toLowerCase()} can't be assigned to others`);
@@ -355,7 +354,7 @@ export async function updateRequestAssignees(
   const before = new Set(record.assignees.map((a) => a.id));
   await notify(
     assigneeIds.filter((id) => !before.has(id) && id !== viewer.id),
-    { type: 'task', taskId: record.taskId, title: `New task assigned: ${record.title}` }
+    { type: 'task', taskId: record.taskId, title: `New task assigned: ${record.title}` },
   );
 
   const updated = await dbGetRequestById(requestId);
@@ -375,7 +374,12 @@ export async function rejectRequest(userId: number, requestId: number, input: { 
   if (record.taskId) {
     await notify(
       record.assignees.map((a) => a.id).filter((id) => id !== viewer.id),
-      { type: 'task', taskId: record.taskId, title: `Task cancelled: ${record.title}`, message: 'The request was rejected.' }
+      {
+        type: 'task',
+        taskId: record.taskId,
+        title: `Task cancelled: ${record.title}`,
+        message: 'The request was rejected.',
+      },
     );
   }
   await notifyRequester(rejected, viewer.id, type, 'was rejected', reason);
@@ -421,7 +425,7 @@ async function notifyRequester(
   actorId: number,
   type: RequestTypeDef,
   outcome: string,
-  message?: string
+  message?: string,
 ): Promise<void> {
   if (!record.requesterId || record.requesterId === actorId) return;
   await notify([record.requesterId], {

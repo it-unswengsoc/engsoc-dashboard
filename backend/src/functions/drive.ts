@@ -1,4 +1,4 @@
-import { google, drive_v3 } from 'googleapis';
+import { google, type drive_v3 } from 'googleapis';
 import { Readable } from 'stream';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -113,7 +113,9 @@ const DEPARTMENT_DEFS: DepartmentDef[] = [
   { name: 'Resources', colour: '#8A94A3', match: () => true },
 ];
 
-function toCapabilities(caps: drive_v3.Schema$File['capabilities'] | drive_v3.Schema$Drive['capabilities']): DriveCapabilities {
+function toCapabilities(
+  caps: drive_v3.Schema$File['capabilities'] | drive_v3.Schema$Drive['capabilities'],
+): DriveCapabilities {
   return {
     canEdit: caps?.canEdit ?? false,
     canAddChildren: caps?.canAddChildren ?? false,
@@ -178,7 +180,7 @@ export async function listDepartments(refreshToken: string, includeFileCounts = 
         webViewLink: `https://drive.google.com/drive/folders/${sharedDrive.id}`,
         capabilities: toCapabilities(sharedDrive.capabilities),
       };
-    })
+    }),
   );
 
   const departments: DriveDepartment[] = DEPARTMENT_DEFS.map((def) => ({
@@ -198,7 +200,8 @@ export async function listDepartments(refreshToken: string, includeFileCounts = 
 // The fields of a single File resource this app ever needs — shared between
 // a list response (wrapped in `files(...)`) and a single create/update/get
 // response (the bare field list) so the two can't drift apart.
-const ENTRY_FIELD_LIST = 'id, name, mimeType, modifiedTime, size, webViewLink, capabilities(canEdit, canAddChildren, canRename, canDelete)';
+const ENTRY_FIELD_LIST =
+  'id, name, mimeType, modifiedTime, size, webViewLink, capabilities(canEdit, canAddChildren, canRename, canDelete)';
 const ENTRY_FIELDS = `files(${ENTRY_FIELD_LIST})`;
 
 function toDriveEntry(f: drive_v3.Schema$File): DriveEntry {
@@ -229,7 +232,7 @@ function toDriveEntry(f: drive_v3.Schema$File): DriveEntry {
 export async function listDriveEntries(
   refreshToken: string,
   driveId: string,
-  folderId?: string
+  folderId?: string,
 ): Promise<DriveEntry[]> {
   const drive = getDriveClient(refreshToken);
   // A Shared Drive's own ID doubles as the parent ID for whatever sits at
@@ -302,7 +305,7 @@ export async function createDriveFolder(
   refreshToken: string,
   driveId: string,
   parentId: string | undefined,
-  name: string
+  name: string,
 ): Promise<DriveEntry> {
   const drive = getDriveClient(refreshToken);
   const res = await drive.files.create({
@@ -328,7 +331,7 @@ export async function createDriveFile(
   driveId: string,
   parentId: string | undefined,
   name: string,
-  mimeType: string
+  mimeType: string,
 ): Promise<DriveEntry> {
   const drive = getDriveClient(refreshToken);
   const res = await drive.files.create({
@@ -372,7 +375,7 @@ export async function uploadDriveFile(
   parentId: string | undefined,
   name: string,
   mimeType: string,
-  buffer: Buffer
+  buffer: Buffer,
 ): Promise<DriveEntry> {
   const drive = getDriveClient(refreshToken);
   const res = await drive.files.create({

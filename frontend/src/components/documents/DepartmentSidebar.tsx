@@ -31,10 +31,7 @@ export default function DepartmentSidebar({ departments, activeDepartment, onSel
                 isActive ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
               }`}
             >
-              <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: department.colour }}
-              />
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: department.colour }} />
               <span className="flex-1 truncate">{department.name}</span>
               <svg
                 className={`h-3 w-3 shrink-0 ${isActive ? 'text-gray-400' : 'text-gray-300'}`}
@@ -56,7 +53,10 @@ export default function DepartmentSidebar({ departments, activeDepartment, onSel
 /* Stands in for the sidebar while departments are loading. */
 export function DepartmentSidebarSkeleton() {
   return (
-    <div className="flex h-full w-[80vw] shrink-0 snap-start flex-col md:w-56 border-r border-gray-200" aria-busy="true">
+    <div
+      className="flex h-full w-[80vw] shrink-0 snap-start flex-col md:w-56 border-r border-gray-200"
+      aria-busy="true"
+    >
       <SidebarHeading />
       <div className="flex flex-col gap-1 p-2">
         {[0, 1, 2, 3].map((i) => (

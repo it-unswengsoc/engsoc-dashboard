@@ -48,7 +48,10 @@ const emailAttachments = EMAIL_IMAGES.map((img) => ({
 export async function sendEmail(to: string, subject: string, bodyHtml: string): Promise<void> {
   const transport = getTransport();
   if (!transport) {
-    console.warn('SES not configured (AWS_SES_ACCESS_KEY_ID/AWS_SES_SECRET_ACCESS_KEY missing) — skipping email:', subject);
+    console.warn(
+      'SES not configured (AWS_SES_ACCESS_KEY_ID/AWS_SES_SECRET_ACCESS_KEY missing) — skipping email:',
+      subject,
+    );
     return;
   }
 

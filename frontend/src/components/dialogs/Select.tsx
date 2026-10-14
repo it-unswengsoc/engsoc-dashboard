@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown } from 'lucide-react';
 
@@ -74,6 +74,7 @@ export default function Select({
   invalid,
   onChange,
 }: SelectProps) {
+  const listboxId = useId();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState<Position | null>(null);
@@ -132,6 +133,7 @@ export default function Select({
   const list = open && position && (
     <ul
       ref={listRef}
+      id={listboxId}
       role="listbox"
       data-dialog-popover
       style={{
@@ -171,8 +173,10 @@ export default function Select({
       <button
         ref={triggerRef}
         type="button"
+        role="combobox"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={listboxId}
         aria-required={required}
         aria-invalid={invalid}
         onClick={toggle}
@@ -181,9 +185,7 @@ export default function Select({
         } ${invalid ? 'ring-2 ring-[#ED6672]' : ''}`}
       >
         {selected ? <OptionLabel option={selected} /> : placeholder}
-        <ChevronDown
-          className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
+        <ChevronDown className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {mounted && list ? createPortal(list, document.body) : null}

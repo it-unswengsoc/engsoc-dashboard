@@ -118,7 +118,7 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
           setCoords(
             official.locationLat !== null && official.locationLng !== null
               ? { lat: official.locationLat, lng: official.locationLng }
-              : null
+              : null,
           );
           if (!token) return;
           const profile = await getProfile(token);
@@ -127,7 +127,9 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
         .catch(() => setCanEdit(false));
 
       if (token) {
-        getRsvpSummary(token, officialEventId).then(setRsvpSummary).catch(() => {});
+        getRsvpSummary(token, officialEventId)
+          .then(setRsvpSummary)
+          .catch(() => {});
       }
     } else {
       setCanEdit(item.canEdit);
@@ -210,7 +212,8 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
         {confirmingDelete ? (
           <div className="flex flex-col gap-4">
             <p className="text-sm text-gray-600">
-              This can&apos;t be undone — the event will be gone for everyone{item.source === 'shared' ? ', including anyone who RSVP\'d' : ''}.
+              This can&apos;t be undone — the event will be gone for everyone
+              {item.source === 'shared' ? ", including anyone who RSVP'd" : ''}.
             </p>
             {error && (
               <p role="alert" className="text-xs font-bold text-[#ED6672]">
@@ -317,7 +320,9 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
                     onClick={() => handleRsvp('going')}
                     disabled={rsvpBusy}
                     className={`flex-1 rounded-lg py-2 text-xs font-bold uppercase tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                      myStatus === 'going' ? 'bg-[#3D6C94] text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+                      myStatus === 'going'
+                        ? 'bg-[#3D6C94] text-white'
+                        : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     Going
@@ -326,7 +331,9 @@ export default function EventDetailModal({ open, item, onClose, onEdit }: EventD
                     onClick={() => handleRsvp('not_going')}
                     disabled={rsvpBusy}
                     className={`flex-1 rounded-lg py-2 text-xs font-bold uppercase tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                      myStatus === 'not_going' ? 'bg-gray-500 text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
+                      myStatus === 'not_going'
+                        ? 'bg-gray-500 text-white'
+                        : 'border border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
                   >
                     Can&apos;t come

@@ -1,262 +1,102 @@
-import { Router, Request, Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import {
   registerUser,
   loginUser,
   getUserProfile,
   updateUserProfile,
-  verifyToken,
   findOrCreateGoogleUser,
   generateToken,
 } from '../functions/auth';
 import { getGoogleAuthUrl, exchangeGoogleCode, GoogleDomainError } from '../functions/google';
-import { isUserAdmin } from '../functions/admin';
-import { getUserRole } from '../functions/users';
-import type { AuthorRole } from '../functions/announcements';
+import { verifyAuthToken, type AuthedRequest } from '../middleware/auth';
+import { NotFoundError, UnauthorizedError, ValidationError } from '../lib/errors';
+import { asyncHandler, created, ok } from '../lib/http';
 
 const router = Router();
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
-
-// Middleware to verify JWT token
-export function verifyAuthToken(req: Request, res: Response, next: Function) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({
-      status: 'error',
-      message: 'Missing or invalid authorization header',
-    });
-  }
-
-  const token = authHeader.substring(7);
-  const decoded = verifyToken(token);
-
-  if (!decoded) {
-    return res.status(401).json({
-      status: 'error',
-      message: 'Invalid or expired token',
-    });
-  }
-
-  (req as any).user = decoded;
-  next();
-}
-
-// Gates every /admin/* route. Must run after verifyAuthToken (needs
-// req.user). Checks the database rather than the JWT — role isn't in the
-// token, so a change takes effect on the member's very next request rather
-// than only after they log back in.
-export async function requireAdmin(req: Request, res: Response, next: Function) {
-  const user = (req as any).user;
-  try {
-    const admin = await isUserAdmin(user.userId);
-    if (!admin) {
-      return res.status(403).json({ status: 'error', message: 'Admin access required' });
-    }
-    next();
-  } catch (error) {
-    console.error('Admin check error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-}
-
-// General version of requireAdmin for anything short of full admin — e.g.
-// "director, executive or admin only" on posting an announcement. Same
-// database-not-JWT reasoning.
-export function requireRole(allowed: AuthorRole[]) {
-  return async (req: Request, res: Response, next: Function) => {
-    const user = (req as any).user;
-    try {
-      const role = await getUserRole(user.userId);
-      if (!role || !allowed.includes(role)) {
-        return res.status(403).json({ status: 'error', message: 'Insufficient permissions' });
-      }
-      next();
-    } catch (error) {
-      console.error('Role check error:', error);
-      res.status(500).json({ status: 'error', message: 'Internal server error' });
-    }
-  };
-}
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * POST /api/auth/register
+ * POST /auth/register
  * Register a new user
  */
-router.post('/register', async (req: Request, res: Response) => {
-  try {
+router.post(
+  '/register',
+  asyncHandler(async (req, res) => {
     const { email, password, firstName, lastName } = req.body;
 
-    // Validate inputs
     if (!email || !password || !firstName || !lastName) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required fields: email, password, firstName, lastName',
-      });
+      throw new ValidationError('Missing required fields: email, password, firstName, lastName');
     }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid email format',
-      });
-    }
-
-    // Validate password length
-    if (password.length < 8) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Password must be at least 8 characters long',
-      });
-    }
+    if (!EMAIL_PATTERN.test(email)) throw new ValidationError('Invalid email format');
+    if (password.length < 8) throw new ValidationError('Password must be at least 8 characters long');
 
     const result = await registerUser(email, password, firstName, lastName);
+    if (!result) throw new ValidationError('Registration failed. User may already exist.');
 
-    if (!result) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Registration failed. User may already exist.',
-      });
-    }
-
-    res.status(201).json({
-      status: 'success',
-      message: 'User registered successfully',
-      data: result,
-    });
-  } catch (error) {
-    console.error('Register error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+    created(res, result, { message: 'User registered successfully' });
+  }),
+);
 
 /**
- * POST /api/auth/login
+ * POST /auth/login
  * Login user and return JWT token
  */
-router.post('/login', async (req: Request, res: Response) => {
-  try {
+router.post(
+  '/login',
+  asyncHandler(async (req, res) => {
     const { email, password } = req.body;
-
-    // Validate inputs
-    if (!email || !password) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required fields: email, password',
-      });
-    }
+    if (!email || !password) throw new ValidationError('Missing required fields: email, password');
 
     const result = await loginUser(email, password);
+    if (!result) throw new UnauthorizedError('Invalid email or password');
 
-    if (!result) {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Invalid email or password',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Login successful',
-      data: result,
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+    ok(res, result, { message: 'Login successful' });
+  }),
+);
 
 /**
- * GET /api/auth/profile
+ * GET /auth/profile
  * Get authenticated user profile
  */
-router.get('/profile', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const profile = await getUserProfile(user.userId);
-
-    if (!profile) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'User profile not found',
-      });
-    }
-
-    res.status(200).json({
-      status: 'success',
-      data: profile,
-    });
-  } catch (error) {
-    console.error('Get profile error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+router.get(
+  '/profile',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const profile = await getUserProfile(req.user.userId);
+    if (!profile) throw new NotFoundError('User profile not found');
+    ok(res, profile);
+  }),
+);
 
 /**
- * PUT /api/auth/profile
+ * PUT /auth/profile
  * Update user profile
  */
-router.put('/profile', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
+router.put(
+  '/profile',
+  verifyAuthToken,
+  asyncHandler(async (req: AuthedRequest, res) => {
     const { firstName, lastName } = req.body;
+    if (!firstName || !lastName) throw new ValidationError('Missing required fields: firstName, lastName');
 
-    // Validate inputs
-    if (!firstName || !lastName) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required fields: firstName, lastName',
-      });
-    }
+    const success = await updateUserProfile(req.user.userId, firstName, lastName);
+    if (!success) throw new ValidationError('Failed to update profile');
 
-    const success = await updateUserProfile(user.userId, firstName, lastName);
-
-    if (!success) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Failed to update profile',
-      });
-    }
-
-    const updatedProfile = await getUserProfile(user.userId);
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Profile updated successfully',
-      data: updatedProfile,
-    });
-  } catch (error) {
-    console.error('Update profile error:', error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Internal server error',
-    });
-  }
-});
+    ok(res, await getUserProfile(req.user.userId), { message: 'Profile updated successfully' });
+  }),
+);
 
 /**
- * POST /api/auth/logout
+ * POST /auth/logout
  * Logout user (client-side token removal)
  */
-router.post('/logout', verifyAuthToken, (req: Request, res: Response) => {
-  res.status(200).json({
-    status: 'success',
-    message: 'Logout successful. Please remove the token from client storage.',
-  });
+router.post('/logout', verifyAuthToken, (_req: Request, res: Response) => {
+  ok(res, undefined, { message: 'Logout successful. Please remove the token from client storage.' });
 });
 
 /**
- * GET /api/auth/google
+ * GET /auth/google
  * Redirects to Google's OAuth consent screen. Plain "Sign in with Google"
  * needs no query param; the one-time admin flow that connects the shared
  * EngSoc Drive account passes ?intent=drive-connect (see .env.example).
@@ -267,7 +107,7 @@ router.get('/google', (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/auth/google/callback
+ * GET /auth/google/callback
  * Google's OAuth redirect target — this exact path is registered in Google
  * Cloud Console as the authorized redirect URI. Exchanges the auth code for
  * tokens, verifies the signed-in user's identity, and either:
@@ -275,20 +115,17 @@ router.get('/google', (req: Request, res: Response) => {
  *     back to the frontend with a JWT
  *   - or (state=drive-connect) returns the profile + refresh token as JSON,
  *     for the one-time admin setup that connects the shared EngSoc Drive.
+ *
+ * Failures redirect back to the login page rather than answering JSON, so
+ * this keeps its own try/catch instead of going through the error handler.
  */
 router.get('/google/callback', async (req: Request, res: Response) => {
   const state = typeof req.query.state === 'string' ? req.query.state : undefined;
+  const failed = (reason = 'google_auth_failed') => res.redirect(`${FRONTEND_URL}/login?error=${reason}`);
 
   try {
     const { code, error } = req.query;
-
-    if (error) {
-      return res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
-    }
-
-    if (!code || typeof code !== 'string') {
-      return res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
-    }
+    if (error || !code || typeof code !== 'string') return failed();
 
     const { profile, refreshToken } = await exchangeGoogleCode(code);
 
@@ -298,11 +135,7 @@ router.get('/google/callback', async (req: Request, res: Response) => {
       // whoever authorizes the club's shared Drive account can copy it once
       // into GOOGLE_DRIVE_REFRESH_TOKEN (see .env.example). It's sensitive:
       // treat it like a password, never commit it.
-      return res.status(200).json({
-        status: 'success',
-        message: 'Google account verified',
-        data: { ...profile, refreshToken },
-      });
+      return ok(res, { ...profile, refreshToken }, { message: 'Google account verified' });
     }
 
     const user = await findOrCreateGoogleUser(
@@ -310,21 +143,16 @@ router.get('/google/callback', async (req: Request, res: Response) => {
       profile.email,
       profile.firstName,
       profile.lastName,
-      refreshToken
+      refreshToken,
     );
-
-    if (!user) {
-      return res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
-    }
+    if (!user) return failed();
 
     const token = generateToken(user.userId, user.email);
     res.redirect(`${FRONTEND_URL}/login?token=${encodeURIComponent(token)}`);
   } catch (error) {
-    if (error instanceof GoogleDomainError) {
-      return res.redirect(`${FRONTEND_URL}/login?error=domain_not_allowed`);
-    }
+    if (error instanceof GoogleDomainError) return failed('domain_not_allowed');
     console.error('Google OAuth callback error:', error);
-    res.redirect(`${FRONTEND_URL}/login?error=google_auth_failed`);
+    failed();
   }
 });
 

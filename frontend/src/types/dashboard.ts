@@ -6,12 +6,12 @@ import type { EventType } from '@/types/events';
 
 export interface EventRowData {
   id: number;
-  month: string;      // "AUG"
-  day: number;        // 21
+  month: string; // "AUG"
+  day: number; // 21
   name: string;
   type: EventType;
   dateString: string; // "21/08/26"
-  time: string;       // "7:30pm"
+  time: string; // "7:30pm"
   imageUrl: string | null;
 }
 
@@ -21,11 +21,11 @@ export interface TaskRowData {
   daysTillDue: number | null; // null if no due date was set
   name: string;
   dateString: string; // "Mon, 1 June"; "" if no due date
-  time: string;       // "9:30PM"; "" if no due date
+  time: string; // "9:30PM"; "" if no due date
 }
 
 export interface DashboardStats {
-  openTasks: string;          // "3/5"
-  upcomingEvents: string;     // "4"
-  newAnnouncements: string;   // "2"
+  openTasks: string; // "3/5"
+  upcomingEvents: string; // "4"
+  newAnnouncements: string; // "2"
 }

@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
 import {
   getTasksForUser,
   getTasksForPort,
@@ -6,57 +6,42 @@ import {
   updateTaskStatus,
   updateTaskDetails,
   getTaskById,
-  ForbiddenTaskError,
-  InvalidTaskStatusError,
-  InvalidTaskEditError,
 } from '../functions/tasks';
 import { addTaskAttachment, getTaskAttachments, deleteTaskAttachment } from '../functions/task-attachments';
-import { verifyAuthToken } from './auth';
+import { verifyAuthToken, type AuthedRequest } from '../middleware/auth';
+import { NotFoundError, ValidationError } from '../lib/errors';
+import { asyncHandler, created, ok, parseId } from '../lib/http';
 
 const router = Router();
+
+router.use(verifyAuthToken);
 
 /**
  * GET /tasks?port=…
  * A port's board: every task with at least one assignee in that port.
  * Members of that port and admins only.
  */
-router.get('/', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
+router.get(
+  '/',
+  asyncHandler(async (req: AuthedRequest, res) => {
     const port = req.query.port;
-    if (typeof port !== 'string' || !port) {
-      return res.status(400).json({ status: 'error', message: 'Missing required query param: port' });
-    }
+    if (typeof port !== 'string' || !port) throw new ValidationError('Missing required query param: port');
 
-    const tasks = await getTasksForPort(port, user.userId);
-    res.status(200).json({ status: 'success', data: tasks });
-  } catch (error) {
-    if (error instanceof ForbiddenTaskError) {
-      return res.status(403).json({ status: 'error', message: error.message });
-    }
-    if (error instanceof Error && error.message === 'Unknown portfolio') {
-      return res.status(400).json({ status: 'error', message: error.message });
-    }
-    console.error('Get port tasks error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+    ok(res, await getTasksForPort(port, req.user.userId));
+  }),
+);
 
 /**
  * GET /tasks/mine
  * Lists every task the requesting user is an assignee on — backs the
  * dashboard's "My tasks" widget.
  */
-router.get('/mine', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
-    const tasks = await getTasksForUser(user.userId);
-    res.status(200).json({ status: 'success', data: tasks });
-  } catch (error) {
-    console.error('Get my tasks error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+router.get(
+  '/mine',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    ok(res, await getTasksForUser(req.user.userId));
+  }),
+);
 
 /**
  * POST /tasks
@@ -65,9 +50,9 @@ router.get('/mine', verifyAuthToken, async (req: Request, res: Response) => {
  * Body: { title, description?, dueDate?, assignTo, port?, assigneeIds?,
  * assigneeId? }.
  */
-router.post('/', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const user = (req as any).user;
+router.post(
+  '/',
+  asyncHandler(async (req: AuthedRequest, res) => {
     const { title, description, dueDate, assignTo, port, assigneeIds, assigneeId } = req.body as {
       title?: string;
       description?: string;
@@ -79,12 +64,9 @@ router.post('/', verifyAuthToken, async (req: Request, res: Response) => {
     };
 
     if (assigneeIds !== undefined && (!Array.isArray(assigneeIds) || !assigneeIds.every(Number.isInteger))) {
-      return res.status(400).json({ status: 'error', message: 'assigneeIds must be an array of user ids' });
+      throw new ValidationError('assigneeIds must be an array of user ids');
     }
-
-    if (!title || !assignTo) {
-      return res.status(400).json({ status: 'error', message: 'Missing required fields: title, assignTo' });
-    }
+    if (!title || !assignTo) throw new ValidationError('Missing required fields: title, assignTo');
 
     const tasks = await createTasks({
       title,
@@ -94,20 +76,12 @@ router.post('/', verifyAuthToken, async (req: Request, res: Response) => {
       port,
       assigneeIds,
       assigneeId,
-      requestedBy: user.userId,
+      requestedBy: req.user.userId,
     });
 
-    res.status(201).json({ status: 'success', message: 'Task(s) created', data: tasks });
-  } catch (error) {
-    // Mostly invalid input — createTasks' validation messages are written
-    // for the member to read.
-    console.error('Create task error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to create task',
-    });
-  }
-});
+    created(res, tasks, { message: 'Task(s) created' });
+  }),
+);
 
 /**
  * PATCH /tasks/:taskId
@@ -116,10 +90,10 @@ router.post('/', verifyAuthToken, async (req: Request, res: Response) => {
  * or due date; only whoever created it can. Body: { status } and/or
  * { title?, description?, dueDate? } (null clears description or dueDate).
  */
-router.patch('/:taskId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const taskId = parseInt(req.params.taskId);
-    const user = (req as any).user;
+router.patch(
+  '/:taskId',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const taskId = parseId(req.params.taskId, 'task');
     const { status, title, description, dueDate } = req.body as {
       status?: string;
       title?: string;
@@ -127,82 +101,39 @@ router.patch('/:taskId', verifyAuthToken, async (req: Request, res: Response) =>
       dueDate?: string | null;
     };
     const isEdit = title !== undefined || description !== undefined || dueDate !== undefined;
+    if (!status && !isEdit) throw new ValidationError('Nothing to update');
 
-    if (isNaN(taskId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid task ID' });
-    }
-    if (!status && !isEdit) {
-      return res.status(400).json({ status: 'error', message: 'Nothing to update' });
-    }
+    let task = isEdit ? await updateTaskDetails(taskId, req.user.userId, { title, description, dueDate }) : null;
+    if (status) task = await updateTaskStatus(taskId, req.user.userId, status);
+    if (!task) throw new NotFoundError('Task not found');
 
-    let task = isEdit ? await updateTaskDetails(taskId, user.userId, { title, description, dueDate }) : null;
-    if (status) task = await updateTaskStatus(taskId, user.userId, status);
-    if (!task) {
-      return res.status(404).json({ status: 'error', message: 'Task not found' });
-    }
-
-    res.status(200).json({ status: 'success', data: task });
-  } catch (error) {
-    if (error instanceof ForbiddenTaskError) {
-      return res.status(403).json({ status: 'error', message: error.message });
-    }
-    if (error instanceof InvalidTaskStatusError || error instanceof InvalidTaskEditError) {
-      return res.status(400).json({ status: 'error', message: error.message });
-    }
-    console.error('Update task error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+    ok(res, task);
+  }),
+);
 
 /**
  * GET /tasks/:taskId
  * A single task's full details — assignee, creator or admin only. Backs the task
  * detail dialog.
  */
-router.get('/:taskId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const taskId = parseInt(req.params.taskId);
-    const user = (req as any).user;
-    if (isNaN(taskId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid task ID' });
-    }
-
-    const task = await getTaskById(taskId, user.userId);
-    if (!task) {
-      return res.status(404).json({ status: 'error', message: 'Task not found' });
-    }
-
-    res.status(200).json({ status: 'success', data: task });
-  } catch (error) {
-    if (error instanceof ForbiddenTaskError) {
-      return res.status(403).json({ status: 'error', message: error.message });
-    }
-    console.error('Get task error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+router.get(
+  '/:taskId',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const task = await getTaskById(parseId(req.params.taskId, 'task'), req.user.userId);
+    if (!task) throw new NotFoundError('Task not found');
+    ok(res, task);
+  }),
+);
 
 /**
  * GET /tasks/:taskId/attachments
  */
-router.get('/:taskId/attachments', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const taskId = parseInt(req.params.taskId);
-    const user = (req as any).user;
-    if (isNaN(taskId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid task ID' });
-    }
-
-    const attachments = await getTaskAttachments(taskId, user.userId);
-    res.status(200).json({ status: 'success', data: attachments });
-  } catch (error) {
-    if (error instanceof ForbiddenTaskError) {
-      return res.status(403).json({ status: 'error', message: error.message });
-    }
-    console.error('Get task attachments error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+router.get(
+  '/:taskId/attachments',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    ok(res, await getTaskAttachments(parseId(req.params.taskId, 'task'), req.user.userId));
+  }),
+);
 
 /**
  * POST /tasks/:taskId/attachments
@@ -211,42 +142,27 @@ router.get('/:taskId/attachments', verifyAuthToken, async (req: Request, res: Re
  * this only ever receives the resulting Drive file's metadata, never the
  * file's actual bytes.
  */
-router.post('/:taskId/attachments', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const taskId = parseInt(req.params.taskId);
-    const user = (req as any).user;
+router.post(
+  '/:taskId/attachments',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const taskId = parseId(req.params.taskId, 'task');
     const { driveFileId, name, webViewLink, mimeType } = req.body as {
       driveFileId?: string;
       name?: string;
       webViewLink?: string | null;
       mimeType?: string | null;
     };
+    if (!driveFileId || !name) throw new ValidationError('Missing required fields: driveFileId, name');
 
-    if (isNaN(taskId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid task ID' });
-    }
-    if (!driveFileId || !name) {
-      return res.status(400).json({ status: 'error', message: 'Missing required fields: driveFileId, name' });
-    }
-
-    const attachment = await addTaskAttachment(taskId, user.userId, {
+    const attachment = await addTaskAttachment(taskId, req.user.userId, {
       driveFileId,
       name,
       webViewLink: webViewLink ?? null,
       mimeType: mimeType ?? null,
     });
-    res.status(201).json({ status: 'success', data: attachment });
-  } catch (error) {
-    if (error instanceof ForbiddenTaskError) {
-      return res.status(403).json({ status: 'error', message: error.message });
-    }
-    console.error('Add task attachment error:', error);
-    res.status(400).json({
-      status: 'error',
-      message: error instanceof Error ? error.message : 'Failed to add attachment',
-    });
-  }
-});
+    created(res, attachment);
+  }, 'Failed to add attachment'),
+);
 
 /**
  * DELETE /tasks/:taskId/attachments/:attachmentId
@@ -254,27 +170,13 @@ router.post('/:taskId/attachments', verifyAuthToken, async (req: Request, res: R
  * Drive file, matching how the Documents page treats Drive-trash vs a
  * permanent delete (the file just stops being attached here).
  */
-router.delete('/:taskId/attachments/:attachmentId', verifyAuthToken, async (req: Request, res: Response) => {
-  try {
-    const attachmentId = parseInt(req.params.attachmentId);
-    const user = (req as any).user;
-    if (isNaN(attachmentId)) {
-      return res.status(400).json({ status: 'error', message: 'Invalid attachment ID' });
-    }
-
-    const deleted = await deleteTaskAttachment(attachmentId, user.userId);
-    if (!deleted) {
-      return res.status(404).json({ status: 'error', message: 'Attachment not found' });
-    }
-
-    res.status(200).json({ status: 'success', message: 'Attachment removed' });
-  } catch (error) {
-    if (error instanceof ForbiddenTaskError) {
-      return res.status(403).json({ status: 'error', message: error.message });
-    }
-    console.error('Delete task attachment error:', error);
-    res.status(500).json({ status: 'error', message: 'Internal server error' });
-  }
-});
+router.delete(
+  '/:taskId/attachments/:attachmentId',
+  asyncHandler(async (req: AuthedRequest, res) => {
+    const deleted = await deleteTaskAttachment(parseId(req.params.attachmentId, 'attachment'), req.user.userId);
+    if (!deleted) throw new NotFoundError('Attachment not found');
+    ok(res, undefined, { message: 'Attachment removed' });
+  }),
+);
 
 export default router;

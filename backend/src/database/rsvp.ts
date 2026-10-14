@@ -1,6 +1,5 @@
-import { QueryResult } from 'pg';
+import { type QueryResult } from 'pg';
 import pool from './pool';
-
 
 export type RsvpStatus = 'going' | 'not_going';
 
@@ -21,7 +20,7 @@ export async function dbSetRsvp(eventId: number, userId: number, status: RsvpSta
      VALUES ($1, $2, $3, NOW())
      ON CONFLICT (event_id, user_id)
      DO UPDATE SET status = $3, registered_at = NOW()`,
-    [eventId, userId, status]
+    [eventId, userId, status],
   );
 }
 
@@ -37,7 +36,7 @@ export async function dbGetRsvpEntries(eventId: number): Promise<RsvpEntry[]> {
      JOIN users u ON u.id = ea.user_id
      WHERE ea.event_id = $1
      ORDER BY ea.registered_at ASC`,
-    [eventId]
+    [eventId],
   );
   return result.rows.map((row) => ({
     userId: row.user_id,

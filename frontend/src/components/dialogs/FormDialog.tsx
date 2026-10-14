@@ -115,15 +115,7 @@ function buildPayload(fields: FieldDef[], values: FieldValues): FieldPayload {
   return payload;
 }
 
-export default function FormDialog({
-  open,
-  title,
-  submitLabel,
-  fields,
-  onSubmit,
-  onClose,
-  onBack,
-}: FormDialogProps) {
+export default function FormDialog({ open, title, submitLabel, fields, onSubmit, onClose, onBack }: FormDialogProps) {
   const [values, setValues] = useState<FieldValues>({});
   const [missing, setMissing] = useState<Record<string, boolean>>({});
   const [fileErrors, setFileErrors] = useState<Record<string, string>>({});
@@ -140,9 +132,7 @@ export default function FormDialog({
   useEffect(() => {
     const shown = new Set(shownNames.split('\n'));
     const prune = <T,>(prev: Record<string, T>): Record<string, T> => {
-      const next = Object.fromEntries(
-        Object.entries(prev).filter(([name]) => shown.has(name)),
-      );
+      const next = Object.fromEntries(Object.entries(prev).filter(([name]) => shown.has(name)));
       return Object.keys(next).length === Object.keys(prev).length ? prev : next;
     };
 
@@ -186,9 +176,7 @@ export default function FormDialog({
 
   function toggleMulti(name: string, option: string) {
     const selected = values[name] ? values[name].split(MULTI_SEPARATOR) : [];
-    const next = selected.includes(option)
-      ? selected.filter((value) => value !== option)
-      : [...selected, option];
+    const next = selected.includes(option) ? selected.filter((value) => value !== option) : [...selected, option];
     setValue(name, next.join(MULTI_SEPARATOR));
   }
 
@@ -204,8 +192,7 @@ export default function FormDialog({
        here instead to keep one consistent error style. Only visible fields
        count — switching request type swaps which ones are required. */
     const empty = resolvedFields.filter(
-      (field) =>
-        field.kind !== 'notice' && field.required && !values[field.name]?.trim(),
+      (field) => field.kind !== 'notice' && field.required && !values[field.name]?.trim(),
     );
 
     if (empty.length > 0) {
@@ -241,155 +228,144 @@ export default function FormDialog({
         {/* Symmetric padding: overflow-y clips the x-axis too, so focus rings
             need room on both sides, not just the scrollbar's side. */}
         <div className="-mx-2 max-h-[68vh] overflow-y-auto px-2">
-        <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
-        {resolvedFields.map((field) => {
-          if (field.kind === 'notice') {
-            return (
-              <div
-                key={field.name}
-                className="text-sm leading-relaxed text-gray-500 sm:col-span-2"
-              >
-                <p>{field.text}</p>
-                {field.steps && (
-                  <ol className="mt-1.5 list-decimal space-y-1 pl-5">
-                    {field.steps.map((step) => (
-                      <li key={step}>{step}</li>
-                    ))}
-                  </ol>
-                )}
-                {field.footer && <p className="mt-1.5">{field.footer}</p>}
-              </div>
-            );
-          }
+          <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-2">
+            {resolvedFields.map((field) => {
+              if (field.kind === 'notice') {
+                return (
+                  <div key={field.name} className="text-sm leading-relaxed text-gray-500 sm:col-span-2">
+                    <p>{field.text}</p>
+                    {field.steps && (
+                      <ol className="mt-1.5 list-decimal space-y-1 pl-5">
+                        {field.steps.map((step) => (
+                          <li key={step}>{step}</li>
+                        ))}
+                      </ol>
+                    )}
+                    {field.footer && <p className="mt-1.5">{field.footer}</p>}
+                  </div>
+                );
+              }
 
-          /* Only wrap real form controls in a label — a label would forward
+              /* Only wrap real form controls in a label — a label would forward
              clicks on a dropdown option back to the toggle button. */
-          const isChoice =
-            field.kind === 'select' ||
-            field.kind === 'segmented' ||
-            field.kind === 'boolean' ||
-            field.kind === 'checkboxes';
-          const Wrapper = isChoice ? 'div' : 'label';
-          const span = field.span === 'half' ? '' : 'sm:col-span-2';
-          const invalid = missing[field.name] === true;
-          const controlStyles = invalid ? `${inputStyles} ring-2 ring-[#ED6672]` : inputStyles;
+              const isChoice =
+                field.kind === 'select' ||
+                field.kind === 'segmented' ||
+                field.kind === 'boolean' ||
+                field.kind === 'checkboxes';
+              const Wrapper = isChoice ? 'div' : 'label';
+              const span = field.span === 'half' ? '' : 'sm:col-span-2';
+              const invalid = missing[field.name] === true;
+              const controlStyles = invalid ? `${inputStyles} ring-2 ring-[#ED6672]` : inputStyles;
 
-          return (
-            <Wrapper key={field.name} className={`flex min-w-0 flex-col gap-1.5 ${span}`}>
-              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                {field.label}
-                {field.required && <span className="text-[#ED6672]"> *</span>}
-              </span>
+              return (
+                <Wrapper key={field.name} className={`flex min-w-0 flex-col gap-1.5 ${span}`}>
+                  <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
+                    {field.label}
+                    {field.required && <span className="text-[#ED6672]"> *</span>}
+                  </span>
 
-              {field.kind === 'textarea' ? (
-                <textarea
-                  rows={3}
-                  required={field.required}
-                  aria-invalid={invalid}
-                  placeholder={field.placeholder}
-                  value={values[field.name] ?? ''}
-                  onChange={(e) => setValue(field.name, e.target.value)}
-                  className={`${controlStyles} resize-none`}
-                />
-              ) : field.kind === 'select' ? (
-                <Select
-                  value={values[field.name] ?? ''}
-                  options={field.options}
-                  placeholder={field.placeholder}
-                  required={field.required}
-                  invalid={invalid}
-                  onChange={(value) => setValue(field.name, value)}
-                />
-              ) : field.kind === 'boolean' || field.kind === 'segmented' ? (
-                <div
-                  role="radiogroup"
-                  aria-required={field.required}
-                  aria-invalid={invalid}
-                  className={`flex gap-2 rounded-lg ${invalid ? 'ring-2 ring-[#ED6672]' : ''}`}
-                >
-                  {(field.kind === 'boolean' ? BOOLEAN_OPTIONS : field.options).map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={values[field.name] === option.value}
-                      onClick={() => setValue(field.name, option.value)}
-                      className={`flex-1 rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
-                        values[field.name] === option.value
-                          ? 'border-[#B1C9DC] bg-[#B1C9DC]/20 text-gray-900'
-                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                  {field.kind === 'textarea' ? (
+                    <textarea
+                      rows={3}
+                      required={field.required}
+                      aria-invalid={invalid}
+                      placeholder={field.placeholder}
+                      value={values[field.name] ?? ''}
+                      onChange={(e) => setValue(field.name, e.target.value)}
+                      className={`${controlStyles} resize-none`}
+                    />
+                  ) : field.kind === 'select' ? (
+                    <Select
+                      value={values[field.name] ?? ''}
+                      options={field.options}
+                      placeholder={field.placeholder}
+                      required={field.required}
+                      invalid={invalid}
+                      onChange={(value) => setValue(field.name, value)}
+                    />
+                  ) : field.kind === 'boolean' || field.kind === 'segmented' ? (
+                    <div
+                      role="radiogroup"
+                      aria-required={field.required}
+                      aria-invalid={invalid}
+                      className={`flex gap-2 rounded-lg ${invalid ? 'ring-2 ring-[#ED6672]' : ''}`}
+                    >
+                      {(field.kind === 'boolean' ? BOOLEAN_OPTIONS : field.options).map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={values[field.name] === option.value}
+                          onClick={() => setValue(field.name, option.value)}
+                          className={`flex-1 rounded-lg border px-3 py-2 text-sm font-bold transition-colors ${
+                            values[field.name] === option.value
+                              ? 'border-[#B1C9DC] bg-[#B1C9DC]/20 text-gray-900'
+                              : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : field.kind === 'checkboxes' ? (
+                    <div
+                      role="group"
+                      className={`grid gap-x-5 gap-y-0.5 sm:grid-cols-2 ${
+                        invalid ? 'rounded-lg p-1 ring-2 ring-[#ED6672]' : ''
                       }`}
                     >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              ) : field.kind === 'checkboxes' ? (
-                <div
-                  role="group"
-                  aria-required={field.required}
-                  aria-invalid={invalid}
-                  className={`grid gap-x-5 gap-y-0.5 sm:grid-cols-2 ${
-                    invalid ? 'rounded-lg p-1 ring-2 ring-[#ED6672]' : ''
-                  }`}
-                >
-                  {field.options.map((option) => (
-                    <label
-                      key={option.value}
-                      className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1.5 text-sm text-gray-900 transition-colors hover:bg-gray-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={(values[field.name] ?? '')
-                          .split(MULTI_SEPARATOR)
-                          .includes(option.value)}
-                        onChange={() => toggleMulti(field.name, option.value)}
-                        className="h-4 w-4 shrink-0 cursor-pointer accent-[#3D6C94]"
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </div>
-              ) : field.kind === 'file' ? (
-                <input
-                  type="file"
-                  accept={field.accept}
-                  required={field.required}
-                  aria-invalid={invalid || Boolean(fileErrors[field.name])}
-                  onChange={(e) => handleFileChange(field, e.target.files?.[0])}
-                  className={`${controlStyles} file:mr-3 file:rounded-md file:border-0 file:bg-[#B1C9DC] file:px-3 file:py-1 file:text-xs file:font-bold file:text-white`}
-                />
-              ) : (
-                <input
-                  type={
-                    field.kind === 'datetime'
-                      ? 'datetime-local'
-                      : field.kind === 'date'
-                        ? 'date'
-                        : field.kind
-                  }
-                  required={field.required}
-                  aria-invalid={invalid}
-                  placeholder={field.placeholder}
-                  value={values[field.name] ?? ''}
-                  onChange={(e) => setValue(field.name, e.target.value)}
-                  className={controlStyles}
-                />
-              )}
+                      {field.options.map((option) => (
+                        <label
+                          key={option.value}
+                          className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1.5 text-sm text-gray-900 transition-colors hover:bg-gray-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={(values[field.name] ?? '').split(MULTI_SEPARATOR).includes(option.value)}
+                            onChange={() => toggleMulti(field.name, option.value)}
+                            aria-required={field.required}
+                            aria-invalid={invalid}
+                            className="h-4 w-4 shrink-0 cursor-pointer accent-[#3D6C94]"
+                          />
+                          {option.label}
+                        </label>
+                      ))}
+                    </div>
+                  ) : field.kind === 'file' ? (
+                    <input
+                      type="file"
+                      accept={field.accept}
+                      required={field.required}
+                      aria-invalid={invalid || Boolean(fileErrors[field.name])}
+                      onChange={(e) => handleFileChange(field, e.target.files?.[0])}
+                      className={`${controlStyles} file:mr-3 file:rounded-md file:border-0 file:bg-[#B1C9DC] file:px-3 file:py-1 file:text-xs file:font-bold file:text-white`}
+                    />
+                  ) : (
+                    <input
+                      type={field.kind === 'datetime' ? 'datetime-local' : field.kind === 'date' ? 'date' : field.kind}
+                      required={field.required}
+                      aria-invalid={invalid}
+                      placeholder={field.placeholder}
+                      value={values[field.name] ?? ''}
+                      onChange={(e) => setValue(field.name, e.target.value)}
+                      className={controlStyles}
+                    />
+                  )}
 
-              {fileErrors[field.name] ? (
-                <span role="alert" className="text-xs font-bold text-[#ED6672]">
-                  {fileErrors[field.name]}
-                </span>
-              ) : invalid ? (
-                <span role="alert" className="text-xs font-bold text-[#ED6672]">
-                  {field.label} is required
-                </span>
-              ) : null}
-            </Wrapper>
-          );
-        })}
-        </div>
+                  {fileErrors[field.name] ? (
+                    <span role="alert" className="text-xs font-bold text-[#ED6672]">
+                      {fileErrors[field.name]}
+                    </span>
+                  ) : invalid ? (
+                    <span role="alert" className="text-xs font-bold text-[#ED6672]">
+                      {field.label} is required
+                    </span>
+                  ) : null}
+                </Wrapper>
+              );
+            })}
+          </div>
         </div>
 
         {submitError && (

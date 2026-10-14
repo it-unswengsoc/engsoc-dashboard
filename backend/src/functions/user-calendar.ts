@@ -1,4 +1,4 @@
-import { google, calendar_v3 } from 'googleapis';
+import { google, type calendar_v3 } from 'googleapis';
 import { dbGetEventIdsByGoogleCalendarEventIds } from '../database/events';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -80,7 +80,7 @@ function resolveSharedCalendarId(): Promise<string | null> {
 function toUserCalendarEvent(
   event: calendar_v3.Schema$Event,
   cal: calendar_v3.Schema$CalendarListEntry,
-  sharedCalendarId: string | null
+  sharedCalendarId: string | null,
 ): UserCalendarEvent {
   const isSharedEngSocEvent = !!sharedCalendarId && cal.id === sharedCalendarId;
   return {
@@ -114,7 +114,7 @@ function toUserCalendarEvent(
 export async function getUserCalendarEvents(
   refreshToken: string,
   timeMin: string,
-  timeMax: string
+  timeMax: string,
 ): Promise<UserCalendarEvent[]> {
   const calendar = getUserCalendarClient(refreshToken);
   const sharedCalendarId = await resolveSharedCalendarId();
@@ -146,7 +146,7 @@ export async function getUserCalendarEvents(
         console.error(`Failed to list events for calendar ${cal.id}:`, error);
         return [];
       }
-    })
+    }),
   );
 
   const events = perCalendar.flat();
@@ -162,7 +162,9 @@ export async function getUserCalendarEvents(
   return events.sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
 }
 
-function toGoogleEventBody(input: CreateUserCalendarEventInput | UpdateUserCalendarEventInput): calendar_v3.Schema$Event {
+function toGoogleEventBody(
+  input: CreateUserCalendarEventInput | UpdateUserCalendarEventInput,
+): calendar_v3.Schema$Event {
   const body: calendar_v3.Schema$Event = {};
   if (input.title !== undefined) body.summary = input.title;
   if (input.description !== undefined) body.description = input.description ?? undefined;
@@ -185,7 +187,7 @@ function toGoogleEventBody(input: CreateUserCalendarEventInput | UpdateUserCalen
  */
 export async function createUserCalendarEvent(
   refreshToken: string,
-  input: CreateUserCalendarEventInput
+  input: CreateUserCalendarEventInput,
 ): Promise<UserCalendarEvent> {
   const calendar = getUserCalendarClient(refreshToken);
   const res = await calendar.events.insert({
@@ -198,7 +200,7 @@ export async function createUserCalendarEvent(
 export async function updateUserCalendarEvent(
   refreshToken: string,
   googleEventId: string,
-  input: UpdateUserCalendarEventInput
+  input: UpdateUserCalendarEventInput,
 ): Promise<UserCalendarEvent> {
   const calendar = getUserCalendarClient(refreshToken);
   // .patch (not .update) — .update replaces the whole event resource, which

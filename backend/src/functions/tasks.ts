@@ -1,3 +1,4 @@
+import { ForbiddenError, ValidationError } from '../lib/errors';
 import {
   dbGetTasksForUser,
   dbGetTasksForPort,
@@ -9,9 +10,7 @@ import {
 } from '../database/tasks';
 import { listDirectoryUsers, getUserPort } from './users';
 import { createNotificationsBulk } from './notifications';
-import { isUserAdmin, USER_PORTFOLIOS } from './admin';
-import pool from '../database/pool';
-
+import { isUserAdmin, USER_PORTFOLIOS, type UserPortfolio } from './admin';
 
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 export const TASK_STATUSES: TaskStatus[] = ['pending', 'in_progress', 'completed', 'cancelled'];
@@ -59,13 +58,13 @@ export interface CreateTaskRequest {
 }
 
 /** Thrown when a member tries to reach a task they aren't assigned to. */
-export class ForbiddenTaskError extends Error {}
+export class ForbiddenTaskError extends ForbiddenError {}
 
 /** Thrown for a status outside task_status — the route answers 400. */
-export class InvalidTaskStatusError extends Error {}
+export class InvalidTaskStatusError extends ValidationError {}
 
 /** Thrown for an invalid edit (empty title, bad date) — the route answers 400. */
-export class InvalidTaskEditError extends Error {}
+export class InvalidTaskEditError extends ValidationError {}
 
 export interface TaskDetailsEdit {
   title?: string;
@@ -93,7 +92,7 @@ export async function getTasksForUser(userId: number): Promise<Task[]> {
  * (caught by the route as a 403).
  */
 export async function getTasksForPort(port: string, userId: number): Promise<Task[]> {
-  if (!USER_PORTFOLIOS.includes(port as any)) throw new Error('Unknown portfolio');
+  if (!USER_PORTFOLIOS.includes(port as UserPortfolio)) throw new ValidationError('Unknown portfolio');
   if ((await getUserPort(userId)) !== port && !(await isUserAdmin(userId))) {
     throw new ForbiddenTaskError("You can only view your own port's tasks");
   }
@@ -117,28 +116,29 @@ export async function getTasksForPort(port: string, userId: number): Promise<Tas
  */
 export async function createTasks(input: CreateTaskRequest): Promise<Task[]> {
   const title = input.title?.trim();
-  if (!title) throw new Error('Title is required');
-  if (title.length > 255) throw new Error('Title must be 255 characters or fewer');
+  if (!title) throw new ValidationError('Title is required');
+  if (title.length > 255) throw new ValidationError('Title must be 255 characters or fewer');
   if (input.dueDate !== undefined && isNaN(new Date(input.dueDate).getTime())) {
-    throw new Error('Due date must be a valid date');
+    throw new ValidationError('Due date must be a valid date');
   }
 
   let assigneeIds: number[];
   if (input.assignTo === 'me') {
     assigneeIds = [input.requestedBy];
   } else if (input.assignTo === 'port') {
-    if (!input.port) throw new Error('A portfolio is required when assigning to a port');
+    if (!input.port) throw new ValidationError('A portfolio is required when assigning to a port');
     const directory = await listDirectoryUsers();
     assigneeIds = directory.filter((u) => u.port === input.port).map((u) => u.id);
-    if (assigneeIds.length === 0) throw new Error('No members currently hold that portfolio');
+    if (assigneeIds.length === 0) throw new ValidationError('No members currently hold that portfolio');
   } else if (input.assignTo === 'person') {
     const requested = input.assigneeIds ?? (input.assigneeId ? [input.assigneeId] : []);
-    if (requested.length === 0) throw new Error('At least one person is required when assigning to people');
+    if (requested.length === 0) throw new ValidationError('At least one person is required when assigning to people');
     const activeIds = new Set((await listDirectoryUsers()).map((u) => u.id));
-    if (requested.some((id) => !activeIds.has(id))) throw new Error('Every assignee must be an active member');
+    if (requested.some((id) => !activeIds.has(id)))
+      throw new ValidationError('Every assignee must be an active member');
     assigneeIds = [...new Set(requested)];
   } else {
-    throw new Error('assignTo must be one of: me, port, person');
+    throw new ValidationError('assignTo must be one of: me, port, person');
   }
 
   const task = await dbCreateTask({
@@ -225,11 +225,7 @@ export async function updateTaskDetails(taskId: number, userId: number, edit: Ta
 export async function getTaskById(taskId: number, userId: number): Promise<Task | null> {
   const task = await dbGetTaskById(taskId);
   if (!task) return null;
-  if (
-    !task.assignees.some((a) => a.id === userId) &&
-    task.assignedBy !== userId &&
-    !(await isUserAdmin(userId))
-  ) {
+  if (!task.assignees.some((a) => a.id === userId) && task.assignedBy !== userId && !(await isUserAdmin(userId))) {
     throw new ForbiddenTaskError('You can only view your own tasks');
   }
   return task;

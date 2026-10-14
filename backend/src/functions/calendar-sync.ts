@@ -1,5 +1,5 @@
-import { google, calendar_v3 } from 'googleapis';
-import { Event } from './events';
+import { google, type calendar_v3 } from 'googleapis';
+import { type Event } from './events';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';

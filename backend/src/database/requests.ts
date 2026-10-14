@@ -1,6 +1,7 @@
-import { PoolClient, QueryResult } from 'pg';
+import { type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
 import type { RequestRecord } from '../functions/requests';
 import pool from './pool';
+import { ConflictError } from '../lib/errors';
 
 /* One row per request, with the requester and handler joined in, the
    request's task (the one created when it was accepted) and that task's
@@ -41,7 +42,7 @@ function fullName(first: string | null, last: string | null): string | null {
   return first ? `${first} ${last}` : null;
 }
 
-function rowToRequest(row: any): RequestRecord {
+function rowToRequest(row: QueryResultRow): RequestRecord {
   return {
     id: row.id,
     requestType: row.request_type,
@@ -59,7 +60,11 @@ function rowToRequest(row: any): RequestRecord {
     handledBy: row.handled_by,
     handledByName: fullName(row.handled_by_first_name, row.handled_by_last_name),
     taskId: row.task_id,
-    assignees: row.assignees.map((a: any) => ({ id: a.id, name: `${a.firstName} ${a.lastName}`, port: a.port })),
+    assignees: row.assignees.map((a: { id: number; firstName: string; lastName: string; port: string | null }) => ({
+      id: a.id,
+      name: `${a.firstName} ${a.lastName}`,
+      port: a.port,
+    })),
     attachments: row.attachments,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -70,19 +75,17 @@ function rowToRequest(row: any): RequestRecord {
 /** Every request of the given types, newest first — a port's incoming list. */
 export async function dbGetRequestsOfTypes(requestTypes: string[]): Promise<RequestRecord[]> {
   if (requestTypes.length === 0) return [];
-  const result: QueryResult = await pool.query(
-    `${REQUEST_SELECT} WHERE r.request_type = ANY($1) ${REQUEST_ORDER}`,
-    [requestTypes]
-  );
+  const result: QueryResult = await pool.query(`${REQUEST_SELECT} WHERE r.request_type = ANY($1) ${REQUEST_ORDER}`, [
+    requestTypes,
+  ]);
   return result.rows.map(rowToRequest);
 }
 
 /** Every request the user submitted, newest first. */
 export async function dbGetRequestsByRequester(userId: number): Promise<RequestRecord[]> {
-  const result: QueryResult = await pool.query(
-    `${REQUEST_SELECT} WHERE r.requester_id = $1 ${REQUEST_ORDER}`,
-    [userId]
-  );
+  const result: QueryResult = await pool.query(`${REQUEST_SELECT} WHERE r.requester_id = $1 ${REQUEST_ORDER}`, [
+    userId,
+  ]);
   return result.rows.map(rowToRequest);
 }
 
@@ -123,14 +126,14 @@ export async function dbCreateRequest(input: {
         JSON.stringify(input.formData),
         input.isAnonymous,
         input.neededBy,
-      ]
+      ],
     );
     const id: number = result.rows[0].id;
     for (const attachment of input.attachments) {
       await client.query(
         `INSERT INTO request_attachments (request_id, field_name, file_name, mime_type, size_bytes, data)
          VALUES ($1, $2, $3, $4, $5, $6)`,
-        [id, attachment.fieldName, attachment.fileName, attachment.mimeType, attachment.data.length, attachment.data]
+        [id, attachment.fieldName, attachment.fileName, attachment.mimeType, attachment.data.length, attachment.data],
       );
     }
     return id;
@@ -139,7 +142,7 @@ export async function dbCreateRequest(input: {
 }
 
 /** Thrown when a request has already moved on from the status an action expects. */
-export class RequestStatusConflictError extends Error {}
+export class RequestStatusConflictError extends ConflictError {}
 
 /**
  * Accepts a pending request: moves it to in_progress, records who accepted
@@ -159,7 +162,7 @@ export async function dbAcceptRequest(input: {
        SET status = 'in_progress', handled_by = $2, notes = $3, updated_at = NOW()
        WHERE id = $1 AND status = 'pending'
        RETURNING id`,
-      [input.requestId, input.handledBy, input.notes]
+      [input.requestId, input.handledBy, input.notes],
     );
     if (updated.rowCount === 0) throw new RequestStatusConflictError('Only a pending request can be accepted');
 
@@ -168,12 +171,12 @@ export async function dbAcceptRequest(input: {
         `INSERT INTO tasks (title, description, assigned_by, due_date, request_id, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
          RETURNING id`,
-        [input.task.title, input.task.description, input.handledBy, input.task.dueDate, input.requestId]
+        [input.task.title, input.task.description, input.handledBy, input.task.dueDate, input.requestId],
       );
-      await client.query(
-        `INSERT INTO task_assignees (task_id, user_id) SELECT $1, unnest($2::int[])`,
-        [created.rows[0].id, input.task.assigneeIds]
-      );
+      await client.query(`INSERT INTO task_assignees (task_id, user_id) SELECT $1, unnest($2::int[])`, [
+        created.rows[0].id,
+        input.task.assigneeIds,
+      ]);
     }
   });
   return dbGetRequestById(input.requestId);
@@ -188,7 +191,7 @@ export async function dbSetTaskAssignees(taskId: number, assigneeIds: number[]):
     ]);
     await client.query(
       `INSERT INTO task_assignees (task_id, user_id) SELECT $1, unnest($2::int[]) ON CONFLICT DO NOTHING`,
-      [taskId, assigneeIds]
+      [taskId, assigneeIds],
     );
     await client.query(`UPDATE tasks SET updated_at = NOW() WHERE id = $1`, [taskId]);
   });
@@ -198,7 +201,11 @@ export async function dbSetTaskAssignees(taskId: number, assigneeIds: number[]):
  * Rejects a pending or in-progress request with a reason, and cancels its
  * task if it has one, so the work drops off everyone's list.
  */
-export async function dbRejectRequest(requestId: number, handledBy: number, reason: string): Promise<RequestRecord | null> {
+export async function dbRejectRequest(
+  requestId: number,
+  handledBy: number,
+  reason: string,
+): Promise<RequestRecord | null> {
   await inTransaction(async (client) => {
     const updated = await client.query(
       `UPDATE requests
@@ -206,7 +213,7 @@ export async function dbRejectRequest(requestId: number, handledBy: number, reas
            resolved_at = NOW(), updated_at = NOW()
        WHERE id = $1 AND status IN ('pending', 'in_progress')
        RETURNING id`,
-      [requestId, handledBy, reason]
+      [requestId, handledBy, reason],
     );
     if (updated.rowCount === 0) {
       throw new RequestStatusConflictError('Only a pending or in-progress request can be rejected');
@@ -214,7 +221,7 @@ export async function dbRejectRequest(requestId: number, handledBy: number, reas
     await client.query(
       `UPDATE tasks SET status = 'cancelled', updated_at = NOW()
        WHERE request_id = $1 AND status <> 'completed'`,
-      [requestId]
+      [requestId],
     );
   });
   return dbGetRequestById(requestId);
@@ -227,13 +234,13 @@ export async function dbCompleteRequest(requestId: number): Promise<RequestRecor
       `UPDATE requests SET status = 'completed', resolved_at = NOW(), updated_at = NOW()
        WHERE id = $1 AND status = 'in_progress'
        RETURNING id`,
-      [requestId]
+      [requestId],
     );
     if (updated.rowCount === 0) throw new RequestStatusConflictError('Only an in-progress request can be completed');
     await client.query(
       `UPDATE tasks SET status = 'completed', completed_at = NOW(), updated_at = NOW()
        WHERE request_id = $1 AND status NOT IN ('completed', 'cancelled')`,
-      [requestId]
+      [requestId],
     );
   });
   return dbGetRequestById(requestId);
@@ -242,11 +249,11 @@ export async function dbCompleteRequest(requestId: number): Promise<RequestRecor
 /** One attachment's bytes, only if it belongs to that request. */
 export async function dbGetRequestAttachment(
   requestId: number,
-  attachmentId: number
+  attachmentId: number,
 ): Promise<{ fileName: string; mimeType: string; data: Buffer } | null> {
   const result: QueryResult = await pool.query(
     `SELECT file_name, mime_type, data FROM request_attachments WHERE id = $1 AND request_id = $2`,
-    [attachmentId, requestId]
+    [attachmentId, requestId],
   );
   const row = result.rows[0];
   return row ? { fileName: row.file_name, mimeType: row.mime_type, data: row.data } : null;
@@ -254,15 +261,21 @@ export async function dbGetRequestAttachment(
 
 /** The fields request access checks need about the person asking. */
 export async function dbGetRequestViewer(
-  userId: number
+  userId: number,
 ): Promise<{ id: number; role: string; port: string | null; isTreasurer: boolean; name: string } | null> {
   const result: QueryResult = await pool.query(
     `SELECT id, role, port, is_treasurer, first_name, last_name FROM users WHERE id = $1 AND is_active = true`,
-    [userId]
+    [userId],
   );
   const row = result.rows[0];
   return row
-    ? { id: row.id, role: row.role, port: row.port, isTreasurer: row.is_treasurer, name: `${row.first_name} ${row.last_name}` }
+    ? {
+        id: row.id,
+        role: row.role,
+        port: row.port,
+        isTreasurer: row.is_treasurer,
+        name: `${row.first_name} ${row.last_name}`,
+      }
     : null;
 }
 
@@ -277,7 +290,7 @@ export async function dbGetPortMemberIds(port: string, roles?: string[]): Promis
   const result: QueryResult = await pool.query(
     `SELECT id FROM users
      WHERE is_active = true AND port = $1 AND ($2::text[] IS NULL OR role::text = ANY($2::text[]))`,
-    [port, roles ?? null]
+    [port, roles ?? null],
   );
   return result.rows.map((row) => row.id);
 }
@@ -296,4 +309,3 @@ async function inTransaction<T>(work: (client: PoolClient) => Promise<T>): Promi
     client.release();
   }
 }
-

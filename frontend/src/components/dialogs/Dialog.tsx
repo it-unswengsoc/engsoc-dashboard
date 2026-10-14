@@ -27,15 +27,7 @@ interface DialogProps {
   children: ReactNode;
 }
 
-export default function Dialog({
-  open,
-  title,
-  size = 'md',
-  onClose,
-  onBack,
-  bare = false,
-  children,
-}: DialogProps) {
+export default function Dialog({ open, title, size = 'md', onClose, onBack, bare = false, children }: DialogProps) {
   const [mounted, setMounted] = useState(false);
   // Whether the portal's DOM should exist at all — stays true a little past
   // `open` going false so the close animation below has something to
@@ -62,7 +54,7 @@ export default function Dialog({
       gsap.fromTo(
         cardRef.current,
         { opacity: 0, scale: 0.92, y: 10 },
-        { opacity: 1, scale: 1, y: 0, duration: 0.32, ease: 'back.out(1.7)' }
+        { opacity: 1, scale: 1, y: 0, duration: 0.32, ease: 'back.out(1.7)' },
       );
       return;
     }

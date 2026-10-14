@@ -1,0 +1,6 @@
+node_modules
+dist
+.next
+.vercel
+package-lock.json
+backend/scripts/seed-assets

@@ -1,4 +1,4 @@
-import { QueryResult } from 'pg';
+import { ValidationError } from '../lib/errors';
 import {
   dbGetAllEvents,
   dbGetEventById,
@@ -7,10 +7,9 @@ import {
   dbDeleteEvent,
   dbSetGoogleCalendarEventId,
   dbGetEventImage,
-} from '../database/events'
+} from '../database/events';
 import { validateImageDataUri } from './announcements';
 import { syncEventCreate, syncEventUpdate, syncEventDelete } from './calendar-sync';
-import pool from '../database/pool';
 
 export type EventType = 'internal' | 'external';
 
@@ -77,10 +76,8 @@ export interface UpdateEventInput {
 export function validateEventCoordinates(lat: unknown, lng: unknown): void {
   if (lat === undefined && lng === undefined) return;
   if (lat === null && lng === null) return;
-  const valid =
-    typeof lat === 'number' && typeof lng === 'number' &&
-    Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
-  if (!valid) throw new Error('Location coordinates are invalid');
+  const valid = typeof lat === 'number' && typeof lng === 'number' && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  if (!valid) throw new ValidationError('Location coordinates are invalid');
 }
 
 /* Same rules as an announcement's image: an uploaded (cropped, compressed)
@@ -104,7 +101,7 @@ export async function getEventImage(eventId: number): Promise<string | null> {
    text field here, so a typo doesn't need to be a hard rejection. */
 function validateSocialUrl(url: string | undefined, label: string): void {
   if (url !== undefined && url.length > 500) {
-    throw new Error(`${label} link must be 500 characters or fewer`);
+    throw new ValidationError(`${label} link must be 500 characters or fewer`);
   }
 }
 
@@ -131,7 +128,7 @@ export async function getEventById(eventId: number): Promise<Event | null> {
   try {
     const event = await dbGetEventById(eventId);
     if (event) {
-      return event; 
+      return event;
     }
     return null;
   } catch (error) {
@@ -155,20 +152,20 @@ export async function getEventById(eventId: number): Promise<Event | null> {
 export async function createEvent(input: CreateEventInput): Promise<Event | null> {
   const title = input.title?.trim();
   if (!title) {
-    throw new Error('Title is required');
+    throw new ValidationError('Title is required');
   }
   if (title.length > 30) {
-    throw new Error('Title must be 30 characters or fewer');
+    throw new ValidationError('Title must be 30 characters or fewer');
   }
   if (input.description && input.description.length > 300) {
-    throw new Error('Description must be 300 characters or fewer');
+    throw new ValidationError('Description must be 300 characters or fewer');
   }
   if (input.location && input.location.length > 100) {
-    throw new Error('Location must be 100 characters or fewer');
+    throw new ValidationError('Location must be 100 characters or fewer');
   }
   if (input.capacity !== undefined && input.capacity !== null) {
     if (!Number.isInteger(input.capacity) || input.capacity <= 0) {
-      throw new Error('Capacity must be a positive integer');
+      throw new ValidationError('Capacity must be a positive integer');
     }
   }
   validateSocialUrl(input.facebookUrl, 'Facebook');
@@ -176,17 +173,17 @@ export async function createEvent(input: CreateEventInput): Promise<Event | null
   validateEventImage(input.imageUrl);
   validateEventCoordinates(input.locationLat, input.locationLng);
   if (!input.startDate || isNaN(new Date(input.startDate).getTime())) {
-    throw new Error('A valid start date is required');
+    throw new ValidationError('A valid start date is required');
   }
   if (new Date(input.startDate) <= new Date()) {
-    throw new Error('Event start date must be in the future');
+    throw new ValidationError('Event start date must be in the future');
   }
   if (input.endDate !== undefined) {
     if (isNaN(new Date(input.endDate).getTime())) {
-      throw new Error('End date must be a valid date');
+      throw new ValidationError('End date must be a valid date');
     }
     if (new Date(input.endDate) < new Date(input.startDate)) {
-      throw new Error('End date must not be before the start date');
+      throw new ValidationError('End date must not be before the start date');
     }
   }
 
@@ -215,10 +212,7 @@ export async function createEvent(input: CreateEventInput): Promise<Event | null
  * mirrored). Only the fields present in input will be updated.
  * Returns the updated event if successful, or null if the event was not found.
  */
-export async function updateEvent(
-  eventId: number,
-  input: UpdateEventInput
-): Promise<Event | null> {
+export async function updateEvent(eventId: number, input: UpdateEventInput): Promise<Event | null> {
   try {
     const event = await dbUpdateEvent(eventId, input);
     if (!event) return null;

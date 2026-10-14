@@ -69,7 +69,15 @@ function formatDue(iso: string): { when: string; relative: string; overdue: bool
   const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const days = Math.round((startOfDay(due) - startOfDay(new Date())) / 86_400_000);
   const relative =
-    days < 0 ? 'Overdue' : days === 0 ? 'Due today' : days === 1 ? 'Tomorrow' : days < 7 ? `In ${days} days` : `In ${Math.floor(days / 7)} ${Math.floor(days / 7) === 1 ? 'week' : 'weeks'}`;
+    days < 0
+      ? 'Overdue'
+      : days === 0
+        ? 'Due today'
+        : days === 1
+          ? 'Tomorrow'
+          : days < 7
+            ? `In ${days} days`
+            : `In ${Math.floor(days / 7)} ${Math.floor(days / 7) === 1 ? 'week' : 'weeks'}`;
   return { when, relative, overdue: days < 0 };
 }
 
@@ -263,7 +271,11 @@ function EditTaskForm({
       <div className="flex flex-col gap-2">
         <span className={LABEL_STYLES}>Attachments</span>
         {[
-          ...kept.map((a) => ({ key: `kept-${a.id}`, name: a.name, remove: () => setKept((prev) => prev.filter((k) => k.id !== a.id)) })),
+          ...kept.map((a) => ({
+            key: `kept-${a.id}`,
+            name: a.name,
+            remove: () => setKept((prev) => prev.filter((k) => k.id !== a.id)),
+          })),
           ...added.map((a) => ({
             key: `added-${a.driveFileId}`,
             name: a.name,
@@ -510,9 +522,7 @@ export default function TaskDetailDialog({
   const overdue = !isClosed && !!due?.overdue;
   // A request's task names its type (as a pill) and who sent it, rather
   // than the request's title — which is the task's own title anyway.
-  const requestTypeLabel = task.requestType
-    ? (requestForm(task.requestType)?.label ?? task.requestType)
-    : null;
+  const requestTypeLabel = task.requestType ? (requestForm(task.requestType)?.label ?? task.requestType) : null;
   // Who sent a request shows in its section below. A viewer who can't open
   // the request gets no section, so the header names the requester for
   // them instead; a task without a known request type keeps "From <title>".
@@ -526,16 +536,9 @@ export default function TaskDetailDialog({
       task.assignedBy &&
       `assigned by ${task.assignedBy.id === userId ? 'you' : task.assignedBy.name}`,
   ].filter(Boolean) as string[];
-  const assignerName = task.assignedBy
-    ? task.assignedBy.id === userId
-      ? 'you'
-      : task.assignedBy.name
-    : null;
+  const assignerName = task.assignedBy ? (task.assignedBy.id === userId ? 'you' : task.assignedBy.name) : null;
   const others = task.assignees.filter((a) => a.id !== userId);
-  const peopleLabel = [
-    ...(isAssignee ? ['You'] : []),
-    ...others.map((a) => a.name),
-  ];
+  const peopleLabel = [...(isAssignee ? ['You'] : []), ...others.map((a) => a.name)];
 
   return (
     <Dialog open={open} title={task.title} size="3xl" bare onClose={onClose}>
@@ -554,7 +557,9 @@ export default function TaskDetailDialog({
             )}
           </div>
           {meta.length > 0 && (
-            <p className="mt-1.5 font-mono text-xs text-gray-500">{meta.join(' · ').replace(/^./, (c) => c.toUpperCase())}</p>
+            <p className="mt-1.5 font-mono text-xs text-gray-500">
+              {meta.join(' · ').replace(/^./, (c) => c.toUpperCase())}
+            </p>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -705,8 +710,9 @@ export default function TaskDetailDialog({
             <span className="text-[13px] font-semibold text-gray-500">Request</span>
             {request && (
               <span className="font-mono text-xs text-gray-500">
-                {request.typeLabel} · submitted {new Date(request.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}{' '}
-                by {request.requesterId === userId ? 'you' : (request.requesterName ?? 'Anonymous')}
+                {request.typeLabel} · submitted{' '}
+                {new Date(request.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} by{' '}
+                {request.requesterId === userId ? 'you' : (request.requesterName ?? 'Anonymous')}
               </span>
             )}
           </div>

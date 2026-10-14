@@ -107,9 +107,7 @@ export default function NotificationBell() {
         className="relative rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100"
       >
         <Bell className="h-5 w-5" />
-        {unreadCount > 0 && (
-          <span className="absolute right-1.5 top-1.5 flex h-2 w-2 rounded-full bg-[#ED6672]" />
-        )}
+        {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 flex h-2 w-2 rounded-full bg-[#ED6672]" />}
       </button>
 
       {open && (
@@ -130,7 +128,7 @@ export default function NotificationBell() {
             {loading ? (
               <p className="px-4 py-6 text-center font-mono text-xs text-gray-400">Loading…</p>
             ) : notifications.length === 0 ? (
-              <p className="px-4 py-6 text-center font-mono text-xs text-gray-400">You're all caught up.</p>
+              <p className="px-4 py-6 text-center font-mono text-xs text-gray-400">You&apos;re all caught up.</p>
             ) : (
               <div className="divide-y divide-gray-100">
                 {notifications.map((n) => {
@@ -147,12 +145,12 @@ export default function NotificationBell() {
                         <Icon className="h-3.5 w-3.5 text-[#3D6C94]" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className={`block truncate text-sm ${n.isRead ? 'text-gray-600' : 'font-bold text-gray-900'}`}>
+                        <span
+                          className={`block truncate text-sm ${n.isRead ? 'text-gray-600' : 'font-bold text-gray-900'}`}
+                        >
                           {n.title}
                         </span>
-                        {n.message && (
-                          <span className="block truncate text-xs text-gray-500">{n.message}</span>
-                        )}
+                        {n.message && <span className="block truncate text-xs text-gray-500">{n.message}</span>}
                         <span className="block font-mono text-[10px] text-gray-400">{timeAgo(n.createdAt)}</span>
                       </span>
                       {!n.isRead && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#ED6672]" />}

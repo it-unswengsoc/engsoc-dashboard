@@ -83,7 +83,7 @@ export async function submitRequest(
   requestType: string,
   title: string | undefined,
   formData: Record<string, unknown>,
-  attachments: { fieldName: string; fileName: string; dataUri: string }[]
+  attachments: { fieldName: string; fileName: string; dataUri: string }[],
 ): Promise<RequestDetail> {
   const type = TYPES[requestType];
   if (!type) throw new Error('Unknown request type');
@@ -109,7 +109,13 @@ export async function submitRequest(
     handledByName: null,
     taskId: null,
     assignees: [],
-    attachments: attachments.map((a, i) => ({ id: i + 1, fieldName: a.fieldName, fileName: a.fileName, mimeType: '', sizeBytes: 0 })),
+    attachments: attachments.map((a, i) => ({
+      id: i + 1,
+      fieldName: a.fieldName,
+      fileName: a.fileName,
+      mimeType: '',
+      sizeBytes: 0,
+    })),
     createdAt: now,
     updatedAt: now,
     resolvedAt: null,
@@ -127,7 +133,10 @@ function membersById(ids: number[]) {
   return mockMembers.filter((m) => ids.includes(m.id));
 }
 
-export async function acceptRequest(requestId: number, input: { assigneeIds?: number[]; notes?: string }): Promise<RequestDetail> {
+export async function acceptRequest(
+  requestId: number,
+  input: { assigneeIds?: number[]; notes?: string },
+): Promise<RequestDetail> {
   const current = requests().find((r) => r.id === requestId);
   if (current?.status !== 'pending') throw new Error('Only a pending request can be accepted');
   const assignable = current.assignable;

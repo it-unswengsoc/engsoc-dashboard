@@ -3,17 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import EventRow from "@/components/EventRow";
-import StatCard from "@/components/StatCard";
-import TaskRow from "@/components/TaskRow";
-import AnnouncementRow from "@/components/AnnouncementRow";
-import WelcomeHeading from "@/components/WelcomeHeading";
-import StaggerReveal from "@/components/StaggerReveal";
+import EventRow from '@/components/EventRow';
+import StatCard from '@/components/StatCard';
+import TaskRow from '@/components/TaskRow';
+import AnnouncementRow from '@/components/AnnouncementRow';
+import WelcomeHeading from '@/components/WelcomeHeading';
+import StaggerReveal from '@/components/StaggerReveal';
 import { getDashboard, readCachedDashboard, writeCachedDashboard, type DashboardData } from '@/services/dashboard-api';
-import { toUpcomingEventRows, toOpenTaskRows, toRecentAnnouncements, toDashboardStats } from "@/services/dashboard";
+import { toUpcomingEventRows, toOpenTaskRows, toRecentAnnouncements, toDashboardStats } from '@/services/dashboard';
 import { DASHBOARD_DATA_CHANGED_EVENT } from '@/lib/dashboard-events';
-import type { EventRowData } from "@/types/dashboard";
-import type { TaskStatus } from "@/types/tasks";
+import type { EventRowData } from '@/types/dashboard';
+import type { TaskStatus } from '@/types/tasks';
 import { toOfficialCalendarItem, type CalendarItem } from '@/lib/calendar';
 import type { ComposerPrefill } from '@/components/calendar/CalendarContext';
 
@@ -226,17 +226,17 @@ export default function HomePage() {
           {loading ? (
             <StatCardSkeleton colour="#F4EFD3" />
           ) : (
-            <StatCard label={"OPEN TASKS"} value={stats.openTasks} colour={"#F4EFD3"} />
+            <StatCard label={'OPEN TASKS'} value={stats.openTasks} colour={'#F4EFD3'} />
           )}
           {loading ? (
             <StatCardSkeleton colour="#B1C9DC" />
           ) : (
-            <StatCard label={"UPCOMING EVENTS"} value={stats.upcomingEvents} colour={"#B1C9DC"} />
+            <StatCard label={'UPCOMING EVENTS'} value={stats.upcomingEvents} colour={'#B1C9DC'} />
           )}
           {loading ? (
             <StatCardSkeleton colour="#ED6672" />
           ) : (
-            <StatCard label={"NEW ANNOUNCEMENTS"} value={stats.newAnnouncements} colour={"#ED6672"} />
+            <StatCard label={'NEW ANNOUNCEMENTS'} value={stats.newAnnouncements} colour={'#ED6672'} />
           )}
         </StaggerReveal>
       </div>
@@ -286,9 +286,7 @@ export default function HomePage() {
         <div className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="h-2 bg-[#B1C9DC]" />
           <div className="flex items-center justify-between bg-gray-50 px-4 py-2.5">
-            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500">
-              My tasks
-            </h2>
+            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500">My tasks</h2>
           </div>
 
           {loading ? (
@@ -311,11 +309,7 @@ export default function HomePage() {
               replayKey={openTasks.length}
             >
               {openTasks.map((task) => (
-                <TaskRow
-                  key={task.id}
-                  {...task}
-                  onStatusChanged={handleTaskStatusChanged}
-                />
+                <TaskRow key={task.id} {...task} onStatusChanged={handleTaskStatusChanged} />
               ))}
             </StaggerReveal>
           )}

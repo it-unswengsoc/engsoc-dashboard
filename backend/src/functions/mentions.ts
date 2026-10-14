@@ -53,7 +53,7 @@ export async function extractMentionedUserIds(content: string, excludeUserId: nu
   const lowerContent = content.toLowerCase();
 
   let searchFrom = 0;
-  while (true) {
+  for (;;) {
     const at = lowerContent.indexOf('@', searchFrom);
     if (at === -1) break;
 

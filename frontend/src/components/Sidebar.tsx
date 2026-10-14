@@ -1,30 +1,21 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import {
-  Home,
-  Calendar,
-  FileText,
-  Inbox,
-  KanbanSquare,
-  ShieldCheck,
-  LogOut,
-  type LucideIcon,
-} from "lucide-react";
-import { useProfile } from "@/lib/profile-context";
+import { useState } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { Home, Calendar, FileText, Inbox, KanbanSquare, ShieldCheck, LogOut, type LucideIcon } from 'lucide-react';
+import { useProfile } from '@/lib/profile-context';
 
 const dashboardLinks: { label: string; href: string; icon: LucideIcon }[] = [
-  { label: "Home", href: "/dashboard", icon: Home },
-  { label: "Calendar", href: "/dashboard/calendar", icon: Calendar },
-  { label: "Documents", href: "/dashboard/documents", icon: FileText },
-  { label: "Requests", href: "/dashboard/requests", icon: Inbox },
-  { label: "Tasks", href: "/dashboard/tasks", icon: KanbanSquare },
+  { label: 'Home', href: '/dashboard', icon: Home },
+  { label: 'Calendar', href: '/dashboard/calendar', icon: Calendar },
+  { label: 'Documents', href: '/dashboard/documents', icon: FileText },
+  { label: 'Requests', href: '/dashboard/requests', icon: Inbox },
+  { label: 'Tasks', href: '/dashboard/tasks', icon: KanbanSquare },
 ];
 
-const adminLink = { label: "Admin", href: "/dashboard/admin", icon: ShieldCheck };
+const adminLink = { label: 'Admin', href: '/dashboard/admin', icon: ShieldCheck };
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -35,13 +26,13 @@ export default function Sidebar() {
   // Shown only for an admin — checked against the real role on every load
   // rather than cached, so a role change (granted or revoked in the admin
   // panel) is reflected the next time this member loads the dashboard.
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = profile?.role === 'admin';
 
   const links = isAdmin ? [...dashboardLinks, adminLink] : dashboardLinks;
 
   function handleLogout() {
-    sessionStorage.removeItem("token");
-    router.push("/login");
+    sessionStorage.removeItem('token');
+    router.push('/login');
   }
 
   return (
@@ -49,36 +40,26 @@ export default function Sidebar() {
       onMouseEnter={() => setCollapsed(false)}
       onMouseLeave={() => setCollapsed(true)}
       className={`${
-        collapsed ? "w-20" : "w-56"
+        collapsed ? 'w-20' : 'w-56'
       } hidden md:flex h-screen sticky top-0 bg-[#B1C9DC] flex-col p-4 shrink-0 transition-all duration-200`}
     >
       <div className="flex items-center justify-center mb-4">
-        <Image
-          src="/engsoc-logo.png"
-          alt="EngSoc Dashboard"
-          width={38}
-          height={38}
-          className="shrink-0 rounded-md"
-        />
+        <Image src="/engsoc-logo.png" alt="EngSoc Dashboard" width={38} height={38} className="shrink-0 rounded-md" />
       </div>
 
       <nav className="flex flex-col flex-1 mt-2">
-        <NavGroup
-          links={links}
-          pathname={pathname}
-          collapsed={collapsed}
-        />
+        <NavGroup links={links} pathname={pathname} collapsed={collapsed} />
       </nav>
 
       <button
         onClick={handleLogout}
         className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm text-slate-600 hover:text-slate-900 text-left transition-colors ${
-          collapsed ? "justify-center" : ""
+          collapsed ? 'justify-center' : ''
         }`}
         aria-label="Logout"
       >
         <LogOut className="h-5 w-5 shrink-0 text-white" />
-        {!collapsed && "Logout"}
+        {!collapsed && 'Logout'}
       </button>
     </aside>
   );
@@ -90,7 +71,7 @@ export default function Sidebar() {
 export function MobileNav() {
   const pathname = usePathname();
   const { profile } = useProfile();
-  const links = profile?.role === "admin" ? [...dashboardLinks, adminLink] : dashboardLinks;
+  const links = profile?.role === 'admin' ? [...dashboardLinks, adminLink] : dashboardLinks;
 
   return (
     <nav
@@ -98,14 +79,14 @@ export function MobileNav() {
       className="fixed inset-x-0 bottom-0 z-20 flex border-t border-[#9ab8cb] bg-[#B1C9DC] pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       {links.map(({ label, href, icon: Icon }) => {
-        const active = href === "/dashboard" ? pathname === href : pathname.startsWith(href);
+        const active = href === '/dashboard' ? pathname === href : pathname.startsWith(href);
         return (
           <Link
             key={href}
             href={href}
-            aria-current={active ? "page" : undefined}
+            aria-current={active ? 'page' : undefined}
             className={`flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px] font-semibold transition-colors ${
-              active ? "bg-[#8fafc5] text-slate-900" : "text-slate-700"
+              active ? 'bg-[#8fafc5] text-slate-900' : 'text-slate-700'
             }`}
           >
             <Icon className="h-5 w-5 text-white" />
@@ -138,12 +119,8 @@ function NavLink({
       title={collapsed ? label : undefined}
       aria-label={label}
       className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-        collapsed ? "justify-center" : ""
-      } ${
-        active
-          ? "bg-[#8fafc5] text-slate-900"
-          : "text-slate-700 hover:bg-[#9ab8cb] hover:text-slate-900"
-      }`}
+        collapsed ? 'justify-center' : ''
+      } ${active ? 'bg-[#8fafc5] text-slate-900' : 'text-slate-700 hover:bg-[#9ab8cb] hover:text-slate-900'}`}
     >
       <Icon className="h-5 w-5 shrink-0 text-white" />
       {!collapsed && label}
@@ -163,14 +140,7 @@ function NavGroup({
   return (
     <div className="mb-4 flex flex-col gap-1">
       {links.map(({ label, href, icon }) => (
-        <NavLink
-          key={href}
-          label={label}
-          href={href}
-          icon={icon}
-          active={pathname === href}
-          collapsed={collapsed}
-        />
+        <NavLink key={href} label={label} href={href} icon={icon} active={pathname === href} collapsed={collapsed} />
       ))}
     </div>
   );

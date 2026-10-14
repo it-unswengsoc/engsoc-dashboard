@@ -12,14 +12,14 @@
 // so local `.env` loading keeps working against the real node_modules.
 if (!process.env.VERCEL) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('dotenv').config();
   } catch {
     // not installed locally — fine, env vars can be set another way
   }
 }
 
-import express, { Application, Request, Response } from 'express';
+import express, { type Application, type Request, type Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -35,6 +35,7 @@ import taskRoutes from './routes/tasks';
 import dashboardRoutes from './routes/dashboard';
 import requestRoutes from './routes/requests';
 import placesRoutes from './routes/places';
+import { errorHandler, notFound } from './middleware/errorHandler';
 
 const app: Application = express();
 // Frontend owns port 3000 by Next.js convention; this backend now runs as
@@ -44,15 +45,17 @@ const PORT = process.env.PORT || 5001;
 
 // Middleware
 app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-  // Frontend and backend are on different domains, so every request carrying
-  // an Authorization header is preceded by an OPTIONS preflight. Letting the
-  // browser cache the preflight answer (Chrome caps this at 2h, Firefox 24h)
-  // saves that extra round trip on every call after the first.
-  maxAge: 86400,
-}));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    credentials: true,
+    // Frontend and backend are on different domains, so every request carrying
+    // an Authorization header is preceded by an OPTIONS preflight. Letting the
+    // browser cache the preflight answer (Chrome caps this at 2h, Firefox 24h)
+    // saves that extra round trip on every call after the first.
+    maxAge: 86400,
+  }),
+);
 app.use(morgan('dev'));
 // Default body-parser limit is 100kb — comfortably enough for everything
 // except announcement images (functions/announcements.ts's
@@ -82,7 +85,7 @@ app.use('/requests', requestRoutes);
 app.use('/places', placesRoutes);
 
 // Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'success',
     message: 'Server is running',
@@ -91,23 +94,21 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // Root endpoint
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({
     message: 'EngSoc Dashboard API',
     version: '1.0.0',
   });
 });
 
-// 404 handler
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    status: 'error',
-    message: 'Route not found',
-  });
-});
+// Anything no router matched, then every error a route threw or passed on
+// (see lib/errors.ts) — must come after all routes.
+app.use(notFound);
+app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
+  // eslint-disable-next-line no-console
   console.log(`Server is running on http://localhost:${PORT}`);
 });
 

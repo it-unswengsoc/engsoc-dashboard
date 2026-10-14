@@ -9,6 +9,7 @@ import type { AdminUser, UserRole } from '@/types/admin';
 import { ROLE_OPTIONS } from '@/lib/roles';
 import { PORT_OPTIONS } from '@/lib/ports';
 import Select from '@/components/dialogs/Select';
+import { isUnauthorized } from '@/services/api-client';
 
 const PORT_SELECT_OPTIONS = [{ value: '', label: 'Unassigned' }, ...PORT_OPTIONS];
 
@@ -81,7 +82,7 @@ export default function AdminView() {
         setAuthorized(true);
       })
       .catch((err) => {
-        if (err instanceof Error && err.message === 'Unauthorized') {
+        if (isUnauthorized(err)) {
           sessionStorage.removeItem('token');
           router.push('/login');
         } else {
@@ -249,9 +250,7 @@ export default function AdminView() {
   const treasurer = users.find((u) => u.isTreasurer) ?? null;
   const treasurerOptions = [
     { value: '', label: 'Nobody' },
-    ...users
-      .filter((u) => u.isActive)
-      .map((u) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` })),
+    ...users.filter((u) => u.isActive).map((u) => ({ value: String(u.id), label: `${u.firstName} ${u.lastName}` })),
   ];
 
   async function changeTreasurer(value: string) {
@@ -305,7 +304,11 @@ export default function AdminView() {
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]">Treasurer</span>
               <div className={`w-52 ${treasurerSaving ? 'pointer-events-none opacity-50' : ''}`}>
-                <Select value={treasurer ? String(treasurer.id) : ''} options={treasurerOptions} onChange={changeTreasurer} />
+                <Select
+                  value={treasurer ? String(treasurer.id) : ''}
+                  options={treasurerOptions}
+                  onChange={changeTreasurer}
+                />
               </div>
             </div>
             {treasurerError && <span className="font-mono text-xs text-[#8B2E38]">{treasurerError}</span>}
@@ -315,16 +318,16 @@ export default function AdminView() {
 
       <div className="mt-4 flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-4">
-        <div className="relative w-full max-w-sm">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search members by name or email..."
-            className="w-full rounded-lg border border-transparent bg-gray-100 py-2 pl-9 pr-4 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]"
-          />
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-        </div>
+          <div className="relative w-full max-w-sm">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search members by name or email..."
+              className="w-full rounded-lg border border-transparent bg-gray-100 py-2 pl-9 pr-4 text-sm text-gray-900 transition-colors placeholder:text-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#B1C9DC]"
+            />
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          </div>
 
           <div className="w-40">
             <Select value={roleFilter} options={ROLE_FILTER_OPTIONS} onChange={setRoleFilter} />
@@ -391,7 +394,9 @@ export default function AdminView() {
           <>
             {/* Scrolls sideways on a phone rather than crushing the columns together. */}
             <div className="flex-1 overflow-auto">
-              <div className={`sticky top-0 z-10 grid min-w-[44rem] ${COLUMNS} items-center gap-4 md:min-w-0 border-b border-gray-100 bg-gray-50 px-6 py-2.5 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]`}>
+              <div
+                className={`sticky top-0 z-10 grid min-w-[44rem] ${COLUMNS} items-center gap-4 md:min-w-0 border-b border-gray-100 bg-gray-50 px-6 py-2.5 font-mono text-[10px] font-bold uppercase tracking-wide text-[#8A94A3]`}
+              >
                 <input
                   type="checkbox"
                   checked={allVisibleSelected}
@@ -424,7 +429,10 @@ export default function AdminView() {
                   const portValue = edit && edit.port !== undefined ? (edit.port ?? '') : (user.port ?? '');
 
                   return (
-                    <div key={user.id} className={`min-w-[44rem] border-b border-gray-100 last:border-0 md:min-w-0 ${isPending ? 'bg-[#F4EFD3]/40' : ''}`}>
+                    <div
+                      key={user.id}
+                      className={`min-w-[44rem] border-b border-gray-100 last:border-0 md:min-w-0 ${isPending ? 'bg-[#F4EFD3]/40' : ''}`}
+                    >
                       <div className={`grid min-w-[44rem] ${COLUMNS} items-center gap-4 md:min-w-0 px-6 py-3`}>
                         <input
                           type="checkbox"
@@ -454,19 +462,19 @@ export default function AdminView() {
                         </div>
 
                         <div className="w-36">
-                        <Select
-                          value={roleValue}
-                          options={ROLE_OPTIONS}
-                          onChange={(role) => stage(user.id, { role: role as UserRole })}
-                        />
+                          <Select
+                            value={roleValue}
+                            options={ROLE_OPTIONS}
+                            onChange={(role) => stage(user.id, { role: role as UserRole })}
+                          />
                         </div>
 
                         <div className="w-36">
-                        <Select
-                          value={portValue}
-                          options={PORT_SELECT_OPTIONS}
-                          onChange={(port) => stage(user.id, { port: port === '' ? null : port })}
-                        />
+                          <Select
+                            value={portValue}
+                            options={PORT_SELECT_OPTIONS}
+                            onChange={(port) => stage(user.id, { port: port === '' ? null : port })}
+                          />
                         </div>
 
                         <div>
@@ -486,7 +494,9 @@ export default function AdminView() {
                             <CheckCircle2 className="h-4 w-4 text-[#2A7D6F]" aria-label="Saved" />
                           ) : isPending ? (
                             <>
-                              <span className="rounded-full bg-[#F4EFD3] px-2 py-0.5 font-bold text-[#7A6A2E]">Unsaved</span>
+                              <span className="rounded-full bg-[#F4EFD3] px-2 py-0.5 font-bold text-[#7A6A2E]">
+                                Unsaved
+                              </span>
                               <button
                                 onClick={() => discardRow(user.id)}
                                 aria-label="Discard change"

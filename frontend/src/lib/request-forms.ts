@@ -1,12 +1,4 @@
-import {
-  Camera,
-  Mail,
-  Palette,
-  Receipt,
-  ShieldAlert,
-  Video,
-  type LucideIcon,
-} from 'lucide-react';
+import { Camera, Mail, Palette, Receipt, ShieldAlert, Video, type LucideIcon } from 'lucide-react';
 import type { FieldDef } from '@/components/dialogs/FormDialog';
 import { PORT_OPTIONS } from '@/lib/ports';
 import type { RequestAnswer } from '@/types/requests';
@@ -76,7 +68,13 @@ export const REQUEST_FORMS: RequestForm[] = [
         ],
         footer: 'Thank you so much for your patience filling this out 🤠',
       },
-      { kind: 'text', name: 'title', label: 'Request title', placeholder: 'e.g. Sponsorship deadline reminder', required: true },
+      {
+        kind: 'text',
+        name: 'title',
+        label: 'Request title',
+        placeholder: 'e.g. Sponsorship deadline reminder',
+        required: true,
+      },
       {
         kind: 'textarea',
         name: 'reason',
@@ -261,7 +259,11 @@ export function toAnswers(requestType: string, formData: Record<string, unknown>
     } else if (field.kind === 'select' || field.kind === 'segmented') {
       text = field.options.find((o) => o.value === value)?.label ?? String(value);
     } else if (field.kind === 'date' && typeof value === 'string') {
-      text = new Date(`${value}T00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+      text = new Date(`${value}T00:00`).toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
     } else if (field.kind === 'number' && field.name === 'amount') {
       text = `$${Number(value).toFixed(2)}`;
     } else {

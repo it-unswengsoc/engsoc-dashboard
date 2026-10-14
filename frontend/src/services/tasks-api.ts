@@ -1,7 +1,6 @@
 import type { BoardTask, TaskAssignee, TaskItem, TaskStatus } from '@/types/tasks';
-import { apiUrl } from '@/services/api-config';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === 'true';
+import { USE_MOCK } from '@/services/api-config';
+import { api, apiFetch } from '@/services/api-client';
 
 export type { BoardTask, TaskItem, TaskStatus };
 
@@ -69,13 +68,8 @@ export async function getTasks(token: string): Promise<TaskItem[]> {
     return mockGetTasks();
   }
 
-  const res = await fetch(apiUrl('/tasks/mine'), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load tasks');
-  return (data.data as RawTask[]).filter((raw) => raw.status !== 'cancelled').map(toTaskItem);
+  const data = await api<RawTask[]>('/tasks/mine', { token, errorMessage: 'Failed to load tasks' });
+  return data.filter((raw) => raw.status !== 'cancelled').map(toTaskItem);
 }
 
 /* Backs the task detail dialog — assignee or admin only (backend 403s
@@ -86,13 +80,7 @@ export async function getTask(token: string, taskId: number): Promise<TaskItem> 
     return mockGetTask(taskId);
   }
 
-  const res = await fetch(apiUrl(`/tasks/${taskId}`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load task');
-  return toTaskItem(data.data as RawTask);
+  return toTaskItem(await api<RawTask>(`/tasks/${taskId}`, { token, errorMessage: 'Failed to load task' }));
 }
 
 /* The same task in the board's shape — lets the dashboard open the board's
@@ -103,13 +91,7 @@ export async function getBoardTask(token: string, taskId: number): Promise<Board
     return mockGetBoardTask(taskId);
   }
 
-  const res = await fetch(apiUrl(`/tasks/${taskId}`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load task');
-  return toBoardTask(data.data as RawTask);
+  return toBoardTask(await api<RawTask>(`/tasks/${taskId}`, { token, errorMessage: 'Failed to load task' }));
 }
 
 export interface CreateTaskInput {
@@ -130,14 +112,13 @@ export async function createTask(token: string, input: CreateTaskInput): Promise
     return mockCreateTask(input);
   }
 
-  const res = await fetch(apiUrl('/tasks'), {
+  const data = await api<RawTask[]>('/tasks', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(input),
+    token,
+    body: input,
+    errorMessage: 'Failed to create task',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to create task');
-  return (data.data as RawTask[]).map(toTaskItem);
+  return data.map(toTaskItem);
 }
 
 /* Any of the task's assignees can move it, to any status — the backend 403s
@@ -148,14 +129,14 @@ export async function updateTaskStatus(token: string, taskId: number, status: Ta
     return mockUpdateTaskStatus(taskId, status);
   }
 
-  const res = await fetch(apiUrl(`/tasks/${taskId}`), {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ status }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to update task');
-  return toTaskItem(data.data as RawTask);
+  return toTaskItem(
+    await api<RawTask>(`/tasks/${taskId}`, {
+      method: 'PATCH',
+      token,
+      body: { status },
+      errorMessage: 'Failed to update task',
+    }),
+  );
 }
 
 export interface TaskDetailsEdit {
@@ -172,14 +153,9 @@ export async function updateTaskDetails(token: string, taskId: number, edit: Tas
     return mockUpdateTaskDetails(taskId, edit);
   }
 
-  const res = await fetch(apiUrl(`/tasks/${taskId}`), {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(edit),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to save task');
-  return toBoardTask(data.data as RawTask);
+  return toBoardTask(
+    await api<RawTask>(`/tasks/${taskId}`, { method: 'PATCH', token, body: edit, errorMessage: 'Failed to save task' }),
+  );
 }
 
 /* The file's bytes are never sent here — see documents-api.ts's
@@ -209,33 +185,28 @@ export async function getTaskAttachments(token: string, taskId: number): Promise
     return mockGetTaskAttachments(taskId);
   }
 
-  const res = await fetch(apiUrl(`/tasks/${taskId}/attachments`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+  return api<RawTaskAttachment[]>(`/tasks/${taskId}/attachments`, {
+    token,
+    errorMessage: 'Failed to load attachments',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load attachments');
-  return data.data as RawTaskAttachment[];
 }
 
 export async function addTaskAttachment(
   token: string,
   taskId: number,
-  input: { driveFileId: string; name: string; webViewLink: string | null; mimeType: string | null }
+  input: { driveFileId: string; name: string; webViewLink: string | null; mimeType: string | null },
 ): Promise<TaskAttachment> {
   if (USE_MOCK) {
     const { addTaskAttachment: mockAddTaskAttachment } = await import('@/mocks/functions/task-attachments');
     return mockAddTaskAttachment(taskId, input);
   }
 
-  const res = await fetch(apiUrl(`/tasks/${taskId}/attachments`), {
+  return api<RawTaskAttachment>(`/tasks/${taskId}/attachments`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(input),
+    token,
+    body: input,
+    errorMessage: 'Failed to add attachment',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to add attachment');
-  return data.data as RawTaskAttachment;
 }
 
 export async function deleteTaskAttachment(token: string, taskId: number, attachmentId: number): Promise<void> {
@@ -244,14 +215,11 @@ export async function deleteTaskAttachment(token: string, taskId: number, attach
     return mockDeleteTaskAttachment(attachmentId);
   }
 
-  const res = await fetch(apiUrl(`/tasks/${taskId}/attachments/${attachmentId}`), {
+  await apiFetch(`/tasks/${taskId}/attachments/${attachmentId}`, {
     method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
+    token,
+    errorMessage: 'Failed to remove attachment',
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || 'Failed to remove attachment');
-  }
 }
 
 /* A port's board: every task with at least one assignee currently in that
@@ -262,11 +230,9 @@ export async function getBoardTasks(token: string, port: string): Promise<BoardT
     return mockGetBoardTasks(port);
   }
 
-  const res = await fetch(apiUrl(`/tasks?port=${encodeURIComponent(port)}`), {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: 'no-store',
+  const data = await api<RawTask[]>(`/tasks?port=${encodeURIComponent(port)}`, {
+    token,
+    errorMessage: 'Failed to load tasks',
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || 'Failed to load tasks');
-  return (data.data as RawTask[]).map(toBoardTask);
+  return data.map(toBoardTask);
 }

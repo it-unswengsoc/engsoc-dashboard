@@ -32,7 +32,7 @@ export async function createPersonalEvent(input: PersonalEventInput): Promise<Us
 
 export async function updatePersonalEvent(
   googleEventId: string,
-  input: Partial<PersonalEventInput>
+  input: Partial<PersonalEventInput>,
 ): Promise<UserCalendarEvent> {
   const event = mockPersonalEvents.find((e) => e.id === googleEventId);
   if (!event) throw new Error('Event not found');

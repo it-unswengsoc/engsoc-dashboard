@@ -9,8 +9,6 @@ import {
 } from '../database/notifications';
 import { getUserProfile } from './auth';
 import { sendEmail, renderNotificationEmail, escapeHtml } from './email';
-import pool from '../database/pool';
-
 
 // Matches the notification_type enum in database/create-tables.sql.
 export type NotificationType = 'event' | 'alert' | 'announcement' | 'task' | 'request';
@@ -43,11 +41,7 @@ export interface CreateNotificationInput {
  * Returns an array of notifications, or an empty array if none exist.
  */
 export async function getNotificationsForUser(userId: number): Promise<Notification[]> {
-  try {
-    return await dbGetNotificationsForUser(userId);
-  } catch (error) {
-    throw error;
-  }
+  return await dbGetNotificationsForUser(userId);
 }
 
 /**
@@ -55,11 +49,7 @@ export async function getNotificationsForUser(userId: number): Promise<Notificat
  * Returns the notification if found, or null if no notification exists with the given ID.
  */
 export async function getNotificationById(notificationId: number): Promise<Notification | null> {
-  try {
-    return await dbGetNotificationById(notificationId);
-  } catch (error) {
-    throw error;
-  }
+  return await dbGetNotificationById(notificationId);
 }
 
 /**
@@ -84,7 +74,7 @@ async function notifyByEmail(notifications: Notification[]): Promise<void> {
       } catch (error) {
         console.error('Notify by email error:', error);
       }
-    })
+    }),
   );
 }
 
@@ -92,13 +82,11 @@ async function notifyByEmail(notifications: Notification[]): Promise<void> {
  * Creates a new notification for a user.
  * Returns the newly created notification, or null if creation failed.
  */
-export async function createNotification(
-  input: CreateNotificationInput
-): Promise<Notification | null> {
+export async function createNotification(input: CreateNotificationInput): Promise<Notification | null> {
   try {
-    const result = await dbCreateNotification(input)
+    const result = await dbCreateNotification(input);
     if (result) void notifyByEmail([result]);
-    return result
+    return result;
   } catch (error) {
     console.error('Create Notification error:', error);
     return null;
@@ -112,9 +100,7 @@ export async function createNotification(
  * rather than throwing, so a notification failure never blocks the
  * announcement/task itself from having been created.
  */
-export async function createNotificationsBulk(
-  inputs: CreateNotificationInput[]
-): Promise<Notification[]> {
+export async function createNotificationsBulk(inputs: CreateNotificationInput[]): Promise<Notification[]> {
   try {
     const created = await dbCreateNotificationsBulk(inputs);
     void notifyByEmail(created);
@@ -129,15 +115,8 @@ export async function createNotificationsBulk(
  * Marks a single notification as read by its ID.
  * Returns the updated notification if found, or null if no notification exists with the given ID.
  */
-export async function markNotificationRead(
-  notificationId: number
-): Promise<Notification | null> {
-  try {
-    const result = await dbMarkNotificationRead(notificationId);
-    return result;
-  } catch (error) {
-    throw error;
-  }
+export async function markNotificationRead(notificationId: number): Promise<Notification | null> {
+  return await dbMarkNotificationRead(notificationId);
 }
 
 /**
@@ -145,11 +124,7 @@ export async function markNotificationRead(
  * Returns the number of notifications that were updated.
  */
 export async function markAllNotificationsRead(userId: number): Promise<number> {
-  try {
-    return await dbMarkAllNotificationsRead(userId);
-  } catch (error) {
-    throw error;
-  }
+  return await dbMarkAllNotificationsRead(userId);
 }
 
 /**

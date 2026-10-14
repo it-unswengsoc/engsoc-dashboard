@@ -85,7 +85,12 @@ export default function DriveFilePicker({ onAttach }: DriveFilePickerProps) {
     try {
       const { accessToken } = await getDriveAccessToken(token);
       const uploaded = await uploadDriveFile(accessToken, driveId, path[path.length - 1]?.id, file);
-      onAttach({ driveFileId: uploaded.id, name: uploaded.name, webViewLink: uploaded.webViewLink, mimeType: uploaded.mimeType });
+      onAttach({
+        driveFileId: uploaded.id,
+        name: uploaded.name,
+        webViewLink: uploaded.webViewLink,
+        mimeType: uploaded.mimeType,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to upload file');
     } finally {
@@ -106,10 +111,10 @@ export default function DriveFilePicker({ onAttach }: DriveFilePickerProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-sm text-gray-500">Attach a file</span>
         <div className="flex rounded-lg bg-gray-100 p-0.5">
-          {([
+          {[
             { value: 'upload' as const, label: 'Upload file', icon: Upload },
             { value: 'browse' as const, label: 'Add from Drive', icon: FolderOpen },
-          ]).map(({ value, label, icon: Icon }) => (
+          ].map(({ value, label, icon: Icon }) => (
             <button
               key={value}
               type="button"
@@ -145,7 +150,12 @@ export default function DriveFilePicker({ onAttach }: DriveFilePickerProps) {
         <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#3D6C94] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#2A4A63]">
           <Upload className="h-4 w-4" />
           {uploading ? 'Uploading…' : 'Choose a file from your computer'}
-          <input type="file" className="hidden" disabled={uploading} onChange={(e) => handleFilePicked(e.target.files?.[0])} />
+          <input
+            type="file"
+            className="hidden"
+            disabled={uploading}
+            onChange={(e) => handleFilePicked(e.target.files?.[0])}
+          />
         </label>
       ) : (
         <>

@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { getEventById } from '@/services/events-api';
-import { itemColor, formatFullDate, formatTime, CALENDAR_EVENTS_CHANGED_EVENT, type CalendarItem } from '@/lib/calendar';
+import {
+  itemColor,
+  formatFullDate,
+  formatTime,
+  CALENDAR_EVENTS_CHANGED_EVENT,
+  type CalendarItem,
+} from '@/lib/calendar';
 import { useCalendarContext } from './CalendarContext';
 import EventDetailModal from './EventDetailModal';
 

@@ -177,8 +177,13 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
     if (filter !== 'ALL' && r.status !== filter) return false;
     if (typeFilter !== 'ALL' && r.requestType !== typeFilter) return false;
     if (!needle) return true;
-    return [r.title, r.requesterName ?? '', r.typeLabel, portLabel(r.targetPort), ...r.answers.map((a) => a.value)]
-      .some((text) => text.toLowerCase().includes(needle));
+    return [
+      r.title,
+      r.requesterName ?? '',
+      r.typeLabel,
+      portLabel(r.targetPort),
+      ...r.answers.map((a) => a.value),
+    ].some((text) => text.toLowerCase().includes(needle));
   });
   const narrowed = filter !== 'ALL' || typeFilter !== 'ALL' || needle !== '';
 
@@ -188,10 +193,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
 
   const pendingCount = stream.filter((r) => r.status === 'pending').length;
   const overdueCount = stream.filter(
-    (r) =>
-      r.status !== 'completed' &&
-      r.status !== 'rejected' &&
-      dueBadge(r.neededBy)?.label === 'Overdue',
+    (r) => r.status !== 'completed' && r.status !== 'rejected' && dueBadge(r.neededBy)?.label === 'Overdue',
   ).length;
 
   function replace(updated: RequestDetail) {
@@ -282,9 +284,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
 
   function toggleDraft(member: Member) {
     setDraftAssignees((prev) =>
-      prev.some((m) => m.id === member.id)
-        ? prev.filter((m) => m.id !== member.id)
-        : [...prev, member],
+      prev.some((m) => m.id === member.id) ? prev.filter((m) => m.id !== member.id) : [...prev, member],
     );
   }
 
@@ -322,10 +322,12 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
 
       {/* STREAM TABS */}
       <div className="mt-5 flex gap-1 overflow-x-auto border-b border-gray-200">
-        {([
-          ...(handlesAny ? [{ value: 'inbox' as Tab, label: 'To action', icon: Inbox, count: streams.inbox.length }] : []),
+        {[
+          ...(handlesAny
+            ? [{ value: 'inbox' as Tab, label: 'To action', icon: Inbox, count: streams.inbox.length }]
+            : []),
           { value: 'mine' as Tab, label: 'My requests', icon: Send, count: streams.mine.length },
-        ]).map(({ value, label, icon: Icon, count }) => (
+        ].map(({ value, label, icon: Icon, count }) => (
           <button
             key={value}
             onClick={() => {
@@ -337,9 +339,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
               setActionError('');
             }}
             className={`flex shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-bold transition-colors sm:px-4 ${
-              tab === value
-                ? 'border-[#3D6C94] text-[#3D6C94]'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
+              tab === value ? 'border-[#3D6C94] text-[#3D6C94]' : 'border-transparent text-gray-400 hover:text-gray-600'
             }`}
           >
             <Icon className="h-4 w-4" />
@@ -427,9 +427,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
                       setActionError('');
                     }}
                     className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
-                      isSelected
-                        ? 'bg-[#B1C9DC]/20 shadow-[inset_3px_0_0_#3D6C94]'
-                        : 'hover:bg-gray-50'
+                      isSelected ? 'bg-[#B1C9DC]/20 shadow-[inset_3px_0_0_#3D6C94]' : 'hover:bg-gray-50'
                     }`}
                   >
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -438,9 +436,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
                           aria-hidden="true"
                           className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOTS[request.status]}`}
                         />
-                        <span className="truncate text-sm font-bold text-gray-900">
-                          {request.title}
-                        </span>
+                        <span className="truncate text-sm font-bold text-gray-900">{request.title}</span>
                       </span>
                       <span className="truncate pl-4 font-mono text-[11px] text-gray-400">
                         {tab === 'mine' ? `to ${portLabel(request.targetPort)}` : request.typeLabel}
@@ -454,9 +450,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
                         >
                           {due.label}
                         </span>
-                        <span className="font-mono text-[10px] text-gray-400">
-                          {formatDate(request.neededBy!)}
-                        </span>
+                        <span className="font-mono text-[10px] text-gray-400">{formatDate(request.neededBy!)}</span>
                       </span>
                     )}
                   </button>
@@ -467,7 +461,10 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
 
           {/* DETAIL */}
           {selected && (
-            <div ref={detailRef} className="scroll-mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div
+              ref={detailRef}
+              className="scroll-mt-4 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm"
+            >
               <div className={`h-2 ${STATUS_STRIPS[selected.status]}`} />
 
               <div className="flex flex-wrap items-start justify-between gap-3 px-6 py-5">
@@ -490,9 +487,7 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
               {/* WHY IT WAS TURNED DOWN */}
               {selected.status === 'rejected' && selected.rejectionReason && (
                 <div className="border-t border-gray-200 bg-[#F1C4C9]/25 px-6 py-4">
-                  <span className="text-xs font-bold uppercase tracking-wide text-[#8B2E38]">
-                    Reason
-                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-[#8B2E38]">Reason</span>
                   <p className="mt-1 text-sm text-gray-800">{selected.rejectionReason}</p>
                 </div>
               )}
@@ -518,48 +513,44 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
 
               {selected.assignable &&
                 (selected.status === 'in_progress' ||
-                selected.status === 'approved' ||
-                selected.status === 'completed') && (
-                <div className="border-t border-gray-200 px-6 py-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                      Assigned to
-                    </span>
+                  selected.status === 'approved' ||
+                  selected.status === 'completed') && (
+                  <div className="border-t border-gray-200 px-6 py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Assigned to</span>
 
-                    {selected.assignees.length === 0 && (
-                      <span className="font-mono text-xs text-gray-400">No one yet</span>
-                    )}
+                      {selected.assignees.length === 0 && (
+                        <span className="font-mono text-xs text-gray-400">No one yet</span>
+                      )}
 
-                    {selected.assignees.map((member) => (
-                      <span
-                        key={member.id}
-                        className="flex items-center gap-1.5 rounded-full bg-[#B1C9DC]/30 py-0.5 pl-1 pr-2.5 text-xs font-bold text-gray-700"
-                      >
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#B1C9DC] font-mono text-[9px] text-white">
-                          {initials(member.name)}
+                      {selected.assignees.map((member) => (
+                        <span
+                          key={member.id}
+                          className="flex items-center gap-1.5 rounded-full bg-[#B1C9DC]/30 py-0.5 pl-1 pr-2.5 text-xs font-bold text-gray-700"
+                        >
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#B1C9DC] font-mono text-[9px] text-white">
+                            {initials(member.name)}
+                          </span>
+                          {member.id === currentUserId ? 'You' : member.name}
                         </span>
-                        {member.id === currentUserId ? 'You' : member.name}
-                      </span>
-                    ))}
+                      ))}
 
-                    {canAction && selected.status === 'in_progress' && (
-                      <button
-                        onClick={() => openAssign(selected, 'edit')}
-                        className="flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-2.5 py-1 text-xs font-bold text-gray-500 transition-colors hover:border-[#B1C9DC] hover:text-[#3D6C94]"
-                      >
-                        <Plus className="h-3 w-3" />
-                        Edit
-                      </button>
+                      {canAction && selected.status === 'in_progress' && (
+                        <button
+                          onClick={() => openAssign(selected, 'edit')}
+                          className="flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-2.5 py-1 text-xs font-bold text-gray-500 transition-colors hover:border-[#B1C9DC] hover:text-[#3D6C94]"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Edit
+                        </button>
+                      )}
+                    </div>
+
+                    {selected.notes && (
+                      <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">{selected.notes}</p>
                     )}
                   </div>
-
-                  {selected.notes && (
-                    <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-                      {selected.notes}
-                    </p>
-                  )}
-                </div>
-              )}
+                )}
 
               {selected.answers.length > 0 && (
                 <div className="border-t border-gray-200 px-6 py-2">
@@ -624,7 +615,6 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
                       Reject
                     </button>
                   )}
-
                 </div>
               )}
             </div>
@@ -641,56 +631,51 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
         >
           <div className="mt-6 flex flex-col gap-5">
             {selected.assignable ? (
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                Assign to
-              </span>
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Assign to</span>
 
-              {membersError ? (
-                <p className="text-xs font-bold text-[#8B2E38]">{membersError}</p>
-              ) : membersLoading ? (
-                <p className="font-mono text-xs text-gray-400">Loading {portLabel(selected.targetPort)} members…</p>
-              ) : (
-                members.length === 0 && (
-                  <p className="font-mono text-xs text-gray-400">
-                    No active members in {portLabel(selected.targetPort)} to assign.
+                {membersError ? (
+                  <p className="text-xs font-bold text-[#8B2E38]">{membersError}</p>
+                ) : membersLoading ? (
+                  <p className="font-mono text-xs text-gray-400">Loading {portLabel(selected.targetPort)} members…</p>
+                ) : (
+                  members.length === 0 && (
+                    <p className="font-mono text-xs text-gray-400">
+                      No active members in {portLabel(selected.targetPort)} to assign.
+                    </p>
+                  )
+                )}
+                {droppedAssignees.length > 0 && (
+                  <p className="text-xs text-gray-500">
+                    {droppedAssignees.map((m) => m.name).join(', ')} {droppedAssignees.length === 1 ? 'is' : 'are'} no
+                    longer active in {portLabel(selected.targetPort)}, so saving takes them off this request.
                   </p>
-                )
-              )}
-              {droppedAssignees.length > 0 && (
-                <p className="text-xs text-gray-500">
-                  {droppedAssignees.map((m) => m.name).join(', ')}{' '}
-                  {droppedAssignees.length === 1 ? 'is' : 'are'} no longer active in {portLabel(selected.targetPort)}, so
-                  saving takes them off this request.
-                </p>
-              )}
+                )}
 
-              <div className="grid gap-1 sm:grid-cols-2">
-                {members.map((member) => {
-                  const isOn = draftAssignees.some((m) => m.id === member.id);
-                  return (
-                    <button
-                      key={member.id}
-                      type="button"
-                      onClick={() => toggleDraft(member)}
-                      className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                        isOn
-                          ? 'bg-[#B1C9DC]/20 font-bold text-gray-900'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#B1C9DC] font-mono text-[9px] text-white">
-                          {initials(member.name)}
+                <div className="grid gap-1 sm:grid-cols-2">
+                  {members.map((member) => {
+                    const isOn = draftAssignees.some((m) => m.id === member.id);
+                    return (
+                      <button
+                        key={member.id}
+                        type="button"
+                        onClick={() => toggleDraft(member)}
+                        className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                          isOn ? 'bg-[#B1C9DC]/20 font-bold text-gray-900' : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#B1C9DC] font-mono text-[9px] text-white">
+                            {initials(member.name)}
+                          </span>
+                          {member.id === currentUserId ? `${member.name} (you)` : member.name}
                         </span>
-                        {member.id === currentUserId ? `${member.name} (you)` : member.name}
-                      </span>
-                      {isOn && <Check className="h-4 w-4 shrink-0 text-[#3D6C94]" />}
-                    </button>
-                  );
-                })}
+                        {isOn && <Check className="h-4 w-4 shrink-0 text-[#3D6C94]" />}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
             ) : (
               <p className="text-sm text-gray-600">
                 {selected.approverTask
@@ -700,19 +685,23 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
             )}
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">
-                Notes
-              </span>
+              <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Notes</span>
               <textarea
                 rows={3}
                 value={draftNotes}
                 onChange={(e) => setDraftNotes(e.target.value)}
-                placeholder={selected.assignable ? 'Anything whoever picks this up should know' : 'For your own reference'}
+                placeholder={
+                  selected.assignable ? 'Anything whoever picks this up should know' : 'For your own reference'
+                }
                 className={`${inputStyles} resize-none`}
               />
             </label>
 
-            {actionError && <p role="alert" className="text-xs font-bold text-[#8B2E38]">{actionError}</p>}
+            {actionError && (
+              <p role="alert" className="text-xs font-bold text-[#8B2E38]">
+                {actionError}
+              </p>
+            )}
 
             <div className="flex gap-3">
               <button
@@ -752,7 +741,11 @@ export default function RequestsView({ data, currentUserId, port }: RequestsView
               />
             </label>
 
-            {actionError && <p role="alert" className="text-xs font-bold text-[#8B2E38]">{actionError}</p>}
+            {actionError && (
+              <p role="alert" className="text-xs font-bold text-[#8B2E38]">
+                {actionError}
+              </p>
+            )}
 
             <div className="flex gap-3">
               <button

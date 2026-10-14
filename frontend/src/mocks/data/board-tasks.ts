@@ -2,9 +2,11 @@ import type { BoardTask, TaskAssignee } from '@/types/tasks';
 import { at } from '@/mocks/data/date-helpers';
 import { mockMembers } from '@/mocks/data/members';
 
-const [riley, sam, alex, jordan, priya, dana] = mockMembers.map(
-  (m): TaskAssignee => ({ id: m.id, name: m.name, port: m.port }),
-);
+const [riley, sam, alex, jordan, priya, dana] = mockMembers.map((m): TaskAssignee => ({
+  id: m.id,
+  name: m.name,
+  port: m.port,
+}));
 const by = (a: TaskAssignee) => ({ id: a.id, name: a.name });
 
 /* The Publications port's board. Spread across all four task_status values,
